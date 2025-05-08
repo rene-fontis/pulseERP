@@ -35,13 +35,13 @@ body {
     --radius: 0.5rem;
 
     /* Sidebar Theme - Light */
-    --sidebar-background: 0 0% 100%; /* White */
-    --sidebar-foreground: 224 71.4% 4.1%; /* Dark Blue/Black */
-    --sidebar-primary: 210 17% 95%; /* Very Light Gray for active item background */
-    --sidebar-primary-foreground: 207 100% 50%; /* Turquoise for active item text */
-    --sidebar-accent: 210 17% 90%; /* Muted Gray for hover background */
-    --sidebar-accent-foreground: 224 71.4% 4.1%; /* Dark Blue/Black for hover text */
-    --sidebar-border: 210 17% 85%; /* Light Gray border */
+    --sidebar-background: 210 20% 96%; /* Even Lighter Gray, e.g., #F5F7F9 */
+    --sidebar-foreground: 224 70% 15%; /* Darker Gray for text, e.g., #212936 */
+    --sidebar-primary: 207 90% 54%; /* Slightly brighter Turquoise for active item background */
+    --sidebar-primary-foreground: 0 0% 100%; /* White for active item text */
+    --sidebar-accent: 210 20% 90%; /* Light Gray for hover background, e.g., #E5E9EC */
+    --sidebar-accent-foreground: 207 90% 45%; /* Darker Turquoise for hover text for better contrast */
+    --sidebar-border: 210 17% 88%; /* Slightly lighter gray border, e.g., #DDE1E6 */
     --sidebar-ring: 207 100% 50%; /* Turquoise ring */
   }
   .dark {
@@ -71,15 +71,15 @@ body {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* Dark Sidebar Theme */
-    --sidebar-background: 224 71.4% 5.1%; /* Dark (matches card background) */
-    --sidebar-foreground: 210 17% 98%; /* Light Gray (matches card foreground) */
-    --sidebar-primary: 224 71.4% 10%; /* Slightly lighter dark shade for active item background */
-    --sidebar-primary-foreground: 207 100% 50%; /* Turquoise for active item text */
-    --sidebar-accent: 210 17% 15%; /* Dark Muted Gray for hover background */
-    --sidebar-accent-foreground: 210 17% 98%; /* Light Gray for hover text */
-    --sidebar-border: 210 17% 20%; /* Dark border color */
-    --sidebar-ring: 207 100% 50%; /* Turquoise ring */
+    /* Dark Sidebar Theme - Kept as original for contrast */
+    --sidebar-background: 224 71.4% 5.1%; 
+    --sidebar-foreground: 210 17% 98%; 
+    --sidebar-primary: 224 71.4% 10%; 
+    --sidebar-primary-foreground: 207 100% 50%; 
+    --sidebar-accent: 210 17% 15%; 
+    --sidebar-accent-foreground: 210 17% 98%; 
+    --sidebar-border: 210 17% 20%; 
+    --sidebar-ring: 207 100% 50%; 
   }
 }
 

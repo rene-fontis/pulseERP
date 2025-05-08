@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, Edit, Trash2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 export default function ManageTenantsPage() {
   const { data: tenants, isLoading, error } = useGetTenants();
@@ -34,14 +35,31 @@ export default function ManageTenantsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (tenants) {
+      const newFormattedDates: Record<string, string> = {};
+      tenants.forEach(tenant => {
+        try {
+          newFormattedDates[tenant.id] = format(new Date(tenant.createdAt), "PPP p", { locale: de });
+        } catch (e) {
+          console.error("Error formatting date for tenant:", tenant.id, e);
+          newFormattedDates[tenant.id] = "Ungültiges Datum";
+        }
+      });
+      setFormattedDates(newFormattedDates);
+    }
+  }, [tenants]);
+
 
   const handleCreateTenant = async (values: { name: string }) => {
     try {
       await addTenantMutation.mutateAsync(values.name);
-      toast({ title: "Success", description: "Tenant created successfully.", variant: "default" });
+      toast({ title: "Erfolg", description: "Mandant erfolgreich erstellt.", variant: "default" });
       setIsCreateModalOpen(false);
     } catch (e) {
-      toast({ title: "Error", description: "Failed to create tenant.", variant: "destructive" });
+      toast({ title: "Fehler", description: "Mandant konnte nicht erstellt werden.", variant: "destructive" });
     }
   };
 
@@ -54,20 +72,20 @@ export default function ManageTenantsPage() {
     if (!selectedTenant) return;
     try {
       await updateTenantMutation.mutateAsync({ id: selectedTenant.id, name: values.name });
-      toast({ title: "Success", description: "Tenant updated successfully.", variant: "default" });
+      toast({ title: "Erfolg", description: "Mandant erfolgreich aktualisiert.", variant: "default" });
       setIsEditModalOpen(false);
       setSelectedTenant(null);
     } catch (e) {
-      toast({ title: "Error", description: "Failed to update tenant.", variant: "destructive" });
+      toast({ title: "Fehler", description: "Mandant konnte nicht aktualisiert werden.", variant: "destructive" });
     }
   };
 
   const handleDeleteTenant = async (tenantId: string) => {
     try {
       await deleteTenantMutation.mutateAsync(tenantId);
-      toast({ title: "Success", description: "Tenant deleted successfully.", variant: "default" });
+      toast({ title: "Erfolg", description: "Mandant erfolgreich gelöscht.", variant: "default" });
     } catch (e) {
-      toast({ title: "Error", description: "Failed to delete tenant.", variant: "destructive" });
+      toast({ title: "Fehler", description: "Mandant konnte nicht gelöscht werden.", variant: "destructive" });
     }
   };
 
@@ -75,7 +93,7 @@ export default function ManageTenantsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive">
         <AlertCircle className="w-16 h-16 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Error Loading Tenants</h2>
+        <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Mandanten</h2>
         <p>{error.message}</p>
       </div>
     );
@@ -87,19 +105,19 @@ export default function ManageTenantsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div className="flex items-center">
             <Building2 className="h-6 w-6 mr-3 text-primary" />
-            <CardTitle className="text-2xl font-bold">Tenant Management</CardTitle>
+            <CardTitle className="text-2xl font-bold">Mandantenverwaltung</CardTitle>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
               <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <PlusCircle className="mr-2 h-4 w-4" /> Create Tenant
+                <PlusCircle className="mr-2 h-4 w-4" /> Mandant erstellen
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Create New Tenant</DialogTitle>
+                <DialogTitle>Neuen Mandant erstellen</DialogTitle>
                 <DialogDescription>
-                  Enter the name for the new tenant.
+                  Geben Sie den Namen für den neuen Mandanten ein.
                 </DialogDescription>
               </DialogHeader>
               <TenantForm onSubmit={handleCreateTenant} isSubmitting={addTenantMutation.isPending} />
@@ -127,42 +145,42 @@ export default function ManageTenantsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[200px]">Name</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Erstellt am</TableHead>
+                    <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tenants && tenants.length > 0 ? tenants.map((tenant) => (
                     <TableRow key={tenant.id}>
                       <TableCell className="font-medium">{tenant.name}</TableCell>
-                      <TableCell>{format(new Date(tenant.createdAt), "PPP p")}</TableCell>
+                      <TableCell>{formattedDates[tenant.id] || 'Lädt...'}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="icon" onClick={() => handleEditTenant(tenant)}>
                           <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit Tenant</span>
+                          <span className="sr-only">Mandant bearbeiten</span>
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="icon">
                               <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete Tenant</span>
+                              <span className="sr-only">Mandant löschen</span>
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the tenant "{tenant.name}".
+                                Diese Aktion kann nicht rückgängig gemacht werden. Dadurch wird der Mandant "{tenant.name}" dauerhaft gelöscht.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleDeleteTenant(tenant.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 disabled={deleteTenantMutation.isPending}
                               >
-                                {deleteTenantMutation.isPending && deleteTenantMutation.variables === tenant.id ? 'Deleting...' : 'Delete'}
+                                {deleteTenantMutation.isPending && deleteTenantMutation.variables === tenant.id ? 'Löschen...' : 'Löschen'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -172,7 +190,7 @@ export default function ManageTenantsPage() {
                   )) : (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
-                        No tenants found. Get started by creating one!
+                        Keine Mandanten gefunden. Erstellen Sie einen, um loszulegen!
                       </TableCell>
                     </TableRow>
                   )}
@@ -189,9 +207,9 @@ export default function ManageTenantsPage() {
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Edit Tenant</DialogTitle>
+            <DialogTitle>Mandant bearbeiten</DialogTitle>
             <DialogDescription>
-              Update the name for tenant: {selectedTenant?.name}.
+              Aktualisieren Sie den Namen für den Mandanten: {selectedTenant?.name}.
             </DialogDescription>
           </DialogHeader>
           <TenantForm 

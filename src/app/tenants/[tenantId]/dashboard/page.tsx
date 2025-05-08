@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LayoutDashboard, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, Users, DollarSign, ListChecks } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,7 +28,7 @@ export default function TenantDashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive">
         <AlertCircle className="w-16 h-16 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Error Loading Tenant Data</h2>
+        <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Mandantendaten</h2>
         <p>{error.message}</p>
       </div>
     );
@@ -38,8 +38,8 @@ export default function TenantDashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
         <AlertCircle className="w-16 h-16 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Tenant Not Found</h2>
-        <p>The requested tenant could not be found.</p>
+        <h2 className="text-2xl font-semibold mb-2">Mandant nicht gefunden</h2>
+        <p>Der angeforderte Mandant konnte nicht gefunden werden.</p>
       </div>
     );
   }
@@ -53,38 +53,41 @@ export default function TenantDashboardPage() {
             <CardTitle className="text-3xl font-bold">Dashboard: {tenant.name}</CardTitle>
           </div>
           <CardDescription className="text-lg">
-            Overview and key metrics for {tenant.name}.
+            Übersicht und Kennzahlen für {tenant.name}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Active Users</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xl font-medium">Aktive Benutzer</CardTitle>
+                <Users className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className="text-4xl font-bold">1,234</p>
-                <p className="text-sm text-muted-foreground">+5.2% from last month</p>
+                <p className="text-4xl font-bold">1.234</p>
+                <p className="text-xs text-muted-foreground">+5,2% zum Vormonat</p>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Revenue</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xl font-medium">Umsatz</CardTitle>
+                <DollarSign className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className="text-4xl font-bold">$56,789</p>
-                <p className="text-sm text-muted-foreground">+12.8% from last month</p>
+                <p className="text-4xl font-bold">56.789 €</p>
+                <p className="text-xs text-muted-foreground">+12,8% zum Vormonat</p>
               </CardContent>
             </Card>
             <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-xl">Recent Activity</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xl font-medium">Letzte Aktivitäten</CardTitle>
+                <ListChecks className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  <li className="text-sm">User John Doe signed up.</li>
-                  <li className="text-sm">Invoice #INV-001 paid.</li>
-                  <li className="text-sm">New support ticket #TKT-102 opened.</li>
+                  <li className="text-sm">Benutzer Max Mustermann hat sich registriert.</li>
+                  <li className="text-sm">Rechnung #INV-001 wurde bezahlt.</li>
+                  <li className="text-sm">Neues Support-Ticket #TKT-102 wurde eröffnet.</li>
                 </ul>
               </CardContent>
             </Card>

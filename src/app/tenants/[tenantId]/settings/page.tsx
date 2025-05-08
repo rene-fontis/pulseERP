@@ -33,7 +33,7 @@ export default function TenantSettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive">
         <AlertCircle className="w-16 h-16 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Error Loading Tenant Settings</h2>
+        <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Mandanteneinstellungen</h2>
         <p>{error.message}</p>
       </div>
     );
@@ -43,8 +43,8 @@ export default function TenantSettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
         <AlertCircle className="w-16 h-16 mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Tenant Not Found</h2>
-        <p>The requested tenant could not be found.</p>
+        <h2 className="text-2xl font-semibold mb-2">Mandant nicht gefunden</h2>
+        <p>Der angeforderte Mandant konnte nicht gefunden werden.</p>
       </div>
     );
   }
@@ -55,30 +55,30 @@ export default function TenantSettingsPage() {
         <CardHeader>
           <div className="flex items-center mb-2">
             <Settings className="h-8 w-8 mr-3 text-primary" />
-            <CardTitle className="text-3xl font-bold">Settings: {tenant.name}</CardTitle>
+            <CardTitle className="text-3xl font-bold">Einstellungen: {tenant.name}</CardTitle>
           </div>
           <CardDescription className="text-lg">
-            Configure settings and preferences for {tenant.name}.
+            Konfigurieren Sie Einstellungen und Präferenzen für {tenant.name}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="tenant-name">Tenant Name</Label>
+            <Label htmlFor="tenant-name">Mandantenname</Label>
             <Input id="tenant-name" defaultValue={tenant.name} />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="timezone">Timezone</Label>
-            <Input id="timezone" placeholder="e.g., (GMT-05:00) Eastern Time" />
+            <Label htmlFor="timezone">Zeitzone</Label>
+            <Input id="timezone" placeholder="z.B. (GMT+01:00) Mitteleuropäische Zeit" />
           </div>
           
           <div className="flex items-center space-x-2">
             <Switch id="notifications-enabled" />
-            <Label htmlFor="notifications-enabled">Enable Email Notifications</Label>
+            <Label htmlFor="notifications-enabled">E-Mail-Benachrichtigungen aktivieren</Label>
           </div>
 
           <div className="border-t pt-6">
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Änderungen speichern</Button>
           </div>
         </CardContent>
       </Card>

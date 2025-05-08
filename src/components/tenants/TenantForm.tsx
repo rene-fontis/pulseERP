@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import type { Tenant } from '@/types';
 
 const formSchema = z.object({
-  name: z.string().min(2, { message: "Tenant name must be at least 2 characters." }),
+  name: z.string().min(2, { message: "Mandantenname muss mindestens 2 Zeichen lang sein." }),
 });
 
 type TenantFormValues = z.infer<typeof formSchema>;
@@ -38,16 +38,16 @@ export function TenantForm({ onSubmit, initialData, isSubmitting }: TenantFormPr
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tenant Name</FormLabel>
+              <FormLabel>Mandantenname</FormLabel>
               <FormControl>
-                <Input placeholder="Enter tenant name" {...field} />
+                <Input placeholder="Mandantenname eingeben" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Tenant')}
+          {isSubmitting ? 'Speichern...' : (initialData ? 'Änderungen speichern' : 'Mandant erstellen')}
         </Button>
       </form>
     </Form>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { Building2, LayoutDashboard, Settings, ChevronDown, ChevronRight, HomeIcon } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -12,14 +12,12 @@ import {
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarMenuSkeleton,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useGetTenants } from '@/hooks/useTenants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import * as React from 'react';
 
 export function AppSidebar() {
@@ -53,11 +51,11 @@ export function AppSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/'}
-                tooltip="Home"
+                tooltip="Startseite"
               >
                 <Link href="/">
-                  <LayoutDashboard />
-                  <span>Home</span>
+                  <HomeIcon />
+                  <span>Startseite</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -67,7 +65,7 @@ export function AppSidebar() {
                 "px-4 py-2 text-xs font-semibold text-sidebar-foreground/70",
                 sidebarState === 'collapsed' && "hidden"
               )}>
-                TENANTS
+                MANDANTEN
               </div>
                {sidebarState === 'collapsed' && <div className="my-2 border-t border-sidebar-border mx-2"></div>}
             </SidebarMenuItem>
@@ -115,7 +113,7 @@ export function AppSidebar() {
                       >
                         <Link href={`/tenants/${tenant.id}/settings`}>
                            <Settings size={14} className="mr-1.5" />
-                          Settings
+                          Einstellungen
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

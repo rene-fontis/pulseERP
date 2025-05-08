@@ -11,18 +11,18 @@ export default function Home() {
           <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
             <Users className="h-10 w-10" />
           </div>
-          <CardTitle className="text-3xl font-bold">Welcome to pulseERP</CardTitle>
+          <CardTitle className="text-3xl font-bold">Willkommen bei pulseERP</CardTitle>
           <CardDescription className="text-lg text-muted-foreground">
-            Your streamlined solution for tenant management.
+            Ihre optimierte Lösung für die Mandantenverwaltung.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
           <p className="mb-6">
-            Efficiently manage your tenants, access dashboards, and configure settings all in one place.
+            Verwalten Sie Ihre Mandanten effizient, greifen Sie auf Dashboards zu und konfigurieren Sie Einstellungen – alles an einem Ort.
           </p>
           <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
             <Link href="/manage-tenants">
-              Manage Tenants
+              Mandanten verwalten
             </Link>
           </Button>
         </CardContent>

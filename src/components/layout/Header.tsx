@@ -22,7 +22,7 @@ export function Header() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/manage-tenants">
             <Settings className="mr-2 h-4 w-4" />
-            Manage Tenants
+            Mandanten verwalten
           </Link>
         </Button>
         {/* Future user menu can go here */}
