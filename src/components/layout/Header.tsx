@@ -58,23 +58,22 @@ export function Header() {
   const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
   const divBaseClasses = "flex items-center gap-2";
 
-  // Dynamic classes based on client state to fix hydration
-  // Server (and initial client) renders header with padding, inner divs without
-  // Client post-hydration renders header without padding, inner divs with padding for 100% width effect
-  const headerDynamicClasses = !isClient ? "px-4 sm:px-6" : "";
-  const leftDivDynamicClasses = isClient ? "pl-4 sm:pl-6" : "";
-  const rightDivDynamicClasses = isClient ? "pr-4 sm:pr-6" : "";
+  // Header itself has no dynamic padding, ensuring it's 100% wide.
+  // Padding for inner content is applied consistently on server and client.
+  const headerDynamicClasses = ""; 
+  const leftDivPaddingClasses = "pl-4 sm:pl-6";
+  const rightDivPaddingClasses = "pr-4 sm:pr-6";
 
   return (
     <header className={cn(headerBaseClasses, headerDynamicClasses)}>
-      <div className={cn(divBaseClasses, leftDivDynamicClasses)}>
+      <div className={cn(divBaseClasses, leftDivPaddingClasses)}>
         {isClient && isMobile && <SidebarTrigger />}
         <Link href="/" className="flex items-center gap-2">
           <Briefcase className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold">pulseERP</h1>
         </Link>
       </div>
-      <nav className={cn(divBaseClasses, rightDivDynamicClasses)}>
+      <nav className={cn(divBaseClasses, rightDivPaddingClasses)}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
@@ -114,3 +113,4 @@ export function Header() {
     </header>
   );
 }
+
