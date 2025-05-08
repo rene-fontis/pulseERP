@@ -48,15 +48,15 @@ export function Header() {
   const isTenantSelectedAndOnTenantPage = !!(activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`));
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 text-card-foreground shadow-md sm:px-6">
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md">
+      <div className="flex items-center gap-2 pl-4 sm:pl-6"> {/* Added padding here */}
         {isMobile && <SidebarTrigger />}
         <Link href="/" className="flex items-center gap-2">
           <Briefcase className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold">pulseERP</h1>
         </Link>
       </div>
-      <nav className="flex items-center gap-2">
+      <nav className="flex items-center gap-2 pr-4 sm:pr-6"> {/* Added padding here */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
