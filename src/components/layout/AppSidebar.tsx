@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, ChevronDown, ChevronRight, HomeIcon } from 'lucide-react';
+import { Building2, LayoutDashboard, Settings, HomeIcon } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -10,34 +10,35 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSkeleton,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useGetTenants } from '@/hooks/useTenants';
+import { useGetTenantById } from '@/hooks/useTenants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as React from 'react';
 
 export function AppSidebar() {
-  const { data: tenants, isLoading: isLoadingTenants } = useGetTenants();
   const pathname = usePathname();
   const params = useParams();
   const currentTenantId = params.tenantId as string | undefined;
-  const { state: sidebarState } = useSidebar();
-  const [openTenantSubMenu, setOpenTenantSubMenu] = React.useState<{ [key: string]: boolean }>({});
+  const { data: activeTenant, isLoading: isLoadingActiveTenant } = useGetTenantById(currentTenantId);
+  const { state: sidebarState, isMobile } = useSidebar();
 
-  const toggleTenantSubMenu = (tenantId: string) => {
-    setOpenTenantSubMenu(prev => ({ ...prev, [tenantId]: !prev[tenantId] }));
-  };
-  
-  React.useEffect(() => {
-    if (currentTenantId) {
-      setOpenTenantSubMenu(prev => ({ ...prev, [currentTenantId]: true }));
-    }
-  }, [currentTenantId]);
-
+  const commonMandantenVerwaltenButton = (
+     <SidebarMenuItem>
+        <SidebarMenuButton
+            asChild
+            isActive={pathname === '/manage-tenants'}
+            tooltip="Mandanten verwalten"
+        >
+            <Link href="/manage-tenants">
+                <Building2 /> 
+                <span>Mandanten verwalten</span>
+            </Link>
+        </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r">
@@ -60,67 +61,96 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
-            <SidebarMenuItem className="mt-4">
-              <div className={cn(
-                "px-4 py-2 text-xs font-semibold text-sidebar-foreground/70",
-                sidebarState === 'collapsed' && "hidden"
-              )}>
-                MANDANTEN
-              </div>
-               {sidebarState === 'collapsed' && <div className="my-2 border-t border-sidebar-border mx-2"></div>}
-            </SidebarMenuItem>
-
-            {isLoadingTenants && (
+            {currentTenantId ? (
               <>
-                <SidebarMenuSkeleton showIcon />
-                <SidebarMenuSkeleton showIcon />
+                {/* Active Tenant Section */}
+                <SidebarMenuItem className="mt-4">
+                  {sidebarState === 'expanded' || isMobile ? ( // Show text if expanded or on mobile (where it's always expanded)
+                    <div className={cn(
+                      "px-4 py-2 text-sm font-semibold text-sidebar-foreground truncate",
+                    )}>
+                      {isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
+                    </div>
+                  ) : sidebarState === 'collapsed' && !isMobile ? ( // Show icon button if collapsed and not mobile
+                    <SidebarMenuButton 
+                      tooltip={isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
+                      asChild={false} 
+                      className="flex items-center justify-center w-full pointer-events-none"
+                      isActive={pathname.startsWith(`/tenants/${currentTenantId}`)} // Highlight if on any page of this tenant
+                    >
+                        <Building2 />
+                    </SidebarMenuButton>
+                  ) : null }
+                </SidebarMenuItem>
+
+                {isLoadingActiveTenant ? (
+                  <>
+                    <SidebarMenuSkeleton showIcon />
+                    <SidebarMenuSkeleton showIcon />
+                  </>
+                ) : activeTenant ? (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/tenants/${currentTenantId}/dashboard`}
+                        tooltip="Dashboard"
+                      >
+                        <Link href={`/tenants/${currentTenantId}/dashboard`}>
+                          <LayoutDashboard />
+                          <span>Dashboard</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/tenants/${currentTenantId}/settings`}
+                        tooltip="Einstellungen"
+                      >
+                        <Link href={`/tenants/${currentTenantId}/settings`}>
+                          <Settings />
+                          <span>Einstellungen</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                ) : (
+                  // Case where tenantId is in URL but tenant not found/error
+                  !isLoadingActiveTenant && ( // Only show if not loading and tenant is null/undefined
+                     <SidebarMenuItem>
+                       <div className={cn(
+                          "px-4 py-2 text-xs text-sidebar-foreground/70",
+                           (sidebarState === 'collapsed' && !isMobile) && "hidden" // Hide if collapsed on desktop
+                        )}>
+                         Mandant nicht gefunden.
+                       </div>
+                     </SidebarMenuItem>
+                  )
+                )}
+                
+                {/* Separator after active tenant specific links, visible in expanded mode or if active tenant exists for collapsed mode */}
+                {((sidebarState === 'expanded' || isMobile) || (sidebarState === 'collapsed' && !isMobile && (activeTenant || isLoadingActiveTenant))) && 
+                    <div className="my-2 border-t border-sidebar-border mx-2"></div>
+                }
+                {commonMandantenVerwaltenButton}
+              </>
+            ) : (
+              <>
+                {/* "Mandanten" Heading when no tenant is active */}
+                <SidebarMenuItem className="mt-4">
+                  <div className={cn(
+                    "px-4 py-2 text-xs font-semibold text-sidebar-foreground/70",
+                    (sidebarState === 'collapsed' && !isMobile) && "hidden" // Hide if collapsed on desktop
+                  )}>
+                    MANDANTEN
+                  </div>
+                   {/* Separator for collapsed mode */}
+                  {(sidebarState === 'collapsed' && !isMobile) && <div className="my-2 border-t border-sidebar-border mx-2"></div>}
+                </SidebarMenuItem>
+                {commonMandantenVerwaltenButton}
               </>
             )}
-            
-            {tenants?.map((tenant) => (
-              <SidebarMenuItem key={tenant.id}>
-                <div className="relative">
-                  <SidebarMenuButton
-                    onClick={() => sidebarState === 'collapsed' ? {} : toggleTenantSubMenu(tenant.id)}
-                    isActive={currentTenantId === tenant.id && (pathname.startsWith(`/tenants/${tenant.id}`))}
-                    tooltip={tenant.name}
-                    className="justify-between"
-                  >
-                    <Link href={`/tenants/${tenant.id}/dashboard`} className="flex items-center gap-2 w-full" onClick={(e) => sidebarState === 'collapsed' ? null : e.preventDefault() }>
-                      <Building2 />
-                      <span>{tenant.name}</span>
-                    </Link>
-                    {sidebarState === 'expanded' && (openTenantSubMenu[tenant.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
-                  </SidebarMenuButton>
-                </div>
-                {sidebarState === 'expanded' && openTenantSubMenu[tenant.id] && (
-                  <SidebarMenuSub>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton
-                        asChild
-                        isActive={pathname === `/tenants/${tenant.id}/dashboard`}
-                      >
-                        <Link href={`/tenants/${tenant.id}/dashboard`}>
-                          <LayoutDashboard size={14} className="mr-1.5" />
-                          Dashboard
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton
-                        asChild
-                        isActive={pathname === `/tenants/${tenant.id}/settings`}
-                      >
-                        <Link href={`/tenants/${tenant.id}/settings`}>
-                           <Settings size={14} className="mr-1.5" />
-                          Einstellungen
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  </SidebarMenuSub>
-                )}
-              </SidebarMenuItem>
-            ))}
           </SidebarMenu>
         </SidebarContent>
       </ScrollArea>
