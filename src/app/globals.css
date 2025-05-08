@@ -34,18 +34,18 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar Theme */
-    --sidebar-background: 207 100% 50%; /* Turquoise */
-    --sidebar-foreground: 0 0% 98%; /* Almost White */
-    --sidebar-primary: 0 0% 98%; /* Active item background: White */
-    --sidebar-primary-foreground: 207 100% 50%; /* Active item text: Turquoise */
-    --sidebar-accent: 207 100% 60%; /* Hover background: Lighter Turquoise */
-    --sidebar-accent-foreground: 0 0% 98%; /* Hover text: Almost White */
-    --sidebar-border: 207 100% 45%; /* Border color: Darker Turquoise */
-    --sidebar-ring: 0 0% 98%; /* Ring for focus within sidebar */
+    /* Sidebar Theme - Light */
+    --sidebar-background: 0 0% 100%; /* White */
+    --sidebar-foreground: 224 71.4% 4.1%; /* Dark Blue/Black */
+    --sidebar-primary: 210 17% 95%; /* Very Light Gray for active item background */
+    --sidebar-primary-foreground: 207 100% 50%; /* Turquoise for active item text */
+    --sidebar-accent: 210 17% 90%; /* Muted Gray for hover background */
+    --sidebar-accent-foreground: 224 71.4% 4.1%; /* Dark Blue/Black for hover text */
+    --sidebar-border: 210 17% 85%; /* Light Gray border */
+    --sidebar-ring: 207 100% 50%; /* Turquoise ring */
   }
   .dark {
-    /* Dark theme adjustments - keeping similar logic but inverted */
+    /* Dark theme adjustments */
     --background: 224 71.4% 4.1%; /* Dark Blue/Black */
     --foreground: 210 17% 98%; /* Light Gray */
     --card: 224 71.4% 5.1%; /* Slightly lighter dark */
@@ -72,14 +72,14 @@ body {
     --chart-5: 340 75% 55%;
 
     /* Dark Sidebar Theme */
-    --sidebar-background: 207 100% 45%; /* Darker Turquoise */
-    --sidebar-foreground: 0 0% 98%; 
-    --sidebar-primary: 0 0% 98%; 
-    --sidebar-primary-foreground: 207 100% 45%; 
-    --sidebar-accent: 207 100% 55%; 
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 207 100% 40%;
-    --sidebar-ring: 0 0% 98%;
+    --sidebar-background: 224 71.4% 5.1%; /* Dark (matches card background) */
+    --sidebar-foreground: 210 17% 98%; /* Light Gray (matches card foreground) */
+    --sidebar-primary: 224 71.4% 10%; /* Slightly lighter dark shade for active item background */
+    --sidebar-primary-foreground: 207 100% 50%; /* Turquoise for active item text */
+    --sidebar-accent: 210 17% 15%; /* Dark Muted Gray for hover background */
+    --sidebar-accent-foreground: 210 17% 98%; /* Light Gray for hover text */
+    --sidebar-border: 210 17% 20%; /* Dark border color */
+    --sidebar-ring: 207 100% 50%; /* Turquoise ring */
   }
 }
 
