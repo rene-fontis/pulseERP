@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -60,20 +59,26 @@ export function Header() {
 
   // Header itself has no dynamic padding, ensuring it's 100% wide.
   // Padding for inner content is applied consistently on server and client.
-  const headerDynamicClasses = ""; 
+  const headerDynamicClasses = "";
   const leftDivPaddingClasses = "pl-4 sm:pl-6";
   const rightDivPaddingClasses = "pr-4 sm:pr-6";
 
+  // Construct class names directly using template literals to ensure explicitness
+  const headerClasses = `${headerBaseClasses} ${headerDynamicClasses}`.trim();
+  const leftDivClasses = `${divBaseClasses} ${leftDivPaddingClasses}`.trim();
+  const rightNavClasses = `${divBaseClasses} ${rightDivPaddingClasses}`.trim();
+
+
   return (
-    <header className={cn(headerBaseClasses, headerDynamicClasses)}>
-      <div className={cn(divBaseClasses, leftDivPaddingClasses)}>
+    <header className={headerClasses}>
+      <div className={leftDivClasses}>
         {isClient && isMobile && <SidebarTrigger />}
         <Link href="/" className="flex items-center gap-2">
           <Briefcase className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold">pulseERP</h1>
         </Link>
       </div>
-      <nav className={cn(divBaseClasses, rightDivPaddingClasses)}>
+      <nav className={rightNavClasses}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
@@ -113,4 +118,3 @@ export function Header() {
     </header>
   );
 }
-
