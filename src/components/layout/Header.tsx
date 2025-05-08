@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -15,7 +16,8 @@ import {
 import { useGetTenants } from '@/hooks/useTenants';
 import { useParams, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 export function Header() {
   const { isMobile } = useSidebar();
@@ -25,6 +27,11 @@ export function Header() {
   const currentTenantId = params.tenantId as string | undefined;
 
   const [activeTenantName, setActiveTenantName] = React.useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   React.useEffect(() => {
     if (currentTenantId && tenants) {
@@ -36,7 +43,7 @@ export function Header() {
   }, [currentTenantId, tenants]);
 
   const getTriggerLabel = () => {
-    if (isLoadingTenants && !activeTenantName) { // Show skeleton only if tenants list is loading and no active tenant name is set yet
+    if (isLoadingTenants && !activeTenantName) {
       return <Skeleton className="h-4 w-[150px]" />;
     }
     if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
@@ -47,16 +54,27 @@ export function Header() {
 
   const isTenantSelectedAndOnTenantPage = !!(activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`));
 
+  // Base classes that are always present
+  const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
+  const divBaseClasses = "flex items-center gap-2";
+
+  // Dynamic classes based on client state to fix hydration
+  // Server (and initial client) renders header with padding, inner divs without
+  // Client post-hydration renders header without padding, inner divs with padding for 100% width effect
+  const headerDynamicClasses = !isClient ? "px-4 sm:px-6" : "";
+  const leftDivDynamicClasses = isClient ? "pl-4 sm:pl-6" : "";
+  const rightDivDynamicClasses = isClient ? "pr-4 sm:pr-6" : "";
+
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md">
-      <div className="flex items-center gap-2 pl-4 sm:pl-6"> {/* Added padding here */}
-        {isMobile && <SidebarTrigger />}
+    <header className={cn(headerBaseClasses, headerDynamicClasses)}>
+      <div className={cn(divBaseClasses, leftDivDynamicClasses)}>
+        {isClient && isMobile && <SidebarTrigger />}
         <Link href="/" className="flex items-center gap-2">
           <Briefcase className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold">pulseERP</h1>
         </Link>
       </div>
-      <nav className="flex items-center gap-2 pr-4 sm:pr-6"> {/* Added padding here */}
+      <nav className={cn(divBaseClasses, rightDivDynamicClasses)}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
@@ -65,7 +83,7 @@ export function Header() {
               <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64"> {/* Increased width for potentially long names */}
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Mandant auswählen</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {isLoadingTenants ? (
@@ -74,7 +92,7 @@ export function Header() {
               </DropdownMenuItem>
             ) : (
               tenants?.map(tenant => (
-                <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId}>
+                <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)}>
                   <Link href={`/tenants/${tenant.id}/dashboard`}>{tenant.name}</Link>
                 </DropdownMenuItem>
               ))
