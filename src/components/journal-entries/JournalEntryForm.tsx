@@ -31,7 +31,7 @@ const dateValidation = (fiscalYear?: FiscalYear | null) => z.date({ required_err
 
 const journalEntryLineSchema = z.object({
   id: z.string().optional(),
-  accountId: z.string().min(1, "Konto ist erforderlich."),
+  accountId: z.string(), // Allow empty string initially. Validation moved to .refine
   debit: z.preprocess(
     (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number().optional()
@@ -43,11 +43,20 @@ const journalEntryLineSchema = z.object({
 }).refine(data => {
   const hasDebit = typeof data.debit === 'number' && data.debit !== 0;
   const hasCredit = typeof data.credit === 'number' && data.credit !== 0;
-  // Valid if: (debit and no credit) OR (credit and no debit) OR (no debit, no credit, and no accountId - allows for an truly empty line that might be removed)
-  return (hasDebit && !hasCredit) || (!hasDebit && hasCredit) || (!hasDebit && !hasCredit && (data.accountId === '' || data.accountId === undefined));
+
+  // If it's an empty line (no debit/credit), it's fine regardless of accountId.
+  if (!hasDebit && !hasCredit) return true;
+
+  // If it has debit or credit, then accountId must be non-empty.
+  if ((hasDebit || hasCredit) && (!data.accountId || data.accountId.trim() === '')) {
+    return false; 
+  }
+  
+  // Only one of debit/credit can have a value if amounts are present.
+  return (hasDebit && !hasCredit) || (!hasDebit && hasCredit);
 }, {
-  message: "Pro Zeile entweder Soll oder Haben > 0 angeben (nicht beides).",
-  path: ["debit"], 
+  message: "Wenn ein Betrag vorhanden ist, muss ein Konto ausgewählt sein. Pro Zeile entweder Soll oder Haben angeben (nicht beides).",
+  path: ["accountId"], // General path, specific errors can be added via superRefine on batch schema if needed
 });
 
 
@@ -65,13 +74,12 @@ const singleEntryPartSchema = z.object({
     (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number({invalid_type_error: "Betrag muss eine Zahl sein."}).positive("Betrag muss positiv sein.")
   ),
-  lines: z.array(journalEntryLineSchema).optional(), // Not directly used for single validation but part of overall form
 });
 
 const batchEntryPartSchema = z.object({
   entryType: z.literal('batch'),
   lines: z.array(journalEntryLineSchema).min(2, "Mindestens zwei Buchungszeilen erforderlich.")
-    .refine(lines => lines.some(line => line.accountId && (line.debit || line.credit)), "Mindestens eine gültige Buchungszeile erforderlich.")
+    .refine(lines => lines.some(line => line.accountId && (line.debit || line.credit) && line.accountId.trim() !== ''), "Mindestens eine gültige Buchungszeile mit Konto und Betrag erforderlich.")
     .refine(lines => {
       const totalDebits = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
       const totalCredits = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
@@ -89,9 +97,6 @@ const batchEntryPartSchema = z.object({
     }, {
         message: "Mindestens eine Haben-Buchung mit Betrag > 0 erforderlich.",
     }),
-  debitAccountId: z.string().optional(),
-  creditAccountId: z.string().optional(),
-  amount: z.number().optional(),
 });
 
 const getJournalEntryFormSchema = (fiscalYear?: FiscalYear | null) => {
@@ -138,8 +143,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
       }
 
       if (initialData && activeFiscalYear) {
-        // When editing, always default to 'batch' tab to show all lines.
-        // User can switch to 'single' if it's a simple 2-liner.
         return {
           entryType: 'batch',
           date: parseISO(initialData.date),
@@ -182,8 +185,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   const currentEntryType = form.watch("entryType");
 
   useEffect(() => {
-    // If initialData changes, reset the form.
-    // This ensures that if the dialog is re-opened with different initialData, the form updates.
     const defaultDate = activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date();
     if (initialData && activeFiscalYear) {
         form.reset({
@@ -239,7 +240,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
         { id: crypto.randomUUID(), accountId: debitAccount.id, accountNumber: debitAccount.number, accountName: debitAccount.name, debit: values.amount, credit: undefined },
         { id: crypto.randomUUID(), accountId: creditAccount.id, accountNumber: creditAccount.number, accountName: creditAccount.name, debit: undefined, credit: values.amount },
       ];
-    } else { // entryType === 'batch'
+    } else { 
       finalLines = values.lines!.filter(line => line.accountId && (line.debit || line.credit)).map(line => {
         const account = accounts.find(acc => acc.id === line.accountId);
         if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
@@ -274,17 +275,19 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
             if (today < fiscalYearStartDate) nextDefaultDate = fiscalYearStartDate;
             if (today > fiscalYearEndDate) nextDefaultDate = fiscalYearEndDate;
              if (!isWithinInterval(values.date, {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
-                nextDefaultDate = values.date; // keep user selected date if valid, otherwise reset based on FY
+                // This case should ideally not happen due to date picker validation
+                // but if it does, reset to a valid date within the fiscal year.
+                nextDefaultDate = fiscalYearStartDate; 
              } else {
-                nextDefaultDate = values.date;
+                nextDefaultDate = values.date; // Keep the date from the previous valid entry
              }
         }
 
 
         form.reset({ 
-            entryType: 'single', // Reset to single entry for next new one
-            date: nextDefaultDate, // Keep the date from the previous entry
-            entryNumber: '', // Clear for new entry number (or implement auto-increment)
+            entryType: 'single', 
+            date: nextDefaultDate, 
+            entryNumber: (parseInt(values.entryNumber, 10) + 1).toString(), // Increment entry number
             description: '',
             debitAccountId: '',
             creditAccountId: '',
@@ -312,7 +315,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     form.setValue("entryType", newTabValue as 'single' | 'batch', { shouldValidate: true, shouldDirty: true });
 
     if (newTabValue === 'batch') {
-      // Switching from single to batch
       if (currentValues.entryType === 'single' && currentValues.debitAccountId && currentValues.creditAccountId && currentValues.amount) {
         replace([
           { id: crypto.randomUUID(), accountId: currentValues.debitAccountId, debit: currentValues.amount, credit: undefined },
@@ -329,7 +331,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
       form.setValue("amount", undefined);
 
     } else if (newTabValue === 'single') {
-      // Switching from batch to single
       if (currentValues.entryType === 'batch' && currentValues.lines && currentValues.lines.length === 2) {
         const firstLine = currentValues.lines[0];
         const secondLine = currentValues.lines[1];
@@ -342,13 +343,11 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
            form.setValue("creditAccountId", firstLine.accountId);
            form.setValue("amount", firstLine.credit);
         } else {
-          // Not a simple 2-liner, clear single fields
           form.setValue("debitAccountId", '');
           form.setValue("creditAccountId", '');
           form.setValue("amount", undefined);
         }
       } else {
-        // Default for new single entry or complex batch
         form.setValue("debitAccountId", '');
         form.setValue("creditAccountId", '');
         form.setValue("amount", undefined);
@@ -360,7 +359,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitInternal)} className="space-y-6">
-        {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
@@ -413,7 +411,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 <FormItem>
                 <FormLabel>Belegnummer</FormLabel>
                 <FormControl>
-                    <Input placeholder="z.B. 2024-001" {...field} />
+                    <Input placeholder="Fortlaufende Nummer" {...field} />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -493,7 +491,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                             size="icon"
                             className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 2 && (index === 0 || index === 1) } // Prevent removing first two lines if only two exist
+                            disabled={fields.length <= 2 && (index === 0 || index === 1) } 
                         >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Zeile entfernen</span>
@@ -557,11 +555,8 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                                 )}
                             />
                         </div>
-                        {form.formState.errors.lines?.[index]?.debit?.message && (
-                            <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.debit?.message}</FormMessage>
-                        )}
-                         {form.formState.errors.lines?.[index]?.credit?.message && !form.formState.errors.lines?.[index]?.debit?.message && (
-                            <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.credit?.message}</FormMessage>
+                        {form.formState.errors.lines?.[index]?.accountId?.message && (
+                            <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.accountId?.message}</FormMessage>
                         )}
                     </CardContent>
                 </Card>
