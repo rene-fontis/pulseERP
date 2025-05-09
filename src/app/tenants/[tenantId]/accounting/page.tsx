@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -11,6 +10,7 @@ import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { Skeleton } from '@/components/ui/skeleton';
 import React, { useMemo, useEffect, useState } from 'react';
 import { AccountingOverview } from '@/components/accounting/AccountingOverview';
+import { GlobalSummaryCards } from '@/components/accounting/GlobalSummaryCards';
 import { calculateFinancialSummary, type FinancialSummary } from '@/lib/accounting';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -102,16 +102,10 @@ export default function TenantAccountingPage() {
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
         <Skeleton className="h-6 w-2/3 mb-6" />
-        {/* Skeleton for Feature Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {[...Array(2)].map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-lg" />
-          ))}
-        </div>
-        {/* Skeleton for AccountingOverview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
-            {[...Array(4)].map((_, i) => (
-            <Card key={i}>
+        {/* Skeleton for GlobalSummaryCards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mb-6">
+            {[...Array(6)].map((_, i) => (
+            <Card key={`summary-skeleton-${i}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-5 w-1/2" />
                 <Skeleton className="h-4 w-4" />
@@ -123,6 +117,22 @@ export default function TenantAccountingPage() {
             </Card>
             ))}
         </div>
+        {/* Skeleton for Feature Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {[...Array(2)].map((_, i) => (
+            <Skeleton key={`feature-skeleton-${i}`} className="h-32 w-full rounded-lg" />
+          ))}
+        </div>
+        {/* Skeleton for AccountingOverview (Detailed view) */}
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-5 w-3/4" />
+            </CardHeader>
+            <CardContent>
+                 <Skeleton className="h-32 w-full" />
+            </CardContent>
+        </Card>
       </div>
     );
   }
@@ -180,8 +190,8 @@ export default function TenantAccountingPage() {
 
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 px-4 md:px-0">
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="px-4 md:px-0">
         <div className="flex items-center mb-2">
             <BookOpen className="h-8 w-8 mr-3 text-primary" />
             <h1 className="text-3xl font-bold">Buchhaltung: {tenant?.name || (isLoadingTenant ? "Lade..." : "Unbekannt")}</h1>
@@ -191,7 +201,9 @@ export default function TenantAccountingPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0 mb-8">
+      <GlobalSummaryCards summary={financialSummary} isLoading={isLoadingData || !clientLoaded} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0">
         {accountingFeatures.map(feature => (
           <AccountingFeatureCard key={feature.href} {...feature} />
         ))}
@@ -199,7 +211,7 @@ export default function TenantAccountingPage() {
       
       <Card className="shadow-xl mx-4 md:mx-0">
         <CardHeader>
-            <CardTitle className="text-2xl font-bold">Finanzübersicht</CardTitle>
+            <CardTitle className="text-2xl font-bold">Finanzübersicht im Detail</CardTitle>
              <CardDescription className="flex items-center">
                 <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground"/> {getOverviewSubtitle()}
             </CardDescription>
@@ -210,7 +222,7 @@ export default function TenantAccountingPage() {
             {!isLoadingData && clientLoaded && chartOfAccounts && (
                 <AccountingOverview 
                     summary={financialSummary} 
-                    isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} 
+                    isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} // Pass isLoading to control accordion skeletons
                     chartOfAccounts={chartOfAccounts}
                 />
             )}
@@ -221,10 +233,12 @@ export default function TenantAccountingPage() {
                     <p>Die Finanzübersicht kann nicht angezeigt werden, da der zugehörige Kontenplan nicht verfügbar ist.</p>
                 </div>
             )}
+             {!isLoadingData && clientLoaded && !financialSummary && chartOfAccounts && (
+                 <p className="text-muted-foreground">Keine Buchungsdaten für die detaillierte Übersicht vorhanden.</p>
+            )}
         </CardContent>
       </Card>
 
     </div>
   );
 }
-
