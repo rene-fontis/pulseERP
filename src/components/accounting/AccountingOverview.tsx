@@ -4,14 +4,15 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileText, TrendingUp, TrendingDown, BarChart2 as BarChartIconLucide } from 'lucide-react'; // BarChart2 added for clarity
+import { FileText, TrendingUp, TrendingDown, BarChart2 as BarChartIconLucide, DollarSign } from 'lucide-react'; // BarChart2 added for clarity
 import type { FinancialSummary } from '@/lib/accounting';
 import type { TenantChartOfAccounts, Account, AccountGroup, FiscalYear } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  BarChart,
+  ComposedChart, // Changed from BarChart to ComposedChart
   Bar,
+  Line, // Added Line
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,7 +32,7 @@ interface AccountingOverviewProps {
   summary: FinancialSummary | null;
   isLoading: boolean;
   chartOfAccounts: TenantChartOfAccounts | undefined;
-  selectedFiscalYear: FiscalYear | undefined; // Added to provide context
+  selectedFiscalYear: FiscalYear | undefined; 
 }
 
 const bilanzCategories: Array<{ type: AccountGroup['mainType'], displayName: string, id: string }> = [
@@ -58,7 +59,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
         </div>
         <div>
             <div className="flex items-center mb-4">
-                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> {/* Changed Icon */}
+                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> 
                 <Skeleton className="h-6 w-1/4" />
             </div>
             <Card className="mb-6">
@@ -90,10 +91,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
     );
   }
   
-  const monthlyChartData = summary.monthlyBreakdown?.map(item => ({ // Optional chaining for monthlyBreakdown
+  const monthlyChartData = summary.monthlyBreakdown?.map(item => ({ 
     name: item.monthYear, 
     Ertrag: item.revenue,
-    Aufwand: item.expenses,
+    Aufwand: -item.expenses, // Expenses as negative values
+    GewinnVerlust: item.revenue - item.expenses, // Calculate Profit/Loss
   })) || [];
 
   const chartConfig = {
@@ -107,6 +109,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
       color: "hsl(var(--chart-1))", 
       icon: TrendingDown
     },
+    GewinnVerlust: { // New entry for Profit/Loss line
+      label: "Gewinn/Verlust",
+      color: "hsl(var(--chart-4))", // Use a different chart color
+      icon: DollarSign 
+    }
   } satisfies ChartConfig;
   
   return (
@@ -151,7 +158,17 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
                                         const balance = summary.accountBalances[account.id] || 0;
-                                        const displayBalance = (category.type === 'Liability' || category.type === 'Equity') ? -balance : balance;
+                                        // For balance sheet, Liabilities and Equity typically have credit balances.
+                                        // To display them as positive numbers when they represent a "plus" for the company (like equity),
+                                        // or a "minus" (like a liability), we might invert them.
+                                        // Assets are debit positive.
+                                        // Liabilities are credit positive (so if balance is -500, it's 500 liability).
+                                        // Equity is credit positive (so if balance is -1000, it's 1000 equity).
+                                        let displayBalance = balance;
+                                        if (category.type === 'Liability' || category.type === 'Equity') {
+                                            displayBalance = -balance;
+                                        }
+                                        
                                         return (
                                             <TableRow key={account.id}>
                                             <TableCell className="font-medium">{account.number}</TableCell>
@@ -176,7 +193,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
         {/* Erfolgsrechnung Section */}
         <div>
              <div className="flex items-center mb-4 mt-8">
-                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> {/* Changed Icon */}
+                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> 
                 <h3 className="text-xl font-semibold">Monatliche Erfolgsübersicht</h3>
             </div>
             {monthlyChartData.length > 0 ? (
@@ -188,8 +205,8 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                    <BarChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+                  <ChartContainer config={chartConfig} className="h-[400px] w-full"> {/* Increased height for better visibility */}
+                    <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
                         dataKey="name"
@@ -202,19 +219,28 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                         tickLine={false}
                         axisLine={true}
                         tickMargin={8}
+                        allowDataOverflow={true} // Allow y-axis to extend for negative values
                       />
                       <ChartTooltip
                         cursor={true}
-                        content={<ChartTooltipContent formatter={(value, name) => [formatCurrency(value as number), String(name)]} />}
+                        content={<ChartTooltipContent formatter={(value, name) => {
+                            // For 'Aufwand', show the original positive value in tooltip
+                            if (name === 'Aufwand' && typeof value === 'number') {
+                                return [formatCurrency(-value), String(name)];
+                            }
+                            return [formatCurrency(value as number), String(name)];
+                        }} />}
                       />
                        <ChartLegend content={<ChartLegendContent />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}}/>
                       <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                       <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
-                        <LabelList dataKey="Aufwand" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
+                         {/* For negative bars, position "bottom" places label below the bar (further from x-axis) */}
+                        <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(-value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
-                    </BarChart>
+                       <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
+                    </ComposedChart>
                   </ChartContainer>
                 </CardContent>
               </Card>
@@ -259,15 +285,12 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .sort((a,b) => (a.isFixed ? -1 : 1))
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
-                                        // For P&L, we want the *change* during the period.
-                                        // summary.accountBalances[account.id] is closing balance.
-                                        // account.balance is opening balance.
                                         const closingBalance = summary.accountBalances[account.id] || 0;
                                         const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
                                         let periodChange = closingBalance - openingBalance;
-
-                                        // Revenue: credit balance means positive revenue. If balance becomes "more negative", that's revenue.
-                                        // Expense: debit balance means positive expense. If balance becomes "more positive", that's expense.
+                                        
+                                        // Revenue: credit balance means positive revenue. Positive periodChange (more debit) reduces revenue, negative periodChange (more credit) increases it.
+                                        // Expense: debit balance means positive expense. Positive periodChange (more debit) increases expense.
                                         const displayAmount = (category.type === 'Revenue') ? -periodChange : periodChange;
                                         
                                         return (
