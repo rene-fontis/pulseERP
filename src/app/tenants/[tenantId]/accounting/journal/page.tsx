@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useParams } from 'next/navigation';
@@ -202,7 +203,7 @@ export default function TenantJournalPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Neue Buchung
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Neue Buchung erstellen</DialogTitle>
                 <DialogDescriptionComponent>
@@ -258,16 +259,21 @@ export default function TenantJournalPage() {
                 </TableHeader>
                 <TableBody>
                   {journalEntries.length > 0 ? journalEntries.map((entry) => {
-                    const debitLine = entry.lines.find(l => l.debit && l.debit > 0);
-                    const creditLine = entry.lines.find(l => l.credit && l.credit > 0);
+                    const debitLines = entry.lines.filter(l => l.debit && l.debit > 0);
+                    const creditLines = entry.lines.filter(l => l.credit && l.credit > 0);
+                    const totalAmount = debitLines.reduce((sum, l) => sum + (l.debit || 0), 0);
+
+                    const debitAccountsDisplay = debitLines.map(l => `${l.accountNumber} ${l.accountName}`).join(', ');
+                    const creditAccountsDisplay = creditLines.map(l => `${l.accountNumber} ${l.accountName}`).join(', ');
+                    
                     return (
                     <TableRow key={entry.id}>
                       <TableCell>{formatDate(entry.date)}</TableCell>
                       <TableCell>{entry.entryNumber}</TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={entry.description}>{entry.description}</TableCell>
-                      <TableCell>{debitLine ? `${debitLine.accountNumber} ${debitLine.accountName}` : '-'}</TableCell>
-                      <TableCell>{creditLine ? `${creditLine.accountNumber} ${creditLine.accountName}` : '-'}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(debitLine?.debit || creditLine?.credit)}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={debitAccountsDisplay}>{debitAccountsDisplay || '-'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={creditAccountsDisplay}>{creditAccountsDisplay || '-'}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(totalAmount)}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="outline" size="icon" disabled title="Buchung bearbeiten (Demnächst)">
                             <Edit className="h-4 w-4" />
