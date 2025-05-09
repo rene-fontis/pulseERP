@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -164,11 +163,12 @@ export default function ManageBudgetsPage() {
                 </TableHeader>
                 <TableBody>
                   {budgets && budgets.length > 0 ? budgets.map((budget) => (
-                    <TableRow key={budget.id}>
-                      <TableCell className="font-medium hover:underline cursor-pointer">
-                        <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`}>
+                    <TableRow key={budget.id} className="group">
+                      <TableCell className="font-medium">
+                        <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`} className="hover:underline">
                           {budget.name}
                         </Link>
+                        <p className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">Klicken, um Einträge zu verwalten</p>
                       </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -249,3 +249,4 @@ export default function ManageBudgetsPage() {
     </div>
   );
 }
+
