@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { getDocs, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // oder wo auch immer deine DB-Instanz ist
+import React, { useEffect } from 'react';
 
 export default function ManageTenantsPage() {
   const { data: tenants, isLoading, error } = useGetTenants();
@@ -222,3 +225,24 @@ export default function ManageTenantsPage() {
     </div>
   );
 }
+useEffect(() => {
+  async function testFirestore() {
+    const tenantsRef = collection(db, 'tenants');
+    const snapshot = await getDocs(tenantsRef);
+
+    snapshot.forEach(doc => {
+      console.log('Mandant:', doc.id, doc.data());
+    });
+  }
+
+  testFirestore();
+}, []);
+
+return (
+  <div>
+    <h1>Mandanten</h1>
+    {/* Hier könntest du später die Mandanten rendern */}
+  </div>
+);
+}
+
