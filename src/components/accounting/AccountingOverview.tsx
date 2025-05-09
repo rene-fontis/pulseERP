@@ -160,12 +160,17 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
                                         const closingBalance = summary.accountBalances[account.id] || 0;
-                                        let displayBalanceForBilanz = closingBalance;
-                                        // Liabilities and Equity are typically credit balances.
-                                        // To show them as positive conventional values in the balance sheet passives/equity side:
+                                        const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
+                                        let periodChange = closingBalance - openingBalance;
+
+                                        let displayBalanceForBilanz = periodChange; // Default to period change for Assets
+
                                         if (category.type === 'Liability' || category.type === 'Equity') {
-                                          displayBalanceForBilanz = -closingBalance;
+                                          // For Liabilities and Equity, a positive periodChange usually means increase in credit balance
+                                          // To show as positive on passive side (conventionally):
+                                          displayBalanceForBilanz = -periodChange; 
                                         }
+
 
                                         return (
                                             <TableRow key={account.id}>
@@ -209,13 +214,13 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                       <XAxis
                         dataKey="name"
                         tickLine={false}
-                        axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1.5 }}
+                        axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1.5, strokeDasharray: "5 5" }}
                         tickMargin={8}
                       />
                       <YAxis
                         tickFormatter={(value) => `${(value / 1000)}k`}
                         tickLine={false}
-                        axisLine={false} // Default Y axis line is turned off
+                        axisLine={false} 
                         tickMargin={8}
                       />
                       <ChartTooltip
@@ -226,12 +231,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                         }} />}
                       />
                        <ChartLegend content={<ChartLegendContent />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}}/>
-                       <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} strokeOpacity={0.7}/>
+                       <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={2} strokeOpacity={0.9}/>
                       <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                       <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
-                         {/* For negative bars (Aufwand), position="bottom" places label near zero-axis inside the bar */}
                         <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                        <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
