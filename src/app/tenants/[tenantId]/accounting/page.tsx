@@ -54,7 +54,6 @@ export default function TenantAccountingPage() {
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
   
-  // Fetch journal entries based on active fiscal year, or all if not set
   const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, tenant?.activeFiscalYearId);
   const { data: activeFiscalYear, isLoading: isLoadingActiveFiscalYear } = useGetFiscalYearById(tenantId, tenant?.activeFiscalYearId ?? null);
   
@@ -81,12 +80,34 @@ export default function TenantAccountingPage() {
       return "Ungültiges Datum";
     }
   };
+  
+  const accountingFeatures: AccountingFeatureCardProps[] = [
+    {
+      title: "Journal",
+      description: "Buchungssätze erfassen und Hauptbuch führen.",
+      icon: BookOpen,
+      href: `/tenants/${tenantId}/accounting/journal`
+    },
+    {
+      title: "Berichte",
+      description: "Bilanz, Erfolgsrechnung und weitere Finanzberichte erstellen.",
+      icon: FileTextIcon,
+      href: `/tenants/${tenantId}/accounting/reports`, 
+      disabled: true,
+    }
+  ];
 
-  if (isLoadingData && !clientLoaded) { // Initial full page skeleton
+  if (isLoadingData && !clientLoaded) { 
     return (
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
         <Skeleton className="h-6 w-2/3 mb-6" />
+        {/* Skeleton for Feature Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {[...Array(2)].map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          ))}
+        </div>
         {/* Skeleton for AccountingOverview */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
             {[...Array(4)].map((_, i) => (
@@ -101,10 +122,6 @@ export default function TenantAccountingPage() {
                 </CardContent>
             </Card>
             ))}
-        </div>
-         <div className="grid md:grid-cols-2 gap-6">
-          <Skeleton className="h-32 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
         </div>
       </div>
     );
@@ -150,26 +167,10 @@ export default function TenantAccountingPage() {
     );
   }
   
-  const accountingFeatures: AccountingFeatureCardProps[] = [
-    {
-      title: "Journal",
-      description: "Buchungssätze erfassen und Hauptbuch führen.",
-      icon: BookOpen,
-      href: `/tenants/${tenantId}/accounting/journal`
-    },
-    {
-      title: "Berichte",
-      description: "Bilanz, Erfolgsrechnung und weitere Finanzberichte erstellen.",
-      icon: FileTextIcon,
-      href: `/tenants/${tenantId}/accounting/reports`, 
-      disabled: true,
-    }
-  ];
-
   const getOverviewSubtitle = () => {
     if (isLoadingActiveFiscalYear && tenant?.activeFiscalYearId) return "Lade Geschäftsjahres Info...";
     if (activeFiscalYear) {
-      return `Zusammenfassung für Geschäftsjahr: ${activeFiscalYear.name} (${formatDate(activeFiscalYear.startDate)} - ${formatDate(activeFiscalYear.endDate)})`;
+      return `Finanzübersicht für Geschäftsjahr: ${activeFiscalYear.name} (${formatDate(activeFiscalYear.startDate)} - ${formatDate(activeFiscalYear.endDate)})`;
     }
     if (tenant && !tenant.activeFiscalYearId) {
       return "Gesamte finanzielle Zusammenfassung (kein spezifisches Geschäftsjahr aktiv)";
@@ -190,39 +191,39 @@ export default function TenantAccountingPage() {
         </p>
       </div>
 
-      {isLoadingData && clientLoaded && <Loader2 className="mx-auto my-8 h-12 w-12 animate-spin text-primary" />}
-      
-      {!isLoadingData && clientLoaded && chartOfAccounts && (
-        <>
-         <CardDescription className="mb-4 px-4 md:px-0 flex items-center">
-            <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground"/> {getOverviewSubtitle()}
-          </CardDescription>
-          <AccountingOverview 
-            summary={financialSummary} 
-            isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} 
-            chartOfAccounts={chartOfAccounts}
-          />
-        </>
-      )}
-      
-      {!isLoadingData && clientLoaded && !chartOfAccounts && tenant?.chartOfAccountsId && (
-         <Card className="mb-6">
-            <CardHeader>
-            <CardTitle>Finanzübersicht</CardTitle>
-            <CardDescription className="text-destructive">Kontenplan konnte nicht geladen werden.</CardDescription>
-            </CardHeader>
-            <CardContent>
-            <p className="text-muted-foreground">Die Finanzübersicht kann nicht angezeigt werden, da der zugehörige Kontenplan nicht verfügbar ist.</p>
-            </CardContent>
-        </Card>
-      )}
-
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0 mb-8">
         {accountingFeatures.map(feature => (
           <AccountingFeatureCard key={feature.href} {...feature} />
         ))}
       </div>
+      
+      <Card className="shadow-xl mx-4 md:mx-0">
+        <CardHeader>
+            <CardTitle className="text-2xl font-bold">Finanzübersicht</CardTitle>
+             <CardDescription className="flex items-center">
+                <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground"/> {getOverviewSubtitle()}
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            {isLoadingData && clientLoaded && <Loader2 className="mx-auto my-8 h-12 w-12 animate-spin text-primary" />}
+            
+            {!isLoadingData && clientLoaded && chartOfAccounts && (
+                <AccountingOverview 
+                    summary={financialSummary} 
+                    isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} 
+                    chartOfAccounts={chartOfAccounts}
+                />
+            )}
+            
+            {!isLoadingData && clientLoaded && !chartOfAccounts && tenant?.chartOfAccountsId && (
+                <div className="text-destructive">
+                    <p className="font-semibold">Kontenplan konnte nicht geladen werden.</p>
+                    <p>Die Finanzübersicht kann nicht angezeigt werden, da der zugehörige Kontenplan nicht verfügbar ist.</p>
+                </div>
+            )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
