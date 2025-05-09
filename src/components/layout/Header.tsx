@@ -42,14 +42,7 @@ export function Header() {
   }, [currentTenantId, tenants, pathname, isClient]);
 
   const getTenantDropdownTriggerLabelContents = () => {
-    if (!isClient) {
-      // Consistent output for SSR and initial client render
-      // Using Skeleton as it's generally safe if its props are deterministic.
-      // Alternatively, a simple string like "Lädt..." could be used.
-      return <Skeleton className="h-4 w-[150px]" />;
-    }
-
-    // Client-side only logic (after isClient is true)
+    // This function is called only when isClient is true due to the wrapper below
     if (isLoadingTenants) {
       return <Skeleton className="h-4 w-[150px]" />;
     }
@@ -89,59 +82,64 @@ export function Header() {
         </Link>
       </div>
       <nav className={rightNavClasses}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start px-3">
-              {tenantDropdownTriggerIcon}
-              <span className="truncate">{getTenantDropdownTriggerLabelContents()}</span>
-              <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>Mandant auswählen</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {isLoadingTenants && isClient ? ( // Show skeleton only on client if still loading
-              <DropdownMenuItem disabled>
-                <Skeleton className="h-4 w-full" />
-              </DropdownMenuItem>
-            ) : (
-              tenants?.map(tenant => (
-                <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId && pathname.startsWith(`/tenants/${tenant.id}`)}>
-                  <Link href={`/tenants/${tenant.id}/dashboard`}>{tenant.name}</Link>
-                </DropdownMenuItem>
-              ))
-            )}
-            {(!isLoadingTenants && tenants && tenants.length === 0 && isClient) && (
-                 <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
-            )}
-             {!isClient && ( // Placeholder for SSR / initial client render
-                <DropdownMenuItem disabled>
+        {isClient ? (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start px-3">
+                  {tenantDropdownTriggerIcon}
+                  <span className="truncate">{getTenantDropdownTriggerLabelContents()}</span>
+                  <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Mandant auswählen</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {isLoadingTenants ? (
+                  <DropdownMenuItem disabled>
                     <Skeleton className="h-4 w-full" />
+                  </DropdownMenuItem>
+                ) : (
+                  tenants?.map(tenant => (
+                    <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId && pathname.startsWith(`/tenants/${tenant.id}`)}>
+                      <Link href={`/tenants/${tenant.id}/dashboard`}>{tenant.name}</Link>
+                    </DropdownMenuItem>
+                  ))
+                )}
+                {(!isLoadingTenants && tenants && tenants.length === 0) && (
+                     <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
+                  <Link href="/manage-tenants" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Mandantenübersicht
+                  </Link>
                 </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
-              <Link href="/manage-tenants" className="flex items-center">
-                <Settings className="mr-2 h-4 w-4" />
-                Mandantenübersicht
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        <Button 
-            variant="ghost" 
-            size="sm" 
-            asChild 
-            className={cn("ml-2", pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
-        >
-          <Link href="/manage-templates" className="flex items-center gap-2 px-3">
-            <FileText className="h-4 w-4 text-primary" />
-            <span>Vorlagen</span>
-          </Link>
-        </Button>
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                asChild 
+                className={cn("ml-2", pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
+            >
+              <Link href="/manage-templates" className="flex items-center gap-2 px-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <span>Vorlagen</span>
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            {/* Placeholder for Tenant Dropdown Button */}
+            <Skeleton className="h-9 w-[180px] rounded-md" /> 
+            {/* Placeholder for Vorlagen Button */}
+            <Skeleton className="h-9 w-[100px] ml-2 rounded-md" />
+          </>
+        )}
       </nav>
     </header>
   );
 }
-
