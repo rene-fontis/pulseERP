@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -39,31 +40,22 @@ export function Header() {
     } else {
       setActiveTenantName(null);
     }
-  }, [currentTenantId, tenants]);
+  }, [currentTenantId, tenants, pathname]);
 
-  const getTriggerLabel = () => {
-    if (isLoadingTenants && !activeTenantName && !pathname.startsWith('/manage-templates')) { // Don't show skeleton if on templates page
-      return <Skeleton className="h-4 w-[150px]" />;
-    }
+  const getTenantDropdownTriggerLabel = () => {
     if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
       return activeTenantName;
     }
-    if (pathname.startsWith('/manage-templates')) {
-        return "Vorlagenverwaltung";
+    if (pathname.startsWith('/manage-tenants')) {
+      return "Mandantenübersicht";
+    }
+    if (isLoadingTenants) {
+      return <Skeleton className="h-4 w-[150px]" />;
     }
     return "Mandant wählen...";
   };
-  
-  const getTriggerIcon = () => {
-    if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
-        return <Building2 className="h-4 w-4 text-primary" />;
-    }
-    if (pathname.startsWith('/manage-templates')) {
-        return <FileText className="h-4 w-4 text-primary" />;
-    }
-    return <Settings className="h-4 w-4" />;
-  };
 
+  const tenantDropdownTriggerIcon = <Building2 className="h-4 w-4 text-primary" />;
 
   const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
   const divBaseClasses = "flex items-center gap-2";
@@ -89,9 +81,9 @@ export function Header() {
       <nav className={rightNavClasses}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
-              {getTriggerIcon()}
-              <span className="truncate">{getTriggerLabel()}</span>
+            <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start px-3">
+              {tenantDropdownTriggerIcon}
+              <span className="truncate">{getTenantDropdownTriggerLabel()}</span>
               <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
@@ -104,7 +96,7 @@ export function Header() {
               </DropdownMenuItem>
             ) : (
               tenants?.map(tenant => (
-                <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)}>
+                <DropdownMenuItem key={tenant.id} asChild data-active={tenant.id === currentTenantId && pathname.startsWith(`/tenants/${tenant.id}`)}>
                   <Link href={`/tenants/${tenant.id}/dashboard`}>{tenant.name}</Link>
                 </DropdownMenuItem>
               ))
@@ -113,21 +105,26 @@ export function Header() {
                  <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Verwaltung</DropdownMenuLabel>
             <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
               <Link href="/manage-tenants" className="flex items-center">
                 <Settings className="mr-2 h-4 w-4" />
-                Alle Mandanten verwalten
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild data-active={pathname === '/manage-templates'}>
-              <Link href="/manage-templates" className="flex items-center">
-                <FileText className="mr-2 h-4 w-4" />
-                Vorlagen verwalten
+                Mandantenübersicht
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button 
+            variant="ghost" 
+            size="sm" 
+            asChild 
+            className={cn(pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
+        >
+          <Link href="/manage-templates" className="flex items-center gap-2 px-3">
+            <FileText className="h-4 w-4 text-primary" />
+            <span>Vorlagen</span>
+          </Link>
+        </Button>
       </nav>
     </header>
   );
