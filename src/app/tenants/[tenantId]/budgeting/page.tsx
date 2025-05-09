@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { PlusCircle, Edit, Trash2, BarChartBig, AlertCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, BarChartBig, AlertCircle, Loader2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -166,10 +166,17 @@ export default function ManageBudgetsPage() {
                   {budgets && budgets.length > 0 ? budgets.map((budget) => (
                     <TableRow key={budget.id} className="group">
                       <TableCell className="font-medium">
-                        <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`} className="hover:underline">
-                          {budget.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">Klicken, um Einträge zu verwalten</p>
+                        <div>{budget.name}</div>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            asChild
+                            className="p-0 h-auto text-xs text-muted-foreground hover:text-primary"
+                        >
+                            <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`}>
+                                <Eye className="mr-1 h-3 w-3" /> Einträge verwalten
+                            </Link>
+                        </Button>
                       </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -250,3 +257,4 @@ export default function ManageBudgetsPage() {
     </div>
   );
 }
+
