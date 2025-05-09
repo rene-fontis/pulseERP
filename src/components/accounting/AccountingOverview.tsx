@@ -1,18 +1,19 @@
+
 "use client";
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileText, TrendingUp, TrendingDown, BarChart2 as BarChartIconLucide, DollarSign } from 'lucide-react'; // BarChart2 added for clarity
+import { FileText, TrendingUp, TrendingDown, BarChart2 as BarChartIconLucide, DollarSign } from 'lucide-react';
 import type { FinancialSummary } from '@/lib/accounting';
 import type { TenantChartOfAccounts, Account, AccountGroup, FiscalYear } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  ComposedChart, // Changed from BarChart to ComposedChart
+  ComposedChart,
   Bar,
-  Line, // Added Line
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -94,8 +95,8 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
   const monthlyChartData = summary.monthlyBreakdown?.map(item => ({ 
     name: item.monthYear, 
     Ertrag: item.revenue,
-    Aufwand: -item.expenses, // Expenses as negative values
-    GewinnVerlust: item.revenue - item.expenses, // Calculate Profit/Loss
+    Aufwand: -item.expenses, // Expenses as negative values for downward bars
+    GewinnVerlust: item.revenue - item.expenses,
   })) || [];
 
   const chartConfig = {
@@ -109,9 +110,9 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
       color: "hsl(var(--chart-1))", 
       icon: TrendingDown
     },
-    GewinnVerlust: { // New entry for Profit/Loss line
+    GewinnVerlust: {
       label: "Gewinn/Verlust",
-      color: "hsl(var(--chart-4))", // Use a different chart color
+      color: "hsl(var(--chart-4))",
       icon: DollarSign 
     }
   } satisfies ChartConfig;
@@ -157,23 +158,20 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .sort((a,b) => (a.isFixed ? -1 : 1)) 
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
-                                        const balance = summary.accountBalances[account.id] || 0;
-                                        // For balance sheet, Liabilities and Equity typically have credit balances.
-                                        // To display them as positive numbers when they represent a "plus" for the company (like equity),
-                                        // or a "minus" (like a liability), we might invert them.
-                                        // Assets are debit positive.
-                                        // Liabilities are credit positive (so if balance is -500, it's 500 liability).
-                                        // Equity is credit positive (so if balance is -1000, it's 1000 equity).
-                                        let displayBalance = balance;
+                                        const closingBalance = summary.accountBalances[account.id] || 0;
+                                        const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
+                                        let periodChange = closingBalance - openingBalance;
+                                        let displayBalanceForBilanz = closingBalance;
                                         if (category.type === 'Liability' || category.type === 'Equity') {
-                                            displayBalance = -balance;
+                                          displayBalanceForBilanz = -closingBalance;
                                         }
-                                        
+
+
                                         return (
                                             <TableRow key={account.id}>
                                             <TableCell className="font-medium">{account.number}</TableCell>
                                             <TableCell>{account.name}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(displayBalanceForBilanz)}</TableCell>
                                             </TableRow>
                                         );
                                 })}
@@ -205,7 +203,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-[400px] w-full"> {/* Increased height for better visibility */}
+                  <ChartContainer config={chartConfig} className="h-[400px] w-full">
                     <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
@@ -219,12 +217,12 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                         tickLine={false}
                         axisLine={true}
                         tickMargin={8}
-                        allowDataOverflow={true} // Allow y-axis to extend for negative values
+                        allowDataOverflow={true}
+                        domain={['auto', 'auto']} // Explicitly set domain to auto for both ends
                       />
                       <ChartTooltip
                         cursor={true}
                         content={<ChartTooltipContent formatter={(value, name) => {
-                            // For 'Aufwand', show the original positive value in tooltip
                             if (name === 'Aufwand' && typeof value === 'number') {
                                 return [formatCurrency(-value), String(name)];
                             }
@@ -236,7 +234,6 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                       <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
-                         {/* For negative bars, position "bottom" places label below the bar (further from x-axis) */}
                         <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(-value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                        <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
@@ -289,8 +286,6 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                         const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
                                         let periodChange = closingBalance - openingBalance;
                                         
-                                        // Revenue: credit balance means positive revenue. Positive periodChange (more debit) reduces revenue, negative periodChange (more credit) increases it.
-                                        // Expense: debit balance means positive expense. Positive periodChange (more debit) increases expense.
                                         const displayAmount = (category.type === 'Revenue') ? -periodChange : periodChange;
                                         
                                         return (
