@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams } from 'next/navigation';
@@ -18,7 +19,7 @@ import { de } from 'date-fns/locale';
 import React, { useState, useEffect, useMemo } from 'react';
 import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionRadix, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 
 
 export default function TenantJournalPage() {
@@ -34,6 +35,7 @@ export default function TenantJournalPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<JournalEntry | null>(null);
+  const [hoveredEntryId, setHoveredEntryId] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -275,7 +277,7 @@ export default function TenantJournalPage() {
                   <TableRow>
                     <TableHead>Datum</TableHead>
                     <TableHead>Beleg</TableHead>
-                    <TableHead>Beschreibung (Buchung)</TableHead>
+                    <TableHead>Beschreibung</TableHead>
                     <TableHead>Konto-Nr.</TableHead>
                     <TableHead>Konto-Name</TableHead>
                     <TableHead className="text-right">Soll</TableHead>
@@ -286,7 +288,14 @@ export default function TenantJournalPage() {
                 <TableBody>
                   {journalEntries.length > 0 ? journalEntries.map((entry) => (
                     entry.lines.map((line, lineIndex) => (
-                      <TableRow key={`${entry.id}-${line.id}`}>
+                      <TableRow 
+                        key={`${entry.id}-${line.id}`}
+                        onMouseEnter={() => setHoveredEntryId(entry.id)}
+                        onMouseLeave={() => setHoveredEntryId(null)}
+                        className={cn(
+                            {"bg-muted/50": entry.id === hoveredEntryId}
+                        )}
+                      >
                         {lineIndex === 0 && (
                           <>
                             <TableCell rowSpan={entry.lines.length || 1}>{formatDate(entry.date)}</TableCell>
