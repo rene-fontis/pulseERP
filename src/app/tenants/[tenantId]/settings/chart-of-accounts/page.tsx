@@ -1,15 +1,16 @@
-tsx
+
 "use client";
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText as FileTextIcon, AlertCircle, Edit } from 'lucide-react'; 
+import { FileText as FileTextIcon, AlertCircle, Edit, Loader2 } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import React from 'react';
 
 export default function TenantChartOfAccountsPage() {
   const params = useParams();
@@ -43,7 +44,7 @@ export default function TenantChartOfAccountsPage() {
       <div className="flex flex-col items-center justify-center h-full text-destructive p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden des Mandanten</h2>
-        <p>{tenantError.message}</p>
+        <p>{(tenantError as Error)?.message}</p>
       </div>
     );
   }
@@ -94,7 +95,7 @@ export default function TenantChartOfAccountsPage() {
         <CardContent className="space-y-6">
           {coaStillLoading && (
             <div className="text-center py-10 text-muted-foreground">
-                <FileTextIcon className="mx-auto h-12 w-12 mb-4 animate-pulse text-primary" />
+                <Loader2 className="mx-auto h-12 w-12 mb-4 animate-spin text-primary" />
                 <p>Kontenplan wird geladen...</p>
             </div>
           )}
@@ -109,7 +110,7 @@ export default function TenantChartOfAccountsPage() {
                   <p>Es wurde keine Vorlage bei der Erstellung des Mandanten ausgewählt. Ein Kontenplan kann manuell erstellt oder eine Vorlage zugewiesen werden (Funktion Demnächst).</p>
                 )}
                 <Button asChild variant="link" className="mt-4">
-                    <Link href="/manage-tenants">Zur Mandantenübersicht</Link>
+                    <Link href={`/manage-tenants`}>Zur Mandantenübersicht</Link>
                 </Button>
             </div>
           )}
