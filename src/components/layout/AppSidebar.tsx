@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, BarChart2 as BarChartIconLucide } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -154,8 +154,8 @@ export function AppSidebar() {
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`} disabled>
-                                        <span className="cursor-not-allowed">Berichte (Demn.)</span>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`}>
+                                        <Link href={`/tenants/${currentTenantId}/accounting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                             </SidebarMenuSub>
@@ -368,3 +368,6 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+
+    

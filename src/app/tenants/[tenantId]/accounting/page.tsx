@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2, CalendarDays, Calendar } from 'lucide-react';
+import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2, CalendarDays, Calendar, BarChart2 as BarChartIconLucide } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetJournalEntries } from '@/hooks/useJournalEntries';
@@ -109,10 +110,10 @@ export default function TenantAccountingPage() {
     },
     {
       title: "Berichte",
-      description: "Bilanz, Erfolgsrechnung und weitere Finanzberichte erstellen.",
-      icon: FileTextIcon,
+      description: "Monatliche Erfolgsübersicht und weitere Finanzberichte.",
+      icon: BarChartIconLucide,
       href: `/tenants/${tenantId}/accounting/reports`, 
-      disabled: true,
+      disabled: false, // Enabled
     }
   ];
 
@@ -296,3 +297,5 @@ export default function TenantAccountingPage() {
   );
 }
 
+
+    
