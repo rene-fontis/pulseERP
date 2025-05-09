@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Scale, Landmark, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, Landmark, DollarSign, Minus, Plus } from 'lucide-react';
 import type { FinancialSummary } from '@/lib/accounting';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,18 +13,17 @@ interface StatCardProps {
   value: string;
   icon: React.ElementType;
   description?: string;
-  positive?: boolean;
-  negative?: boolean;
+  valueColorClass?: string; // More flexible color control
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, description, positive, negative }) => (
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, description, valueColorClass }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className={`h-4 w-4 ${positive ? 'text-green-500' : negative ? 'text-red-500' : 'text-muted-foreground'}`} />
+      <Icon className={`h-4 w-4 text-muted-foreground ${valueColorClass ? '' : ''}`} />
     </CardHeader>
     <CardContent>
-      <div className={`text-2xl font-bold ${positive ? 'text-green-600' : negative ? 'text-red-600' : ''}`}>{value}</div>
+      <div className={`text-2xl font-bold ${valueColorClass || ''}`}>{value}</div>
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
     </CardContent>
   </Card>
@@ -66,46 +65,46 @@ export function GlobalSummaryCards({ summary, isLoading }: GlobalSummaryCardsPro
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 px-4 md:px-0">
       <StatCard
-        title="Aktiven"
+        title="Veränderung Aktiven (Periode)"
         value={formatCurrency(summary.totalAssets)}
-        icon={Landmark}
-        description="Gesamtwert aller Vermögenswerte"
+        icon={summary.totalAssets >= 0 ? Plus : Minus}
+        description="Zunahme/Abnahme der Vermögenswerte in der Periode"
+        valueColorClass={summary.totalAssets > 0 ? 'text-green-600' : summary.totalAssets < 0 ? 'text-red-600' : ''}
       />
       <StatCard
-        title="Passiven"
+        title="Veränderung Passiven (Periode)"
         value={formatCurrency(summary.totalLiabilities)}
-        icon={Scale}
-        description="Gesamtwert aller Verbindlichkeiten"
+        icon={summary.totalLiabilities >= 0 ? Plus : Minus}
+        description="Zunahme/Abnahme der Verbindlichkeiten in der Periode"
+        valueColorClass={summary.totalLiabilities > 0 ? 'text-red-600' : summary.totalLiabilities < 0 ? 'text-green-600' : ''} // Increase in liability is usually "bad" for net worth view
       />
       <StatCard
-        title="Eigenkapital"
+        title="Eigenkapital (Ende Periode)"
         value={formatCurrency(summary.equity)}
         icon={DollarSign}
-        description="Reinvermögen (Aktiven - Passiven)"
+        description="Reinvermögen (Aktiven - Passiven) am Periodenende"
       />
-      <StatCard
-        title={summary.netProfitLoss >= 0 ? "Gewinn" : "Verlust"}
+       <StatCard
+        title={summary.netProfitLoss >= 0 ? "Gewinn (Periode)" : "Verlust (Periode)"}
         value={formatCurrency(summary.netProfitLoss)}
         icon={summary.netProfitLoss >= 0 ? TrendingUp : TrendingDown}
-        description="Ergebnis aus Erträgen und Aufwänden"
-        positive={summary.netProfitLoss > 0}
-        negative={summary.netProfitLoss < 0}
+        description="Ergebnis aus Erträgen und Aufwänden der Periode"
+        valueColorClass={summary.netProfitLoss > 0 ? 'text-green-600' : summary.netProfitLoss < 0 ? 'text-red-600' : ''}
       />
       <StatCard
-        title="Gesamtertrag"
+        title="Gesamtertrag (Periode)"
         value={formatCurrency(summary.totalRevenue)}
         icon={TrendingUp}
-        description="Summe aller Erträge"
-        positive
+        description="Summe aller Erträge in der Periode"
+        valueColorClass={summary.totalRevenue > 0 ? 'text-green-600' : summary.totalRevenue < 0 ? 'text-red-600' : ''}
       />
       <StatCard
-        title="Gesamtaufwand"
+        title="Gesamtaufwand (Periode)"
         value={formatCurrency(summary.totalExpenses)}
         icon={TrendingDown}
-        description="Summe aller Aufwände"
-        negative
+        description="Summe aller Aufwände in der Periode"
+        valueColorClass={summary.totalExpenses > 0 ? 'text-red-600' : summary.totalExpenses < 0 ? 'text-green-600' : ''} // Higher expense is "bad"
       />
     </div>
   );
 }
-

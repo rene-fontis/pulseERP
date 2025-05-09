@@ -166,20 +166,22 @@ export interface MonthlyBreakdownItem {
 }
 
 export interface FinancialSummary {
-  totalAssets: number;
-  totalLiabilities: number;
+  totalAssets: number; // Represents period change for summary cards
+  totalLiabilities: number; // Represents period change for summary cards
+  closingTotalAssets: number; // Absolute closing balance for equity calculation
+  closingTotalLiabilities: number; // Absolute closing balance for equity calculation
   totalRevenue: number;
   totalExpenses: number;
   netProfitLoss: number;
-  equity: number;
-  accountBalances: AccountBalances;
+  equity: number; // Closing equity
+  accountBalances: AccountBalances; // Closing balances for all accounts
   monthlyBreakdown: MonthlyBreakdownItem[];
 }
 
 export interface CarryForwardBalancesPayload {
   tenantId: string;
   sourceFiscalYearId: string;
-  targetFiscalYearId: string; // Target is implicitly the one whose CoA is being updated
+  targetFiscalYearId: string; 
 }
 
 // --- Budgeting Types ---
@@ -209,38 +211,33 @@ export type BudgetFormValues = Omit<Budget, 'id' | 'tenantId' | 'createdAt' | 'u
 export interface BudgetEntry {
   id: string;
   budgetId: string;
-  // Fields based on user request - using "accountId" for the main P&L account being budgeted
-  // and "counterAccountId" for the cash-flow related (e.g., bank) account.
   accountId: string; 
-  accountNumber?: string; // For display (e.g. of the P&L account)
-  accountName?: string;   // For display (e.g. of the P&L account)
-  counterAccountId?: string; // Optional: BS account (e.g., bank)
-  counterAccountNumber?: string; // For display
-  counterAccountName?: string;   // For display
+  accountNumber?: string; 
+  accountName?: string;   
+  counterAccountId?: string; 
+  counterAccountNumber?: string; 
+  counterAccountName?: string;   
   description: string;
   amount: number;
-  type: BudgetEntryType; // "Income" or "Expense" - This determines how the amount affects the budget.
-  startDate?: string; // ISO string, required if isRecurring is true or for single specific date entries
-  endDate?: string; // ISO string, optional, for end of recurring period
+  type: BudgetEntryType; 
+  startDate?: string; 
+  endDate?: string; 
   isRecurring: boolean;
   recurrence: BudgetRecurrence;
   createdAt: string;
   updatedAt: string;
 }
 
-// For form handling - client might use Date objects for dates initially
 export type BudgetEntryFormValues = {
   description: string;
-  accountId: string; // P&L Account for the budget item (e.g. Rent Expense)
-  counterAccountId?: string; // Optional Balance Sheet Account (e.g. Bank)
+  accountId: string; 
+  counterAccountId?: string; 
   amount: number;
   type: BudgetEntryType;
-  startDate?: Date; // Date for single entry, or start of recurrence
-  endDate?: Date;   // Optional: end of recurrence
+  startDate?: Date; 
+  endDate?: Date;   
   isRecurring: boolean;
-  recurrence: BudgetRecurrence; // Used if isRecurring is true
+  recurrence: BudgetRecurrence; 
 };
 
-// Payload for adding/updating entries, dates as ISO strings
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
-
