@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   LabelList,
+  ReferenceLine,
 } from 'recharts';
 import {
   ChartContainer,
@@ -33,7 +34,7 @@ interface AccountingOverviewProps {
   summary: FinancialSummary | null;
   isLoading: boolean;
   chartOfAccounts: TenantChartOfAccounts | undefined;
-  selectedFiscalYear: FiscalYear | undefined; 
+  selectedFiscalYear: FiscalYear | undefined;
 }
 
 const bilanzCategories: Array<{ type: AccountGroup['mainType'], displayName: string, id: string }> = [
@@ -60,7 +61,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
         </div>
         <div>
             <div className="flex items-center mb-4">
-                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> 
+                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" />
                 <Skeleton className="h-6 w-1/4" />
             </div>
             <Card className="mb-6">
@@ -91,32 +92,32 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
         <p className="text-muted-foreground">Keine Daten für die detaillierte Finanzübersicht im ausgewählten Geschäftsjahr verfügbar. Bitte überprüfen Sie, ob ein Kontenplan zugewiesen und Buchungen vorhanden sind.</p>
     );
   }
-  
-  const monthlyChartData = summary.monthlyBreakdown?.map(item => ({ 
-    name: item.monthYear, 
+
+  const monthlyChartData = summary.monthlyBreakdown?.map(item => ({
+    name: item.monthYear,
     Ertrag: item.revenue,
-    Aufwand: item.expenses, // Expenses as positive values, will be plotted as negative by Recharts if domain allows
+    Aufwand: -item.expenses, // Expenses are made negative to render downwards
     GewinnVerlust: item.revenue - item.expenses,
   })) || [];
 
   const chartConfig = {
     Ertrag: {
       label: "Ertrag",
-      color: "hsl(var(--chart-2))", 
+      color: "hsl(var(--chart-2))",
       icon: TrendingUp
     },
     Aufwand: {
       label: "Aufwand",
-      color: "hsl(var(--chart-1))", 
+      color: "hsl(var(--chart-1))",
       icon: TrendingDown
     },
     GewinnVerlust: {
       label: "Gewinn/Verlust",
       color: "hsl(var(--chart-4))",
-      icon: DollarSign 
+      icon: DollarSign
     }
   } satisfies ChartConfig;
-  
+
   return (
     <div className="space-y-8">
         {/* Bilanz Section */}
@@ -155,17 +156,16 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                             <TableBody>
                                 {chartOfAccounts.groups
                                     .filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type))
-                                    .sort((a,b) => (a.isFixed ? -1 : 1)) 
+                                    .sort((a,b) => (a.isFixed ? -1 : 1))
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
                                         const closingBalance = summary.accountBalances[account.id] || 0;
-                                        // const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
-                                        // let periodChange = closingBalance - openingBalance;
                                         let displayBalanceForBilanz = closingBalance;
+                                        // Liabilities and Equity are typically credit balances.
+                                        // To show them as positive conventional values in the balance sheet passives/equity side:
                                         if (category.type === 'Liability' || category.type === 'Equity') {
-                                          displayBalanceForBilanz = -closingBalance; // Show as positive for convention
+                                          displayBalanceForBilanz = -closingBalance;
                                         }
-
 
                                         return (
                                             <TableRow key={account.id}>
@@ -178,7 +178,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                             </TableBody>
                             </Table>
                         </div>
-                         {accountsForCategory.length === 0 && 
+                         {accountsForCategory.length === 0 &&
                             chartOfAccounts.groups.filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)).flatMap(g => g.accounts).length === 0 &&
                             (<p className="text-sm text-muted-foreground p-2">Keine Konten in dieser Kategorie.</p>)}
                     </AccordionContent>
@@ -191,7 +191,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
         {/* Erfolgsrechnung Section */}
         <div>
              <div className="flex items-center mb-4 mt-8">
-                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" /> 
+                <BarChartIconLucide className="h-6 w-6 mr-2 text-primary" />
                 <h3 className="text-xl font-semibold">Monatliche Erfolgsübersicht</h3>
             </div>
             {monthlyChartData.length > 0 ? (
@@ -215,29 +215,24 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                       <YAxis
                         tickFormatter={(value) => `${(value / 1000)}k`}
                         tickLine={false}
-                        axisLine={true}
+                        axisLine={false} // Default Y axis line is turned off
                         tickMargin={8}
-                        allowDataOverflow={true}
-                        domain={['auto', 'auto']} 
                       />
                       <ChartTooltip
                         cursor={true}
                         content={<ChartTooltipContent formatter={(value, name) => {
-                            return [formatCurrency(value as number), String(name)];
+                            const displayValue = name === "Aufwand" ? Math.abs(value as number) : value as number;
+                            return [formatCurrency(displayValue), String(name)];
                         }} />}
                       />
                        <ChartLegend content={<ChartLegendContent />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}}/>
+                       <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} strokeOpacity={0.7}/>
                       <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
-                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20} stackId="a">
-                        {(barProps) => {
-                          const { x, y, width, height, value } = barProps;
-                          if (typeof value !== 'number' || value === 0) return null;
-                          // Render expenses as negative bars if they are positive values in data
-                          return <rect x={x} y={y} width={width} height={height > 0 ? height : -height} fill={barProps.fill} />;
-                        }}
-                        <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
+                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
+                         {/* For negative bars (Aufwand), position="bottom" places label near zero-axis inside the bar */}
+                        <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                        <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
                     </ComposedChart>
@@ -247,7 +242,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
             ) : (
                  <p className="text-muted-foreground mb-6">Keine monatlichen Erfolgsdaten für das Diagramm im ausgewählten Geschäftsjahr verfügbar.</p>
             )}
-            
+
             <div className="flex items-center mb-4 mt-6">
                 <FileText className="h-6 w-6 mr-2 text-primary" />
                 <h3 className="text-xl font-semibold">Erfolgsrechnung (Periode)</h3>
@@ -288,12 +283,9 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                         const closingBalance = summary.accountBalances[account.id] || 0;
                                         const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
                                         let periodChange = closingBalance - openingBalance;
-                                        
-                                        // Ertrag wird als positive Zahl dargestellt, Aufwand auch (aber wird vom Ertrag abgezogen)
-                                        // In der Buchhaltung ist Ertrag Haben (negativ), Aufwand Soll (positiv)
-                                        // Für die Anzeige wollen wir Ertrag positiv, Aufwand positiv.
+
                                         const displayAmount = (category.type === 'Revenue') ? -periodChange : periodChange;
-                                        
+
                                         return (
                                             <TableRow key={account.id}>
                                             <TableCell className="font-medium">{account.number}</TableCell>
@@ -305,7 +297,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                             </TableBody>
                             </Table>
                         </div>
-                         {accountsForCategory.length === 0 && 
+                         {accountsForCategory.length === 0 &&
                             chartOfAccounts.groups.filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)).flatMap(g => g.accounts).length === 0 &&
                             (<p className="text-sm text-muted-foreground p-2">Keine Konten in dieser Kategorie.</p>)}
                     </AccordionContent>
@@ -317,4 +309,3 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
     </div>
   );
 }
-
