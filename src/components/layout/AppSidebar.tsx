@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, ChevronDown } from 'lucide-react';
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays } from 'lucide-react'; // ChevronDown removed, CalendarDays added
 import {
   Sidebar,
   SidebarContent,
@@ -63,6 +63,23 @@ export function AppSidebar() {
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
+  
+  const adminImportButton = (
+     <SidebarMenuItem>
+        <SidebarMenuButton
+            asChild
+            isActive={pathname === '/admin/import'}
+            tooltip="Vorlagen Importieren"
+            // disabled // Temporarily re-enable if needed for testing, then disable
+        >
+            <Link href="/admin/import">
+                <Users /> {/* Placeholder icon, replace if a better one exists */}
+                <span>Vorlagen Importieren</span>
+            </Link>
+        </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+
 
   const renderTenantSpecificLinks = () => {
     if (!currentTenantId) return null;
@@ -92,7 +109,6 @@ export function AppSidebar() {
       );
     }
     
-    // For expanded sidebar or mobile view
     const expandedOrMobileContent = (
         <>
             <SidebarMenuItem>
@@ -113,22 +129,25 @@ export function AppSidebar() {
                     <AccordionItem value="accounting-item" className="border-none">
                         <AccordionTrigger className={cn(
                             "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
+                            isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg:not(.no-override)]:text-sidebar-primary-foreground"
                         )}>
                            <div className="flex items-center w-full">
                                 <BookOpen className="mr-2 h-4 w-4 shrink-0" />
                                 <span className="flex-1 text-left">Buchhaltung</span>
-                                {/* ChevronDown is part of AccordionTrigger's default child, removed to avoid duplication due to asChild */}
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
                                 <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting` || pathname === `/tenants/${currentTenantId}/accounting/overview` }>
+                                      <Link href={`/tenants/${currentTenantId}/accounting`}>Übersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/journal`}>
                                     <Link href={`/tenants/${currentTenantId}/accounting/journal`}>Journal</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                 {/* Placeholder for future reports link */}
                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`} disabled>
                                         <span className="cursor-not-allowed">Berichte (Demn.)</span>
@@ -145,16 +164,20 @@ export function AppSidebar() {
                     <AccordionItem value="settings-item" className="border-none">
                         <AccordionTrigger className={cn(
                             "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
+                            isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg:not(.no-override)]:text-sidebar-primary-foreground"
                         )}>
                             <div className="flex items-center w-full">
                                 <Settings className="mr-2 h-4 w-4 shrink-0" />
                                 <span className="flex-1 text-left">Einstellungen</span>
-                                {/* ChevronDown is part of AccordionTrigger's default child, removed to avoid duplication due to asChild */}
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
+                                <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings` || pathname === `/tenants/${currentTenantId}/settings/overview`}>
+                                    <Link href={`/tenants/${currentTenantId}/settings`}>Übersicht</Link>
+                                </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/basic`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/basic`}>Basis</Link>
@@ -170,6 +193,11 @@ export function AppSidebar() {
                                     <Link href={`/tenants/${currentTenantId}/settings/chart-of-accounts`}>Kontenplan</Link>
                                 </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/fiscal-years`}>
+                                    <Link href={`/tenants/${currentTenantId}/settings/fiscal-years`}>Geschäftsjahre</Link>
+                                </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -178,7 +206,6 @@ export function AppSidebar() {
         </>
     );
 
-    // For collapsed sidebar view
     const collapsedContent = (
         <>
             <SidebarMenuItem>
@@ -223,7 +250,6 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r">
       <SidebarHeader className="p-2 justify-center">
-         {/* Sidebar trigger is in main Header for mobile */}
       </SidebarHeader>
       <ScrollArea className="flex-1">
         <SidebarContent>
@@ -243,7 +269,6 @@ export function AppSidebar() {
 
             {currentTenantId ? (
               <>
-                {/* Active Tenant Section */}
                 <SidebarMenuItem className="mt-4">
                   {sidebarState === 'expanded' || isMobile ? ( 
                     <div className={cn(
@@ -273,6 +298,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
+                {adminImportButton}
               </>
             ) : (
               <>
@@ -287,6 +313,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
+                {adminImportButton}
               </>
             )}
           </SidebarMenu>
@@ -295,4 +322,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-

@@ -40,9 +40,9 @@ export function useAddTenant() {
 
 export function useUpdateTenant() {
   const queryClient = useQueryClient();
-  return useMutation<Tenant | undefined, Error, { id: string; name: string } >({ // Removed optimistic update type
-    mutationFn: ({ id, name }: { id: string; name: string }) => updateTenant(id, name),
-    onSuccess: (data, variables) => { // data can be Tenant | undefined
+  return useMutation<Tenant | undefined, Error, { id: string; data: Partial<Pick<Tenant, 'name' | 'activeFiscalYearId'>> }>({
+    mutationFn: ({ id, data }) => updateTenant(id, data),
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: tenantQueryKeys.lists() });
       if (variables.id) {
         queryClient.invalidateQueries({ queryKey: tenantQueryKeys.detail(variables.id) });
@@ -53,12 +53,11 @@ export function useUpdateTenant() {
 
 export function useDeleteTenant() {
   const queryClient = useQueryClient();
-  return useMutation<boolean, Error, string>({ // Removed optimistic update type
+  return useMutation<boolean, Error, string>({
     mutationFn: (id: string) => deleteTenant(id),
-    onSuccess: (data, deletedId) => { // data is boolean
+    onSuccess: (data, deletedId) => {
       queryClient.invalidateQueries({ queryKey: tenantQueryKeys.lists() });
       if (deletedId) {
-         // Optionally remove the specific tenant detail from cache
          queryClient.removeQueries({ queryKey: tenantQueryKeys.detail(deletedId), exact: true });
       }
     },

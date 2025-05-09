@@ -4,6 +4,7 @@ export interface Tenant {
   createdAt: string; // Store as ISO string for simplicity, converted from Firestore Timestamp
   chartOfAccountsTemplateId?: string; // ID of the template used during creation
   chartOfAccountsId?: string; // ID of the tenant's specific Chart of Accounts document
+  activeFiscalYearId?: string; // ID of the currently active fiscal year for this tenant
   // Add other tenant-specific settings like timezone, notification preferences if needed
   // timezone?: string;
   // notificationsEnabled?: boolean;
@@ -11,14 +12,15 @@ export interface Tenant {
 
 // --- Chart of Accounts Template Types ---
 export interface AccountTemplate {
-  id: string; // Unique within the template, e.g., generated or based on number
+  id?: string; // Unique within the template, e.g., generated or based on number
   number: string; // Account number, e.g., "1000"
   name: string; // Account name, e.g., "Kasse"
   description?: string;
+  // isSystemAccount?: boolean; // For special accounts like profit/loss
 }
 
 export interface AccountGroupTemplate {
-  id: string; // Unique within the template
+  id?: string; // Unique within the template
   name: string; // e.g., "Umlaufvermögen", "Bank"
   mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue'; // Main COA categories
   accounts: AccountTemplate[];
@@ -44,6 +46,7 @@ export interface Account {
   name: string;
   description?: string;
   balance?: number; // Current balance, might be calculated or stored
+  // isSystemAccount?: boolean; // For special accounts like profit/loss
 }
 
 export interface AccountGroup {
@@ -73,6 +76,7 @@ export enum Module {
   TENANT_SETTINGS_BASIC = "TENANT_SETTINGS_BASIC",
   TENANT_SETTINGS_USERS = "TENANT_SETTINGS_USERS",
   TENANT_SETTINGS_COA = "TENANT_SETTINGS_COA",
+  TENANT_SETTINGS_FISCAL_YEARS = "TENANT_SETTINGS_FISCAL_YEARS",
   // Add other modules as needed
 }
 
@@ -111,6 +115,7 @@ export interface JournalEntryLine {
 export interface JournalEntry {
   id:string; // Firestore document ID
   tenantId: string;
+  fiscalYearId?: string; // Reference to the fiscal year this entry belongs to
   entryNumber: string; // Sequential or generated
   date: string; // ISO string
   description: string;
@@ -123,3 +128,17 @@ export interface JournalEntry {
 
 // Type for submitting new journal entries to the service/mutation
 export type NewJournalEntryPayload = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
+
+// --- Fiscal Year Types ---
+export interface FiscalYear {
+  id: string;
+  name: string; // e.g., "2024", "Geschäftsjahr 23/24"
+  startDate: string; // ISO string
+  endDate: string; // ISO string
+  isClosed?: boolean; // To mark a fiscal year as closed, preventing new entries
+  // tenantId is implicit as this will be a subcollection
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FiscalYearFormValues = Omit<FiscalYear, 'id' | 'isClosed' | 'createdAt' | 'updatedAt'>;

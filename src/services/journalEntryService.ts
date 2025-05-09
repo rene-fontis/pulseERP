@@ -28,12 +28,13 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
   return {
     id: docSnapshot.id,
     tenantId: data.tenantId,
+    fiscalYearId: data.fiscalYearId,
     entryNumber: data.entryNumber,
-    date: formatFirestoreTimestamp(data.date, 'now'), // Date should also be a timestamp or consistently handled
+    date: formatFirestoreTimestamp(data.date, 'now'),
     description: data.description,
     lines: data.lines ? data.lines.map((line: any) => ({
       ...line,
-      id: line.id || crypto.randomUUID(), // Ensure line id
+      id: line.id || crypto.randomUUID(), 
     })) : [],
     attachments: data.attachments || [],
     posted: data.posted || false,
@@ -42,25 +43,28 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
   } as JournalEntry;
 };
 
-export const getJournalEntries = async (tenantId: string): Promise<JournalEntry[]> => {
-  const q = query(
-    journalEntriesCollectionRef, 
+export const getJournalEntries = async (tenantId: string, fiscalYearId?: string): Promise<JournalEntry[]> => {
+  const queryConstraints = [
     where("tenantId", "==", tenantId),
     orderBy("date", "desc"),
-    orderBy("entryNumber", "desc") // Secondary sort by entry number if dates are same
-  );
+    orderBy("entryNumber", "desc")
+  ];
+
+  if (fiscalYearId) {
+    queryConstraints.unshift(where("fiscalYearId", "==", fiscalYearId));
+  }
+  
+  const q = query(journalEntriesCollectionRef, ...queryConstraints);
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(mapDocToJournalEntry);
 };
 
 export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promise<JournalEntry> => {
   const now = serverTimestamp();
-  // Convert date string back to Firestore Timestamp for consistent storage if needed, or ensure it's stored correctly.
-  // For simplicity, assuming entryData.date is already an ISO string that Firestore can handle or just pass it as is if service stores strings.
-  // If storing as Firestore Timestamp: date: Timestamp.fromDate(new Date(entryData.date))
   const newEntry = {
     ...entryData,
-    lines: entryData.lines.map(line => ({ ...line, id: line.id || crypto.randomUUID() })), // ensure line IDs
+    date: Timestamp.fromDate(new Date(entryData.date)), // Store date as Firestore Timestamp
+    lines: entryData.lines.map(line => ({ ...line, id: line.id || crypto.randomUUID() })),
     createdAt: now,
     updatedAt: now,
   };
@@ -72,10 +76,14 @@ export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promis
   throw new Error("Could not retrieve journal entry after creation.");
 };
 
-// Placeholder - Edit functionality for journal entries is currently disabled in UI
 export const updateJournalEntry = async (entryId: string, entryData: Partial<NewJournalEntryPayload>): Promise<JournalEntry | undefined> => {
   const docRef = doc(db, 'journalEntries', entryId);
-  const updateData = { ...entryData, updatedAt: serverTimestamp() };
+  
+  const updateData: any = { ...entryData, updatedAt: serverTimestamp() };
+  if (entryData.date) {
+    updateData.date = Timestamp.fromDate(new Date(entryData.date)); // Ensure date is stored as Timestamp
+  }
+
   await updateDoc(docRef, updateData);
   const updatedDocSnapshot = await getDoc(docRef);
   if (updatedDocSnapshot.exists()) {
@@ -85,7 +93,6 @@ export const updateJournalEntry = async (entryId: string, entryData: Partial<New
 };
 
 export const deleteJournalEntry = async (entryId: string): Promise<boolean> => {
-  // In a real app, you might check if the entry is posted and prevent deletion or handle reversing entries.
   const docRef = doc(db, 'journalEntries', entryId);
   await deleteDoc(docRef);
   return true;

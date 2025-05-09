@@ -3,21 +3,22 @@
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Renamed DialogDescription to avoid conflict
-import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2, CalendarOff } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
+import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { useGetJournalEntries, useAddJournalEntry, useDeleteJournalEntry } from '@/hooks/useJournalEntries'; 
-import type { Account, NewJournalEntryPayload } from '@/types';
+import type { Account, NewJournalEntryPayload, FiscalYear } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import React, { useState, useEffect, useMemo } from 'react';
 import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionRadix, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 export default function TenantJournalPage() {
@@ -26,6 +27,8 @@ export default function TenantJournalPage() {
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
   
+  const { data: activeFiscalYear, isLoading: isLoadingActiveFiscalYear, error: activeFiscalYearError } = useGetFiscalYearById(tenantId, tenant?.activeFiscalYearId ?? null);
+
   const { toast } = useToast();
   const [clientLoaded, setClientLoaded] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -34,7 +37,7 @@ export default function TenantJournalPage() {
     setClientLoaded(true);
   }, []);
 
-  const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId);
+  const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, tenant?.activeFiscalYearId);
   const addEntryMutation = useAddJournalEntry(tenantId);
   const deleteEntryMutation = useDeleteJournalEntry(tenantId);
 
@@ -45,8 +48,12 @@ export default function TenantJournalPage() {
   }, [chartOfAccounts]);
 
   const handleCreateJournalEntry = async (values: NewJournalEntryPayload) => {
+    if (!tenant?.activeFiscalYearId) {
+        toast({ title: "Fehler", description: "Kein aktives Geschäftsjahr ausgewählt.", variant: "destructive" });
+        return;
+    }
     try {
-      await addEntryMutation.mutateAsync(values);
+      await addEntryMutation.mutateAsync({...values, tenantId: tenantId, fiscalYearId: tenant.activeFiscalYearId});
       toast({ title: "Erfolg", description: "Buchungssatz erstellt." });
       setIsCreateModalOpen(false);
     } catch (e) {
@@ -65,10 +72,11 @@ export default function TenantJournalPage() {
     }
   };
   
-  const formatDate = (dateString: string) => {
-    if (!clientLoaded || !dateString) return "Lädt...";
+  const formatDate = (dateInput: string | Date) => {
+    if (!clientLoaded || !dateInput) return "Lädt...";
     try {
-      return format(new Date(dateString), "PP", { locale: de });
+      const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+      return format(date, "PP", { locale: de });
     } catch (e) {
       return "Ungültiges Datum";
     }
@@ -79,9 +87,9 @@ export default function TenantJournalPage() {
     return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount);
   }
   
-  const isLoading = isLoadingTenant || (tenantId && isLoadingEntries && !clientLoaded) || (tenant?.chartOfAccountsId && isLoadingCoA);
+  const isLoading = isLoadingTenant || isLoadingActiveFiscalYear || (tenantId && isLoadingEntries && !clientLoaded) || (tenant?.chartOfAccountsId && isLoadingCoA);
 
-  if (isLoading && !clientLoaded) { // Added !clientLoaded to prevent flash of loading screen if data is already cached by react-query
+  if (isLoading && !clientLoaded) { 
     return (
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
@@ -94,15 +102,15 @@ export default function TenantJournalPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" /> {/* For table header */}
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)} {/* For table rows */}
+            <Skeleton className="h-10 w-full" />
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const combinedError = tenantError || entriesError || coaError;
+  const combinedError = tenantError || entriesError || coaError || activeFiscalYearError;
   if (combinedError) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive p-4 md:p-8">
@@ -113,7 +121,7 @@ export default function TenantJournalPage() {
     );
   }
   
-  if (!tenant && !isLoadingTenant) { // Check isLoadingTenant to avoid showing "not found" during initial load
+  if (!tenant && !isLoadingTenant) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
@@ -123,7 +131,7 @@ export default function TenantJournalPage() {
     );
   }
 
-   if (tenant && !tenant.chartOfAccountsId && !isLoadingCoA) { // Check isLoadingCoA
+   if (tenant && !tenant.chartOfAccountsId && !isLoadingCoA) {
     return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
@@ -137,7 +145,7 @@ export default function TenantJournalPage() {
     );
   }
 
-  if (tenant && tenant.chartOfAccountsId && !chartOfAccounts && !isLoadingCoA) { // Check isLoadingCoA
+  if (tenant && tenant.chartOfAccountsId && !chartOfAccounts && !isLoadingCoA) {
      return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
@@ -150,9 +158,29 @@ export default function TenantJournalPage() {
       </div>
     );
   }
-  
-  const journalEntries = journalEntriesData || [];
 
+  if (tenant && !tenant.activeFiscalYearId && !isLoadingActiveFiscalYear) {
+    return (
+      <div className="container mx-auto py-8 text-center">
+        <CalendarOff className="w-16 h-16 mb-4 mx-auto text-primary" />
+        <h2 className="text-2xl font-semibold mb-2">Kein aktives Geschäftsjahr</h2>
+        <p className="text-muted-foreground">Für diesen Mandanten ist kein Geschäftsjahr als aktiv markiert.</p>
+        <p className="text-sm text-muted-foreground">Bitte wählen Sie ein aktives Geschäftsjahr in den <a href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</a>, um Buchungen zu erfassen.</p>
+      </div>
+    );
+  }
+    if (tenant && tenant.activeFiscalYearId && !activeFiscalYear && !isLoadingActiveFiscalYear) {
+    return (
+      <div className="container mx-auto py-8 text-center">
+        <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
+        <h2 className="text-2xl font-semibold mb-2">Aktives Geschäftsjahr nicht gefunden</h2>
+        <p className="text-muted-foreground">Das als aktiv markierte Geschäftsjahr konnte nicht geladen werden.</p>
+         <p className="text-sm text-muted-foreground">Bitte überprüfen Sie die <a href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</a>.</p>
+      </div>
+    );
+  }
+
+  const journalEntries = journalEntriesData || [];
 
   return (
     <div className="container mx-auto py-8">
@@ -160,38 +188,46 @@ export default function TenantJournalPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div className="flex items-center">
             <BookOpen className="h-6 w-6 mr-3 text-primary" />
-            <CardTitle className="text-2xl font-bold">Journal: {tenant?.name || 'Lädt...'}</CardTitle>
+            <div>
+                <CardTitle className="text-2xl font-bold">Journal: {tenant?.name || 'Lädt...'}</CardTitle>
+                {activeFiscalYear && <CardDescription>Aktives Geschäftsjahr: {activeFiscalYear.name} ({formatDate(activeFiscalYear.startDate)} - {formatDate(activeFiscalYear.endDate)})</CardDescription>}
+            </div>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!chartOfAccounts || allAccounts.length === 0}>
+              <Button 
+                className="bg-accent text-accent-foreground hover:bg-accent/90" 
+                disabled={!chartOfAccounts || allAccounts.length === 0 || !activeFiscalYear || isLoadingActiveFiscalYear}
+              >
                 <PlusCircle className="mr-2 h-4 w-4" /> Neue Buchung
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Neue Buchung erstellen</DialogTitle>
-                <DialogDescriptionComponent> {/* Renamed import */}
-                  Erfassen Sie einen neuen Buchungssatz für {tenant?.name}.
+                <DialogDescriptionComponent>
+                  Erfassen Sie einen neuen Buchungssatz für {tenant?.name} im Geschäftsjahr {activeFiscalYear?.name}.
                 </DialogDescriptionComponent>
               </DialogHeader>
-              {isLoadingCoA || !clientLoaded ? (
+              {(isLoadingCoA || isLoadingActiveFiscalYear) && !clientLoaded ? (
                 <div className="flex justify-center items-center h-32">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="ml-2">Kontenplan wird geladen...</p>
+                  <p className="ml-2">Daten werden geladen...</p>
                 </div>
-              ) : allAccounts.length > 0 ? (
+              ) : allAccounts.length > 0 && activeFiscalYear ? (
                 <JournalEntryForm
                   tenantId={tenantId}
                   accounts={allAccounts}
+                  activeFiscalYear={activeFiscalYear}
                   onSubmit={handleCreateJournalEntry}
                   isSubmitting={addEntryMutation.isPending}
                   defaultEntryNumber={`BU-${String(journalEntries.length + 1).padStart(3, '0')}`}
                 />
               ) : (
                  <div className="text-center py-4">
-                    <p className="text-muted-foreground">Keine Konten im Kontenplan gefunden.</p>
-                    <p className="text-sm text-muted-foreground">Bitte zuerst Konten im Kontenplan anlegen oder einen Kontenplan zuweisen.</p>
+                    <p className="text-muted-foreground">Voraussetzungen nicht erfüllt.</p>
+                    {!activeFiscalYear && <p className="text-sm text-muted-foreground">Kein aktives Geschäftsjahr.</p>}
+                    {allAccounts.length === 0 && <p className="text-sm text-muted-foreground">Keine Konten im Kontenplan.</p>}
                  </div>
               )}
             </DialogContent>
@@ -245,9 +281,9 @@ export default function TenantJournalPage() {
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
-                              <AlertDialogDescription>
+                              <AlertDialogDescriptionRadix>
                                 Diese Aktion kann nicht rückgängig gemacht werden. Der Buchungssatz "{entry.entryNumber}: {entry.description}" wird dauerhaft gelöscht.
-                              </AlertDialogDescription>
+                              </AlertDialogDescriptionRadix>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Abbrechen</AlertDialogCancel>
@@ -266,7 +302,7 @@ export default function TenantJournalPage() {
                   )}) : (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                        Keine Buchungssätze gefunden. Erstellen Sie einen, um loszulegen!
+                        Keine Buchungssätze für das aktive Geschäftsjahr gefunden.
                       </TableCell>
                     </TableRow>
                   )}
@@ -279,4 +315,3 @@ export default function TenantJournalPage() {
     </div>
   );
 }
-

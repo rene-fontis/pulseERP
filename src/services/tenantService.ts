@@ -1,7 +1,7 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { Tenant } from '@/types'; // Removed ChartOfAccountsTemplate as it's not directly used here.
-import { createTenantChartOfAccountsFromTemplate } from './tenantChartOfAccountsService';
+import type { Tenant } from '@/types';
+import { createTenantChartOfAccountsFromTemplate, deleteTenantChartOfAccounts } from './tenantChartOfAccountsService';
 
 const tenantsCollectionRef = collection(db, 'tenants');
 
@@ -27,6 +27,7 @@ const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOpt
   }
   
   const defaultDate = defaultDateOption === 'epoch' ? new Date(0) : new Date();
+  // console.warn(`Invalid timestamp for doc ${docId}:`, timestamp, `Returning default: ${defaultDate.toISOString()}`);
   return defaultDate.toISOString();
 };
 
@@ -44,6 +45,7 @@ export const getTenants = async (): Promise<Tenant[]> => {
       createdAt: createdAtValue,
       chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
       chartOfAccountsId: data.chartOfAccountsId,
+      activeFiscalYearId: data.activeFiscalYearId,
     } as Tenant;
   });
   return tenants;
@@ -60,6 +62,7 @@ export const getTenantById = async (id: string): Promise<Tenant | undefined> => 
       createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id),
       chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
       chartOfAccountsId: data.chartOfAccountsId,
+      activeFiscalYearId: data.activeFiscalYearId,
     } as Tenant;
   }
   return undefined;
@@ -69,14 +72,18 @@ export const getTenantById = async (id: string): Promise<Tenant | undefined> => 
 interface NewTenantData {
     name: string;
     createdAt: any; // For serverTimestamp
+    updatedAt: any; // For serverTimestamp
     chartOfAccountsTemplateId?: string;
     chartOfAccountsId?: string;
+    activeFiscalYearId?: string;
 }
 
 export const addTenant = async (name: string, chartOfAccountsTemplateId?: string): Promise<Tenant> => {
+  const now = serverTimestamp();
   const newTenantFirestoreData: NewTenantData = {
     name,
-    createdAt: serverTimestamp(),
+    createdAt: now,
+    updatedAt: now,
   };
 
   if (chartOfAccountsTemplateId) {
@@ -88,19 +95,15 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
   let finalChartOfAccountsId: string | undefined = undefined;
   if (chartOfAccountsTemplateId && chartOfAccountsTemplateId !== "") {
     try {
-      // Pass tenant name for better naming of the created COA
       const createdCoa = await createTenantChartOfAccountsFromTemplate(chartOfAccountsTemplateId, docRef.id, name); 
       if (createdCoa) {
         finalChartOfAccountsId = createdCoa.id;
-        await updateDoc(docRef, { chartOfAccountsId: finalChartOfAccountsId });
+        await updateDoc(docRef, { chartOfAccountsId: finalChartOfAccountsId, updatedAt: serverTimestamp() });
       }
     } catch (error) {
       console.error("Error creating tenant chart of accounts from template:", error);
-      // Tenant created, but COA creation failed. Tenant will have templateId but no chartOfAccountsId.
     }
   } else {
-    // No template selected, create a blank CoA or handle as needed.
-    // For now, we just won't create a specific CoA.
     console.log(`No chart of accounts template selected for tenant ${name}.`);
   }
   
@@ -112,16 +115,16 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
           name: data.name,
           createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'),
           chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
-          chartOfAccountsId: data.chartOfAccountsId, // This will be populated if COA was created and linked
+          chartOfAccountsId: data.chartOfAccountsId,
+          activeFiscalYearId: data.activeFiscalYearId,
       } as Tenant;
   }
   throw new Error("Could not retrieve tenant after creation.");
 };
 
-export const updateTenant = async (id: string, name: string): Promise<Tenant | undefined> => {
+export const updateTenant = async (id: string, dataToUpdate: Partial<Pick<Tenant, 'name' | 'activeFiscalYearId'>>): Promise<Tenant | undefined> => {
   const tenantDocRef = doc(db, 'tenants', id);
-  // Assuming 'updatedAt' might be a field you want to manage
-  await updateDoc(tenantDocRef, { name, updatedAt: serverTimestamp() }); 
+  await updateDoc(tenantDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() }); 
   
   const updatedDocSnapshot = await getDoc(tenantDocRef);
   if (updatedDocSnapshot.exists()) {
@@ -132,6 +135,7 @@ export const updateTenant = async (id: string, name: string): Promise<Tenant | u
         createdAt: formatFirestoreTimestamp(data.createdAt, updatedDocSnapshot.id),
         chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
         chartOfAccountsId: data.chartOfAccountsId,
+        activeFiscalYearId: data.activeFiscalYearId,
         // updatedAt: formatFirestoreTimestamp(data.updatedAt, updatedDocSnapshot.id) // if you add updatedAt
     } as Tenant;
   }
@@ -140,11 +144,31 @@ export const updateTenant = async (id: string, name: string): Promise<Tenant | u
 
 export const deleteTenant = async (id: string): Promise<boolean> => {
   const tenantDocRef = doc(db, 'tenants', id);
-  // TODO: Optionally, also delete related data like tenantChartOfAccounts, users, journal entries
-  // This requires careful consideration of cascading deletes or marking as inactive.
-  // For now, only the tenant document is deleted.
-  // Example: if (tenant.chartOfAccountsId) await deleteTenantChartOfAccounts(tenant.chartOfAccountsId);
-  await deleteDoc(tenantDocRef);
-  return true; 
-};
+  const tenantSnapshot = await getDoc(tenantDocRef);
 
+  if (tenantSnapshot.exists()) {
+    const tenantData = tenantSnapshot.data() as Tenant;
+    if (tenantData.chartOfAccountsId) {
+      try {
+        await deleteTenantChartOfAccounts(tenantData.chartOfAccountsId);
+        console.log(`Successfully deleted chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}`);
+      } catch (error) {
+        console.error(`Error deleting chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}:`, error);
+        // Potentially stop tenant deletion if CoA deletion fails, or log and continue
+      }
+    }
+    // TODO: Delete fiscal years subcollection
+    // const fiscalYearsRef = collection(db, 'tenants', id, 'fiscalYears');
+    // const fiscalYearsSnapshot = await getDocs(fiscalYearsRef);
+    // const deletePromises = fiscalYearsSnapshot.docs.map(fyDoc => deleteDoc(fyDoc.ref));
+    // await Promise.all(deletePromises);
+    // console.log(`Successfully deleted fiscal years for tenant ${id}`);
+
+    await deleteDoc(tenantDocRef);
+    console.log(`Successfully deleted tenant ${id}`);
+    return true; 
+  } else {
+    console.warn(`Tenant with id ${id} not found for deletion.`);
+    return false;
+  }
+};

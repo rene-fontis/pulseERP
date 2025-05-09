@@ -2,10 +2,9 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight } from 'lucide-react';
+import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight, CalendarDays } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
-// Removed Link import as we use router.push
 
 interface SettingCardProps {
   title: string;
@@ -96,6 +95,12 @@ export default function TenantSettingsOverviewPage() {
       description: "Den Kontenrahmen für diesen Mandanten definieren und bearbeiten.",
       icon: FileTextIcon,
       href: `/tenants/${tenantId}/settings/chart-of-accounts`
+    },
+    {
+      title: "Geschäftsjahre",
+      description: "Geschäftsjahre definieren und das aktive Jahr festlegen.",
+      icon: CalendarDays,
+      href: `/tenants/${tenantId}/settings/fiscal-years`
     }
   ];
 

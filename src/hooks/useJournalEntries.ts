@@ -12,24 +12,25 @@ import type { JournalEntry, NewJournalEntryPayload } from '@/types';
 
 const journalEntryQueryKeys = {
   all: (tenantId?: string) => ['journalEntries', tenantId || 'allScope'] as const,
-  list: (tenantId: string) => [...journalEntryQueryKeys.all(tenantId), 'list'] as const,
+  list: (tenantId: string, fiscalYearId?: string) => [...journalEntryQueryKeys.all(tenantId), 'list', fiscalYearId || 'allYears'] as const,
   detail: (tenantId: string, entryId: string) => [...journalEntryQueryKeys.all(tenantId), 'detail', entryId] as const,
 };
 
-export function useGetJournalEntries(tenantId: string | null) {
+export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: string | null) {
   return useQuery<JournalEntry[], Error>({
-    queryKey: journalEntryQueryKeys.list(tenantId!),
-    queryFn: () => (tenantId ? getJournalEntries(tenantId) : Promise.resolve([])),
-    enabled: !!tenantId,
+    queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId ?? undefined),
+    queryFn: () => (tenantId ? getJournalEntries(tenantId, fiscalYearId ?? undefined) : Promise.resolve([])),
+    enabled: !!tenantId, // Entries are always tenant-specific
   });
 }
 
 export function useAddJournalEntry(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<JournalEntry, Error, NewJournalEntryPayload>({
-    mutationFn: (entryData) => addJournalEntry(entryData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId) });
+    mutationFn: (entryData) => addJournalEntry(entryData), // tenantId is part of entryData
+    onSuccess: (data) => {
+      // Invalidate list for the specific tenant and fiscal year of the new entry
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data.fiscalYearId) });
     },
   });
 }
@@ -39,7 +40,8 @@ export function useUpdateJournalEntry(tenantId: string) {
   return useMutation<JournalEntry | undefined, Error, { entryId: string; data: Partial<NewJournalEntryPayload> }>({
     mutationFn: ({ entryId, data }) => updateJournalEntry(entryId, data),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId) });
+      // Invalidate list for the specific tenant and potentially the fiscal year of the updated entry
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data?.fiscalYearId) });
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.detail(tenantId, variables.entryId) });
     },
   });
@@ -47,10 +49,16 @@ export function useUpdateJournalEntry(tenantId: string) {
 
 export function useDeleteJournalEntry(tenantId: string) {
   const queryClient = useQueryClient();
-  return useMutation<boolean, Error, string>({
+  return useMutation<boolean, Error, string, { previousEntry?: JournalEntry } >({
+    // If optimistic updates were used, context would contain previousEntry for rollback
     mutationFn: (entryId) => deleteJournalEntry(entryId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId) });
+    onSuccess: (success, entryId, context) => {
+      if (success) {
+        // To properly invalidate, we'd need to know which fiscal year list to update.
+        // This might require fetching the entry before deleting or passing fiscalYearId.
+        // For now, invalidate all lists for the tenant, or refine if fiscalYearId is available.
+        queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.all(tenantId) }); 
+      }
     },
   });
 }

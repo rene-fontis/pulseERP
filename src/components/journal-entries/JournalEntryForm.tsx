@@ -13,13 +13,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Account, NewJournalEntryPayload } from '@/types';
+import type { Account, NewJournalEntryPayload, FiscalYear } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
-const journalEntryFormSchema = z.object({
-  date: z.date({ required_error: "Datum ist erforderlich." }),
+const createJournalEntryFormSchema = (fiscalYear?: FiscalYear | null) => z.object({
+  date: z.date({ required_error: "Datum ist erforderlich." })
+    .refine(date => {
+      if (!fiscalYear) return true; // Allow if no fiscal year context (should be handled by disabling form)
+      const startDate = startOfDay(parseISO(fiscalYear.startDate));
+      const endDate = endOfDay(parseISO(fiscalYear.endDate));
+      return isWithinInterval(date, { start: startDate, end: endDate });
+    }, {
+      message: fiscalYear ? `Datum muss zwischen ${format(parseISO(fiscalYear.startDate), "dd.MM.yyyy", { locale: de })} und ${format(parseISO(fiscalYear.endDate), "dd.MM.yyyy", { locale: de })} liegen.` : "Ungültiger Datumsbereich."
+    }),
   entryNumber: z.string().min(1, "Buchungsnummer ist erforderlich."),
   description: z.string().min(1, "Beschreibung ist erforderlich."),
   debitAccountId: z.string().min(1, "Soll-Konto ist erforderlich."),
@@ -30,11 +38,12 @@ const journalEntryFormSchema = z.object({
   ),
 });
 
-export type JournalEntryFormValues = z.infer<typeof journalEntryFormSchema>;
+export type JournalEntryFormValues = z.infer<ReturnType<typeof createJournalEntryFormSchema>>;
 
 interface JournalEntryFormProps {
   tenantId: string;
   accounts: Account[];
+  activeFiscalYear: FiscalYear | null; // Pass the active fiscal year
   onSubmit: (values: NewJournalEntryPayload) => Promise<void>;
   isSubmitting?: boolean;
   defaultEntryNumber?: string;
@@ -46,11 +55,13 @@ interface AccountOption {
   account: Account;
 }
 
-export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, defaultEntryNumber }: JournalEntryFormProps) {
+export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmit, isSubmitting, defaultEntryNumber }: JournalEntryFormProps) {
+  const formSchema = createJournalEntryFormSchema(activeFiscalYear);
+  
   const form = useForm<JournalEntryFormValues>({
-    resolver: zodResolver(journalEntryFormSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date(),
+      date: activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date(), // Default to today or start of fiscal year
       entryNumber: defaultEntryNumber || '',
       description: '',
       debitAccountId: '',
@@ -58,6 +69,28 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
       amount: 0,
     },
   });
+  
+  useEffect(() => {
+    // Reset/update default date if activeFiscalYear changes or on initial load
+    if (activeFiscalYear) {
+      const today = new Date();
+      const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
+      let defaultDate = today;
+      if (today < fiscalYearStartDate) {
+        defaultDate = fiscalYearStartDate;
+      }
+      const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
+      if (today > fiscalYearEndDate) {
+        // This case should ideally be prevented by disabling the form if today is outside active FY
+        // Or default to the end date if creating for past. For now, let's try to keep it within.
+        defaultDate = fiscalYearEndDate; 
+      }
+       if(!isWithinInterval(form.getValues("date"), {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
+         form.setValue("date", defaultDate, { shouldValidate: true });
+       }
+    }
+  }, [activeFiscalYear, form]);
+
 
   const accountOptions: AccountOption[] = accounts.map(acc => ({
     value: acc.id,
@@ -70,19 +103,20 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
     const creditAccount = accounts.find(acc => acc.id === values.creditAccountId);
 
     if (!debitAccount || !creditAccount) {
-      form.setError("debitAccountId", { message: "Ungültiges Konto ausgewählt." }); // Or a general error
+      form.setError("debitAccountId", { message: "Ungültiges Konto ausgewählt." });
       return;
     }
     
     const newJournalEntryPayload: NewJournalEntryPayload = {
       tenantId,
+      fiscalYearId: activeFiscalYear?.id,
       entryNumber: values.entryNumber,
       date: values.date.toISOString(),
       description: values.description,
-      posted: false, // Default to not posted, can be changed later
+      posted: false, 
       lines: [
         {
-          id: crypto.randomUUID(), // Client-generated ID for the line
+          id: crypto.randomUUID(), 
           accountId: debitAccount.id,
           accountNumber: debitAccount.number,
           accountName: debitAccount.name,
@@ -90,7 +124,7 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
           description: "Sollbuchung",
         },
         {
-          id: crypto.randomUUID(), // Client-generated ID for the line
+          id: crypto.randomUUID(), 
           accountId: creditAccount.id,
           accountNumber: creditAccount.number,
           accountName: creditAccount.name,
@@ -98,19 +132,22 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
           description: "Habenbuchung",
         },
       ],
-      // attachments can be added later if needed
     };
     
     await onSubmit(newJournalEntryPayload); 
-    form.reset({ // Reset form after successful submission, keep date or make configurable
-        date: values.date, // Keep date or set to new Date()
-        entryNumber: '', // Generate new entry number based on logic
+    form.reset({ 
+        date: values.date, 
+        entryNumber: '', 
         description: '',
         debitAccountId: '',
         creditAccountId: '',
         amount: 0,
     });
   };
+  
+  const fiscalYearStart = activeFiscalYear ? parseISO(activeFiscalYear.startDate) : undefined;
+  const fiscalYearEnd = activeFiscalYear ? parseISO(activeFiscalYear.endDate) : undefined;
+
 
   return (
     <Form {...form}>
@@ -145,9 +182,12 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
+                    disabled={(date) => {
+                        if (!activeFiscalYear || !fiscalYearStart || !fiscalYearEnd) return false; // No restriction if no fiscal year
+                        return date < fiscalYearStart || date > fiscalYearEnd;
+                      }
                     }
+                    defaultMonth={field.value} // Ensure calendar opens to selected/default month
                     initialFocus
                     locale={de}
                   />
@@ -234,7 +274,7 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button type="submit" disabled={isSubmitting || !activeFiscalYear} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? 'Speichern...' : 'Buchung erstellen'}
         </Button>
       </form>
@@ -276,7 +316,7 @@ function AccountAutocomplete({ options, value, onChange, placeholder }: AccountA
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} // Use label for search filtering
+                  value={option.label} 
                   onSelect={() => {
                     onChange(option.value);
                     setOpen(false);
@@ -298,4 +338,3 @@ function AccountAutocomplete({ options, value, onChange, placeholder }: AccountA
     </Popover>
   );
 }
-
