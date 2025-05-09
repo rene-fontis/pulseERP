@@ -1,3 +1,4 @@
+"use client";
 
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
@@ -30,7 +31,7 @@ const mapDocToBudgetEntry = (docSnapshot: any): BudgetEntry => {
 };
 
 export const getBudgetEntries = async (budgetId: string): Promise<BudgetEntry[]> => {
-  const q = query(budgetEntriesCollectionRef, where("budgetId", "==", budgetId), orderBy("createdAt", "desc"));
+  const q = query(budgetEntriesCollectionRef, where("budgetId", "==", budgetId), orderBy("startDate", "asc"), orderBy("createdAt", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(mapDocToBudgetEntry);
 };
@@ -56,11 +57,14 @@ export const addBudgetEntry = async (newEntryData: NewBudgetEntryPayload): Promi
   };
 
   if (newEntryData.startDate) dataToSave.startDate = Timestamp.fromDate(new Date(newEntryData.startDate));
-  else delete dataToSave.startDate; // Ensure field is removed if undefined
+  else delete dataToSave.startDate; 
 
   if (newEntryData.endDate) dataToSave.endDate = Timestamp.fromDate(new Date(newEntryData.endDate));
-  else delete dataToSave.endDate; // Ensure field is removed if undefined
+  else delete dataToSave.endDate; 
   
+  // Ensure optional fields are removed if undefined/empty to avoid storing nulls unnecessarily
+  if (!newEntryData.accountNumber) delete dataToSave.accountNumber;
+  if (!newEntryData.accountName) delete dataToSave.accountName;
   if (!newEntryData.counterAccountId) delete dataToSave.counterAccountId;
   if (!newEntryData.counterAccountNumber) delete dataToSave.counterAccountNumber;
   if (!newEntryData.counterAccountName) delete dataToSave.counterAccountName;
@@ -74,19 +78,22 @@ export const addBudgetEntry = async (newEntryData: NewBudgetEntryPayload): Promi
   throw new Error("Could not retrieve budget entry after creation.");
 };
 
-export const updateBudgetEntry = async (entryId: string, entryData: Partial<BudgetEntryFormValues>): Promise<BudgetEntry | undefined> => {
+export const updateBudgetEntry = async (entryId: string, entryData: Partial<NewBudgetEntryPayload>): Promise<BudgetEntry | undefined> => {
   const entryDocRef = doc(db, 'budgetEntries', entryId);
   
   const updateData: any = { ...entryData, updatedAt: serverTimestamp() };
 
   if (entryData.startDate) updateData.startDate = Timestamp.fromDate(new Date(entryData.startDate));
-  else if (entryData.hasOwnProperty('startDate') && entryData.startDate === undefined) updateData.startDate = null; // Allow unsetting date
+  else if (entryData.hasOwnProperty('startDate') && entryData.startDate === undefined) updateData.startDate = null; 
 
   if (entryData.endDate) updateData.endDate = Timestamp.fromDate(new Date(entryData.endDate));
-  else if (entryData.hasOwnProperty('endDate') && entryData.endDate === undefined) updateData.endDate = null; // Allow unsetting date
+  else if (entryData.hasOwnProperty('endDate') && entryData.endDate === undefined) updateData.endDate = null; 
 
-  if (entryData.hasOwnProperty('counterAccountId') && entryData.counterAccountId === undefined) updateData.counterAccountId = null;
-
+  if (entryData.hasOwnProperty('counterAccountId') && (entryData.counterAccountId === undefined || entryData.counterAccountId === '')) {
+    updateData.counterAccountId = null;
+    updateData.counterAccountNumber = null;
+    updateData.counterAccountName = null;
+  }
 
   await updateDoc(entryDocRef, updateData);
   const updatedDocSnapshot = await getDoc(entryDocRef);

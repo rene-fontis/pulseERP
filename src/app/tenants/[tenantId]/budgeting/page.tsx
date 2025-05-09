@@ -176,7 +176,7 @@ export default function ManageBudgetsPage() {
                             budget.scenario === 'Best Case' ? 'bg-green-100 text-green-700' :
                             budget.scenario === 'Worst Case' ? 'bg-red-100 text-red-700' : ''
                           }`}>
-                          {budget.scenario === "Actual" ? "Standard" : budget.scenario}
+                          {budget.scenario === "Actual" ? "Standard" : budget.scenario === "Best Case" ? "Best-Case" : "Worst-Case"}
                         </span>
                       </TableCell>
                       <TableCell>{budget.description || '-'}</TableCell>
@@ -249,4 +249,3 @@ export default function ManageBudgetsPage() {
     </div>
   );
 }
-

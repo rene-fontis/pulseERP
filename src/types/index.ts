@@ -1,4 +1,3 @@
-ts
 export interface Tenant {
   id: string;
   name: string;
@@ -185,7 +184,14 @@ export interface CarryForwardBalancesPayload {
 // --- Budgeting Types ---
 export type BudgetScenario = "Actual" | "Best Case" | "Worst Case";
 export type BudgetEntryType = "Income" | "Expense";
-export type BudgetRecurrence = "None" | "Monthly" | "Quarterly" | "Yearly";
+export type BudgetRecurrence = 
+  | "None" 
+  | "Monthly" 
+  | "Bimonthly" // Alle zwei Monate
+  | "Quarterly" // Drei Monate / Quartalsweise
+  | "EveryFourMonths" // Alle vier Monate
+  | "Semiannually" // Halbjährlich
+  | "Yearly"; // Jährlich
 
 export interface Budget {
   id: string;
@@ -202,17 +208,19 @@ export type BudgetFormValues = Omit<Budget, 'id' | 'tenantId' | 'createdAt' | 'u
 export interface BudgetEntry {
   id: string;
   budgetId: string;
-  accountId: string; // P&L account ID
-  accountNumber?: string; // For display
-  accountName?: string; // For display
-  counterAccountId?: string; // Balance sheet account ID (e.g., bank)
+  // Fields based on user request - using "accountId" for the main P&L account being budgeted
+  // and "counterAccountId" for the cash-flow related (e.g., bank) account.
+  accountId: string; 
+  accountNumber?: string; // For display (e.g. of the P&L account)
+  accountName?: string;   // For display (e.g. of the P&L account)
+  counterAccountId?: string; // Optional: BS account (e.g., bank)
   counterAccountNumber?: string; // For display
-  counterAccountName?: string; // For display
+  counterAccountName?: string;   // For display
   description: string;
   amount: number;
-  type: BudgetEntryType;
-  startDate?: string; // ISO string, optional for single entry, required for start of recurring
-  endDate?: string; // ISO string, optional, for end of recurring
+  type: BudgetEntryType; // "Income" or "Expense" - This determines how the amount affects the budget.
+  startDate?: string; // ISO string, required if isRecurring is true or for single specific date entries
+  endDate?: string; // ISO string, optional, for end of recurring period
   isRecurring: boolean;
   recurrence: BudgetRecurrence;
   createdAt: string;
@@ -222,14 +230,15 @@ export interface BudgetEntry {
 // For form handling - client might use Date objects for dates initially
 export type BudgetEntryFormValues = {
   description: string;
-  accountId: string;
-  counterAccountId?: string;
+  accountId: string; // P&L Account for the budget item (e.g. Rent Expense)
+  counterAccountId?: string; // Optional Balance Sheet Account (e.g. Bank)
   amount: number;
   type: BudgetEntryType;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: Date; // Date for single entry, or start of recurrence
+  endDate?: Date;   // Optional: end of recurrence
   isRecurring: boolean;
-  recurrence: BudgetRecurrence;
+  recurrence: BudgetRecurrence; // Used if isRecurring is true
 };
 
+// Payload for adding/updating entries, dates as ISO strings
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;

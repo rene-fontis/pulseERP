@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -19,6 +18,16 @@ import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
+
+const budgetRecurrenceLabels: Record<BudgetEntry['recurrence'], string> = {
+  None: "Einmalig",
+  Monthly: "Monatlich",
+  Bimonthly: "Alle 2 Monate",
+  Quarterly: "Quartalsweise",
+  EveryFourMonths: "Alle 4 Monate",
+  Semiannually: "Halbjährlich",
+  Yearly: "Jährlich",
+};
 
 export default function BudgetEntriesPage() {
   const params = useParams();
@@ -59,11 +68,10 @@ export default function BudgetEntriesPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateEntry = async (values: NewBudgetEntryPayload) => { // This should be Partial<BudgetEntryFormValues> but payload for mutation matches New
+  const handleUpdateEntry = async (values: NewBudgetEntryPayload) => { 
     if (!selectedEntry) return;
     try {
-      // Map form values to a partial of BudgetEntry if necessary, or ensure form output matches service update input
-      await updateEntryMutation.mutateAsync({ entryId: selectedEntry.id, data: values as any });
+      await updateEntryMutation.mutateAsync({ entryId: selectedEntry.id, data: values });
       toast({ title: "Erfolg", description: "Budgeteintrag erfolgreich aktualisiert." });
       setIsEditModalOpen(false);
       setSelectedEntry(null);
@@ -87,7 +95,7 @@ export default function BudgetEntriesPage() {
     if (!clientLoaded) return "Lädt...";
     if (!startDate) return "-";
     const start = format(parseISO(startDate), "dd.MM.yy", { locale: de });
-    if (!endDate) return start;
+    if (!endDate) return start; // For single, non-recurring entries if endDate is not applicable/set
     const end = format(parseISO(endDate), "dd.MM.yy", { locale: de });
     return `${start} - ${end}`;
   };
@@ -183,8 +191,8 @@ export default function BudgetEntriesPage() {
                     <TableHead>Gegenkonto</TableHead>
                     <TableHead className="text-right">Betrag</TableHead>
                     <TableHead>Typ</TableHead>
-                    <TableHead>Datum</TableHead>
-                    <TableHead>Wiederholung</TableHead>
+                    <TableHead>Zeitraum</TableHead>
+                    <TableHead>Intervall</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -192,16 +200,16 @@ export default function BudgetEntriesPage() {
                   {budgetEntries && budgetEntries.length > 0 ? budgetEntries.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="font-medium max-w-xs truncate" title={entry.description}>{entry.description}</TableCell>
-                      <TableCell>{entry.accountName || entry.accountNumber || entry.accountId.slice(0,6)}</TableCell>
-                      <TableCell>{entry.counterAccountName || entry.counterAccountNumber || '-'}</TableCell>
+                      <TableCell>{entry.accountName ? `${entry.accountNumber} - ${entry.accountName}` : entry.accountId.slice(0,8)+'...'}</TableCell>
+                      <TableCell>{entry.counterAccountName ? `${entry.counterAccountNumber} - ${entry.counterAccountName}` : '-'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
                       <TableCell>
                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${entry.type === 'Income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {entry.type === 'Income' ? 'Einnahme' : 'Ausgabe'}
                         </span>
                       </TableCell>
-                      <TableCell>{entry.isRecurring ? formatDateRange(entry.startDate, entry.endDate) : (entry.startDate ? formatDateRange(entry.startDate) : '-')}</TableCell>
-                      <TableCell>{entry.isRecurring ? entry.recurrence === "Monthly" ? "Monatlich" : entry.recurrence === "Quarterly" ? "Quartalsweise" : entry.recurrence === "Yearly" ? "Jährlich" : "Keine"  : '-'}</TableCell>
+                      <TableCell>{formatDateRange(entry.startDate, entry.endDate)}</TableCell>
+                      <TableCell>{entry.isRecurring ? budgetRecurrenceLabels[entry.recurrence] : budgetRecurrenceLabels['None']}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="icon" onClick={() => handleEditEntry(entry)} title="Eintrag bearbeiten">
                           <Edit className="h-4 w-4" />
@@ -262,7 +270,7 @@ export default function BudgetEntriesPage() {
             <BudgetEntryForm 
               budgetId={budgetId}
               tenantId={tenantId}
-              onSubmit={handleUpdateEntry as any} // Cast as NewBudgetEntryPayload might be slightly off from update payload type
+              onSubmit={handleUpdateEntry}
               initialData={selectedEntry}
               isSubmitting={updateEntryMutation.isPending}
             />

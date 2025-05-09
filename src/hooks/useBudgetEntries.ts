@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,13 +8,13 @@ import {
   updateBudgetEntry,
   deleteBudgetEntry,
 } from '@/services/budgetEntryService';
-import type { BudgetEntry, NewBudgetEntryPayload, BudgetEntryFormValues } from '@/types';
+import type { BudgetEntry, NewBudgetEntryPayload } from '@/types';
 
 const budgetEntryQueryKeys = {
   all: (budgetId: string) => ['budgetEntries', budgetId] as const,
   lists: (budgetId: string) => [...budgetEntryQueryKeys.all(budgetId), 'list'] as const,
   details: (budgetId: string) => [...budgetEntryQueryKeys.all(budgetId), 'detail'] as const,
-  detail: (entryId: string) => [...budgetEntryQueryKeys.details(''), entryId] as const, // BudgetId not part of detail key for simplicity
+  detail: (entryId: string) => ['budgetEntryDetail', entryId] as const, // Changed to avoid conflict, budgetId not needed for specific entry
 };
 
 export function useGetBudgetEntries(budgetId: string | null) {
@@ -46,7 +45,7 @@ export function useAddBudgetEntry(budgetId: string) {
 
 export function useUpdateBudgetEntry(budgetId: string) {
   const queryClient = useQueryClient();
-  return useMutation<BudgetEntry | undefined, Error, { entryId: string; data: Partial<BudgetEntryFormValues> }>({
+  return useMutation<BudgetEntry | undefined, Error, { entryId: string; data: Partial<NewBudgetEntryPayload> }>({
     mutationFn: ({ entryId, data }) => updateBudgetEntry(entryId, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: budgetEntryQueryKeys.lists(budgetId) });

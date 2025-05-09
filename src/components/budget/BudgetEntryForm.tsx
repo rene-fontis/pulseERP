@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -23,7 +22,18 @@ import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccount
 import { useGetTenantById } from '@/hooks/useTenants';
 
 const budgetEntryTypes: BudgetEntryType[] = ["Income", "Expense"];
-const budgetRecurrences: BudgetRecurrence[] = ["None", "Monthly", "Quarterly", "Yearly"];
+const budgetRecurrences: BudgetRecurrence[] = ["None", "Monthly", "Bimonthly", "Quarterly", "EveryFourMonths", "Semiannually", "Yearly"];
+
+const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
+  None: "Einmalig / Keine",
+  Monthly: "Monatlich",
+  Bimonthly: "Alle zwei Monate",
+  Quarterly: "Quartalsweise (alle 3 Monate)",
+  EveryFourMonths: "Alle vier Monate",
+  Semiannually: "Halbjährlich",
+  Yearly: "Jährlich",
+};
+
 
 const createBudgetEntryFormSchema = () => z.object({
   description: z.string().min(1, "Beschreibung ist erforderlich."),
@@ -34,7 +44,7 @@ const createBudgetEntryFormSchema = () => z.object({
     z.number().positive("Betrag muss positiv sein.")
   ),
   type: z.enum(budgetEntryTypes, { required_error: "Typ ist erforderlich." }),
-  startDate: z.date().optional(),
+  startDate: z.date().optional(), // Required if isRecurring or for single specific date
   endDate: z.date().optional(),
   isRecurring: z.boolean().default(false),
   recurrence: z.enum(budgetRecurrences).default('None'),
@@ -54,6 +64,14 @@ const createBudgetEntryFormSchema = () => z.object({
 }, {
     message: "Bei wiederkehrenden Einträgen muss eine Wiederholungsart gewählt werden.",
     path: ["recurrence"],
+}).refine(data => {
+    if (data.isRecurring && !data.startDate) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Startdatum ist für wiederkehrende Einträge erforderlich.",
+    path: ["startDate"],
 });
 
 type FormValues = z.infer<ReturnType<typeof createBudgetEntryFormSchema>>;
@@ -98,7 +116,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
           counterAccountId: '',
           amount: 0,
           type: 'Expense',
-          startDate: undefined,
+          startDate: new Date(), // Default to today for new entries
           endDate: undefined,
           isRecurring: false,
           recurrence: 'None',
@@ -154,12 +172,24 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       amount: values.amount,
       type: values.type,
       startDate: values.startDate?.toISOString(),
-      endDate: values.endDate?.toISOString(),
+      endDate: values.isRecurring && values.endDate ? values.endDate.toISOString() : undefined, // Only set endDate if recurring and provided
       isRecurring: values.isRecurring,
       recurrence: values.isRecurring ? values.recurrence : 'None',
     };
     await onSubmit(payload);
-    if (!initialData) form.reset(); // Reset form only on create
+    if (!initialData) {
+       form.reset({
+          description: '',
+          accountId: '',
+          counterAccountId: '',
+          amount: 0,
+          type: 'Expense',
+          startDate: new Date(),
+          endDate: undefined,
+          isRecurring: false,
+          recurrence: 'None',
+       });
+    }
   };
   
   const watchedIsRecurring = form.watch("isRecurring");
@@ -184,8 +214,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             name="accountId"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Budgetkonto (Erfolgskonto)</FormLabel>
+                <FormLabel>Budgetkonto (Erfolgsrechnung)</FormLabel>
                     <AccountAutocomplete options={pnlAccounts} value={field.value} onChange={field.onChange} placeholder="Konto wählen..." isLoading={isLoadingCoA}/>
+                <FormDescription className="text-xs">Das Hauptkonto für diesen Budgetposten (z.B. Miete, Lohn).</FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
@@ -195,9 +226,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             name="counterAccountId"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Gegenkonto (Bilanzkonto, optional)</FormLabel>
+                <FormLabel>Gegenkonto (Bilanz, optional)</FormLabel>
                     <AccountAutocomplete options={balanceSheetAccounts} value={field.value} onChange={field.onChange} placeholder="Gegenkonto wählen..." isLoading={isLoadingCoA}/>
-                <FormDescription className="text-xs">Für Liquiditätsplanung relevant.</FormDescription>
+                <FormDescription className="text-xs">Woher das Geld kommt / wohin es fliesst (z.B. Bank).</FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
@@ -241,60 +272,60 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                 <div className="space-y-0.5">
                     <FormLabel>Wiederkehrender Eintrag?</FormLabel>
-                    <FormDescription className="text-xs">
-                    Wenn aktiviert, Daten und Wiederholung angeben.
-                    </FormDescription>
                 </div>
                 <FormControl>
                     <Switch checked={field.value} onCheckedChange={(checked) => {
                         field.onChange(checked);
                         if (!checked) {
                             form.setValue('recurrence', 'None');
-                            form.setValue('startDate', undefined);
-                            form.setValue('endDate', undefined);
+                            form.setValue('endDate', undefined); // Clear end date if not recurring
+                        } else {
+                           if(form.getValues('recurrence') === 'None') form.setValue('recurrence', 'Monthly'); // Default to Monthly if recurring
                         }
                     }} />
                 </FormControl>
                 </FormItem>
             )}
         />
-        {watchedIsRecurring && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                 <FormField
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                    <FormLabel>{watchedIsRecurring ? "Startdatum Wiederholung" : "Datum des Eintrags"}</FormLabel>
+                    <Popover><PopoverTrigger asChild>
+                    <FormControl>
+                        <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                        {field.value ? format(field.value, "PPP", { locale: de }) : <span>Datum wählen</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                    </FormControl>
+                    </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={de} /></PopoverContent></Popover>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+            {watchedIsRecurring && (
+              <>
+                <FormField
                     control={form.control}
                     name="recurrence"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Wiederholung</FormLabel>
+                        <FormLabel>Intervall</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!watchedIsRecurring}>
                             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent>
                             {budgetRecurrences.map(rec => (
                                 <SelectItem key={rec} value={rec} disabled={rec === 'None' && watchedIsRecurring}>
-                                {rec === 'None' ? 'Keine' : rec === 'Monthly' ? 'Monatlich' : rec === 'Quarterly' ? 'Quartalsweise' : 'Jährlich'}
+                                {budgetRecurrenceLabels[rec]}
                                 </SelectItem>
                             ))}
                             </SelectContent>
                         </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Startdatum</FormLabel>
-                        <Popover><PopoverTrigger asChild>
-                        <FormControl>
-                            <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={!watchedIsRecurring}>
-                            {field.value ? format(field.value, "PPP", { locale: de }) : <span>Datum wählen</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                        </FormControl>
-                        </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={de} /></PopoverContent></Popover>
                         <FormMessage />
                         </FormItem>
                     )}
@@ -314,12 +345,14 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
                         </FormControl>
                         </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
                         <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={de} disabled={(date) => form.getValues("startDate") ? date < form.getValues("startDate")! : false} /></PopoverContent></Popover>
+                         <FormDescription className="text-xs">Letzter Tag der Ausführung.</FormDescription>
                         <FormMessage />
                         </FormItem>
                     )}
                 />
-            </div>
-        )}
+              </>
+            )}
+        </div>
         <Button type="submit" disabled={isSubmitting || isLoadingCoA} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? 'Speichern...' : (initialData ? 'Änderungen speichern' : 'Eintrag erstellen')}
         </Button>
