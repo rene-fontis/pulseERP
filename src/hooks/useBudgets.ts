@@ -59,9 +59,8 @@ export function useUpdateBudget() {
 
 export function useDeleteBudget() {
   const queryClient = useQueryClient();
-  return useMutation<boolean, Error, string, { previousBudgets?: Budget[] }>( // Context for optimistic updates
-    (budgetId) => deleteBudget(budgetId),
-    {
+  return useMutation<boolean, Error, string, { previousBudgets?: Budget[] }>({
+    mutationFn: (budgetId) => deleteBudget(budgetId),
     onSuccess: (success, budgetId, context) => {
       if (success) {
         // A bit aggressive, but ensures lists are updated.
@@ -71,6 +70,6 @@ export function useDeleteBudget() {
         queryClient.removeQueries({queryKey: budgetQueryKeys.detail(budgetId)});
       }
     },
-    }
-  );
+  });
 }
+
