@@ -165,20 +165,24 @@ export default function ManageBudgetsPage() {
                 <TableBody>
                   {budgets && budgets.length > 0 ? budgets.map((budget) => (
                     <TableRow key={budget.id} className="group">
-                      <TableCell className="font-medium">
-                        <div>{budget.name}</div>
-                        <Button
-                            variant="link"
-                            size="sm"
-                            asChild
-                            className="p-0 h-auto text-xs text-muted-foreground hover:text-primary"
-                        >
-                            <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`}>
-                                <Eye className="mr-1 h-3 w-3" /> Einträge verwalten
+                      <TableCell className="font-medium align-top">
+                        <div className="flex flex-col items-start">
+                            <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`} className="hover:underline font-semibold text-base">
+                            {budget.name}
                             </Link>
-                        </Button>
+                            <Button
+                                variant="link"
+                                size="sm"
+                                asChild
+                                className="p-0 h-auto text-xs text-muted-foreground hover:text-primary mt-1"
+                            >
+                                <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`}>
+                                    <Eye className="mr-1 h-3 w-3" /> Einträge verwalten
+                                </Link>
+                            </Button>
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                             budget.scenario === 'Actual' ? 'bg-blue-100 text-blue-700' :
                             budget.scenario === 'Best Case' ? 'bg-green-100 text-green-700' :
@@ -187,9 +191,9 @@ export default function ManageBudgetsPage() {
                           {budget.scenario === "Actual" ? "Standard" : budget.scenario === "Best Case" ? "Best-Case" : "Worst-Case"}
                         </span>
                       </TableCell>
-                      <TableCell>{budget.description || '-'}</TableCell>
-                      <TableCell>{formatDate(budget.createdAt)}</TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="align-top">{budget.description || '-'}</TableCell>
+                      <TableCell className="align-top">{formatDate(budget.createdAt)}</TableCell>
+                      <TableCell className="text-right space-x-2 align-top">
                         <Button variant="outline" size="icon" onClick={() => handleEditBudget(budget)} title="Budget bearbeiten">
                           <Edit className="h-4 w-4" />
                         </Button>
