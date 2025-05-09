@@ -197,7 +197,11 @@ export default function TenantAccountingPage() {
          <CardDescription className="mb-4 px-4 md:px-0 flex items-center">
             <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground"/> {getOverviewSubtitle()}
           </CardDescription>
-          <AccountingOverview summary={financialSummary} isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} />
+          <AccountingOverview 
+            summary={financialSummary} 
+            isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} 
+            chartOfAccounts={chartOfAccounts}
+          />
         </>
       )}
       
