@@ -11,7 +11,6 @@ const firebaseConfig = {
   storageBucket: "pulseerp.appspot.com", // Corrected from firebasestorage.app to appspot.com
   messagingSenderId: "917957062375",
   appId: "1:917957062375:web:96d4e292e4340c3b5ffc42",
-  region: 'eur3' // Added region configuration
 };
 
 // Initialize Firebase
