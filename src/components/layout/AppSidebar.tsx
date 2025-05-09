@@ -1,8 +1,9 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, ChevronDown, UploadCloud } from 'lucide-react';
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, ChevronDown } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -63,22 +64,6 @@ export function AppSidebar() {
     </SidebarMenuItem>
   );
 
-  const commonVorlagenImportierenButton = (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={pathname === '/admin/import'}
-        tooltip="Vorlagen importieren"
-      >
-        <Link href="/admin/import">
-          <UploadCloud />
-          <span>Vorlagen importieren</span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-
-
   const renderTenantSpecificLinks = () => {
     if (!currentTenantId) return null;
 
@@ -126,14 +111,14 @@ export function AppSidebar() {
             <SidebarMenuItem>
                 <Accordion type="single" collapsible className="w-full" defaultValue={isAccountingActive ? "accounting-item" : undefined}>
                     <AccordionItem value="accounting-item" className="border-none">
-                        <AccordionTrigger asChild className={cn(
+                        <AccordionTrigger className={cn(
                             "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                             isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
                         )}>
                            <div className="flex items-center w-full">
                                 <BookOpen className="mr-2 h-4 w-4 shrink-0" />
                                 <span className="flex-1 text-left">Buchhaltung</span>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 text-sidebar-foreground group-data-[state=open]:rotate-180 group-data-[state=open]:text-sidebar-accent-foreground group-data-[active=true]:text-sidebar-primary-foreground" />
+                                {/* ChevronDown is part of AccordionTrigger's default child, removed to avoid duplication due to asChild */}
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
@@ -158,14 +143,14 @@ export function AppSidebar() {
             <SidebarMenuItem>
                  <Accordion type="single" collapsible className="w-full" defaultValue={isSettingsActive ? "settings-item" : undefined}>
                     <AccordionItem value="settings-item" className="border-none">
-                        <AccordionTrigger asChild className={cn(
+                        <AccordionTrigger className={cn(
                             "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                             isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
                         )}>
                             <div className="flex items-center w-full">
                                 <Settings className="mr-2 h-4 w-4 shrink-0" />
                                 <span className="flex-1 text-left">Einstellungen</span>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 text-sidebar-foreground group-data-[state=open]:rotate-180 group-data-[state=open]:text-sidebar-accent-foreground group-data-[active=true]:text-sidebar-primary-foreground" />
+                                {/* ChevronDown is part of AccordionTrigger's default child, removed to avoid duplication due to asChild */}
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
@@ -288,7 +273,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
-                {commonVorlagenImportierenButton}
               </>
             ) : (
               <>
@@ -303,7 +287,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
-                {commonVorlagenImportierenButton}
               </>
             )}
           </SidebarMenu>
@@ -312,3 +295,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
