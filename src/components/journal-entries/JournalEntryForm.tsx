@@ -31,7 +31,7 @@ const dateValidation = (fiscalYear?: FiscalYear | null) => z.date({ required_err
 
 const journalEntryLineSchema = z.object({
   id: z.string().optional(),
-  accountId: z.string(), // Allow empty string initially. Validation moved to .refine
+  accountId: z.string(), // Not optional if debit/credit has value.
   debit: z.preprocess(
     (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number().optional()
@@ -40,23 +40,6 @@ const journalEntryLineSchema = z.object({
     (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number().optional()
   ),
-}).refine(data => {
-  const hasDebit = typeof data.debit === 'number' && data.debit !== 0;
-  const hasCredit = typeof data.credit === 'number' && data.credit !== 0;
-
-  // If it's an empty line (no debit/credit), it's fine regardless of accountId.
-  if (!hasDebit && !hasCredit) return true;
-
-  // If it has debit or credit, then accountId must be non-empty.
-  if ((hasDebit || hasCredit) && (!data.accountId || data.accountId.trim() === '')) {
-    return false; 
-  }
-  
-  // Only one of debit/credit can have a value if amounts are present.
-  return (hasDebit && !hasCredit) || (!hasDebit && hasCredit);
-}, {
-  message: "Wenn ein Betrag vorhanden ist, muss ein Konto ausgewählt sein. Pro Zeile entweder Soll oder Haben angeben (nicht beides).",
-  path: ["accountId"], // General path, specific errors can be added via superRefine on batch schema if needed
 });
 
 
@@ -74,6 +57,7 @@ const singleEntryPartSchema = z.object({
     (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number({invalid_type_error: "Betrag muss eine Zahl sein."}).positive("Betrag muss positiv sein.")
   ),
+  lines: z.array(journalEntryLineSchema).optional(), // Not directly used for single, but part of the union
 });
 
 const batchEntryPartSchema = z.object({
@@ -81,9 +65,22 @@ const batchEntryPartSchema = z.object({
   lines: z.array(journalEntryLineSchema).min(2, "Mindestens zwei Buchungszeilen erforderlich.")
     .refine(lines => lines.some(line => line.accountId && (line.debit || line.credit) && line.accountId.trim() !== ''), "Mindestens eine gültige Buchungszeile mit Konto und Betrag erforderlich.")
     .refine(lines => {
+        return lines.every(line => {
+            const hasDebit = typeof line.debit === 'number' && line.debit !== 0;
+            const hasCredit = typeof line.credit === 'number' && line.credit !== 0;
+            if ((hasDebit || hasCredit) && (!line.accountId || line.accountId.trim() === '')) {
+                return false; // AccountId must be present if debit/credit is present
+            }
+            if(hasDebit && hasCredit) return false; // Cannot have both debit and credit
+            return true;
+        });
+    }, {
+        message: "Pro Zeile entweder Soll oder Haben mit einem gültigen Konto angeben.",
+    })
+    .refine(lines => {
       const totalDebits = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
       const totalCredits = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-      return Math.abs(totalDebits - totalCredits) < 0.001;
+      return Math.abs(totalDebits - totalCredits) < 0.001; // Using a small epsilon for float comparison
     }, {
       message: "Summe Soll muss Summe Haben entsprechen.",
     }).refine(lines => {
@@ -97,6 +94,9 @@ const batchEntryPartSchema = z.object({
     }, {
         message: "Mindestens eine Haben-Buchung mit Betrag > 0 erforderlich.",
     }),
+    debitAccountId: z.string().optional(), // Not used for batch
+    creditAccountId: z.string().optional(), // Not used for batch
+    amount: z.number().optional(), // Not used for batch
 });
 
 const getJournalEntryFormSchema = (fiscalYear?: FiscalYear | null) => {
@@ -154,7 +154,8 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
             debit: line.debit,
             credit: line.credit,
           })),
-          debitAccountId: undefined,
+          // Ensure these are undefined or empty as per schema for batch
+          debitAccountId: undefined, 
           creditAccountId: undefined,
           amount: undefined,
         };
@@ -167,7 +168,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
           debitAccountId: '',
           creditAccountId: '',
           amount: undefined,
-          lines: [
+          lines: [ // Keep for batch structure, even if single is default
             { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
             { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
             ],
@@ -188,7 +189,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     const defaultDate = activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date();
     if (initialData && activeFiscalYear) {
         form.reset({
-            entryType: 'batch',
+            entryType: 'batch', // Initial data is always treated as batch for editing
             date: parseISO(initialData.date),
             entryNumber: initialData.entryNumber,
             description: initialData.description,
@@ -232,7 +233,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     if (values.entryType === 'single') {
       const debitAccount = accounts.find(acc => acc.id === values.debitAccountId);
       const creditAccount = accounts.find(acc => acc.id === values.creditAccountId);
-      if (!debitAccount || !creditAccount || !values.amount) {
+      if (!debitAccount || !creditAccount || !values.amount) { // Amount should be validated by schema
         console.error("Missing data for single entry. This should be caught by validation.");
         return;
       }
@@ -240,10 +241,10 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
         { id: crypto.randomUUID(), accountId: debitAccount.id, accountNumber: debitAccount.number, accountName: debitAccount.name, debit: values.amount, credit: undefined },
         { id: crypto.randomUUID(), accountId: creditAccount.id, accountNumber: creditAccount.number, accountName: creditAccount.name, debit: undefined, credit: values.amount },
       ];
-    } else { 
+    } else { // Batch entry
       finalLines = values.lines!.filter(line => line.accountId && (line.debit || line.credit)).map(line => {
         const account = accounts.find(acc => acc.id === line.accountId);
-        if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
+        if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`); // Should not happen if validation works
         return {
           id: line.id || crypto.randomUUID(), 
           accountId: account.id,
@@ -273,13 +274,11 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
             const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
             const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
             if (today < fiscalYearStartDate) nextDefaultDate = fiscalYearStartDate;
-            if (today > fiscalYearEndDate) nextDefaultDate = fiscalYearEndDate;
-             if (!isWithinInterval(values.date, {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
-                // This case should ideally not happen due to date picker validation
-                // but if it does, reset to a valid date within the fiscal year.
+            else if (today > fiscalYearEndDate) nextDefaultDate = fiscalYearEndDate; // Use end date if today is past it
+             else if (!isWithinInterval(values.date, {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
                 nextDefaultDate = fiscalYearStartDate; 
              } else {
-                nextDefaultDate = values.date; // Keep the date from the previous valid entry
+                nextDefaultDate = values.date; 
              }
         }
 
@@ -287,7 +286,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
         form.reset({ 
             entryType: 'single', 
             date: nextDefaultDate, 
-            entryNumber: (parseInt(values.entryNumber, 10) + 1).toString(), // Increment entry number
+            entryNumber: (parseInt(values.entryNumber, 10) + 1).toString(), 
             description: '',
             debitAccountId: '',
             creditAccountId: '',
@@ -334,6 +333,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
       if (currentValues.entryType === 'batch' && currentValues.lines && currentValues.lines.length === 2) {
         const firstLine = currentValues.lines[0];
         const secondLine = currentValues.lines[1];
+        // Check if it looks like a simple debit/credit pair
         if (firstLine.debit && secondLine.credit && firstLine.debit === secondLine.credit) {
           form.setValue("debitAccountId", firstLine.accountId);
           form.setValue("creditAccountId", secondLine.accountId);
@@ -342,12 +342,12 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
            form.setValue("debitAccountId", secondLine.accountId);
            form.setValue("creditAccountId", firstLine.accountId);
            form.setValue("amount", firstLine.credit);
-        } else {
+        } else { // Not a simple pair, clear single fields
           form.setValue("debitAccountId", '');
           form.setValue("creditAccountId", '');
           form.setValue("amount", undefined);
         }
-      } else {
+      } else { // Not a 2-line batch, clear single fields
         form.setValue("debitAccountId", '');
         form.setValue("creditAccountId", '');
         form.setValue("amount", undefined);
@@ -359,7 +359,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitInternal)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
             control={form.control}
             name="date"
@@ -417,20 +417,21 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 </FormItem>
             )}
             />
+             <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Beschreibung</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Beschreibung der Buchung" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
         </div>
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Beschreibung</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Beschreibung der Buchung" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+
 
         <Tabs defaultValue={form.getValues("entryType")} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -439,45 +440,49 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
           </TabsList>
           
           <TabsContent value="single" className="pt-4 space-y-4">
-            <FormField
-              control={form.control}
-              name="debitAccountId"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Soll-Konto</FormLabel>
-                   <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Soll-Konto wählen..." />
-                  <FormMessage />
-                  </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="creditAccountId"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Haben-Konto</FormLabel>
-                   <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Haben-Konto wählen..." />
-                  <FormMessage />
-                  </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Betrag (CHF)</FormLabel>
-                  <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} 
-                       onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                       value={field.value ?? ''}
-                      />
-                  </FormControl>
-                  <FormMessage />
-                  </FormItem>
-              )}
-            />
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <FormField
+                control={form.control}
+                name="debitAccountId"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Soll-Konto</FormLabel>
+                    <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Soll-Konto wählen..." />
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="creditAccountId"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Haben-Konto</FormLabel>
+                    <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Haben-Konto wählen..." />
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Betrag (CHF)</FormLabel>
+                    <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} 
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                        value={field.value ?? ''}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
              {form.formState.errors.amount && <FormMessage>{form.formState.errors.amount.message}</FormMessage>}
+             {form.formState.errors.debitAccountId && <FormMessage>{form.formState.errors.debitAccountId.message}</FormMessage>}
+             {form.formState.errors.creditAccountId && <FormMessage>{form.formState.errors.creditAccountId.message}</FormMessage>}
           </TabsContent>
 
           <TabsContent value="batch" className="pt-4 space-y-4">
@@ -491,7 +496,8 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                             size="icon"
                             className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 2 && (index === 0 || index === 1) } 
+                            // Ensure at least two lines remain for a batch entry
+                            disabled={fields.length <= 2 } 
                         >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Zeile entfernen</span>
@@ -525,7 +531,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                                         onChange={e => {
                                             const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
                                             field.onChange(value);
-                                            if(value && value > 0) form.setValue(`lines.${index}.credit`, undefined, {shouldValidate: true});
+                                            if(value && value !== 0) form.setValue(`lines.${index}.credit`, undefined, {shouldValidate: true});
                                         }}
                                         value={field.value ?? ''}
                                     />
@@ -545,7 +551,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                                         onChange={e => {
                                             const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
                                             field.onChange(value);
-                                             if(value && value > 0) form.setValue(`lines.${index}.debit`, undefined, {shouldValidate: true});
+                                             if(value && value !== 0) form.setValue(`lines.${index}.debit`, undefined, {shouldValidate: true});
                                         }}
                                          value={field.value ?? ''}
                                     />
@@ -555,8 +561,15 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                                 )}
                             />
                         </div>
+                         {/* Display specific line errors for accountId if they exist */}
                         {form.formState.errors.lines?.[index]?.accountId?.message && (
                             <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.accountId?.message}</FormMessage>
+                        )}
+                        {form.formState.errors.lines?.[index]?.debit?.message && (
+                            <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.debit?.message}</FormMessage>
+                        )}
+                        {form.formState.errors.lines?.[index]?.credit?.message && (
+                            <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.credit?.message}</FormMessage>
                         )}
                     </CardContent>
                 </Card>
@@ -574,23 +587,21 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 <FormMessage>{form.formState.errors.lines.message}</FormMessage>
             )}
             {form.formState.errors.lines?.root?.message && <FormMessage>{form.formState.errors.lines.root.message}</FormMessage>}
+            <div className="mt-4 p-3 border rounded-md bg-muted/50">
+                <div className="flex justify-between font-medium">
+                    <span>Total Soll:</span>
+                    <span>{totalDebits.toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                    <span>Total Haben:</span>
+                    <span>{totalCredits.toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}</span>
+                </div>
+                {Math.abs(totalDebits - totalCredits) >= 0.001 && (
+                    <p className="text-destructive text-sm mt-1">Summe Soll und Haben müssen übereinstimmen.</p>
+                )}
+            </div>
           </TabsContent>
         </Tabs>
-
-        <div className="mt-4 p-3 border rounded-md bg-muted/50">
-            <div className="flex justify-between font-medium">
-                <span>Total Soll:</span>
-                <span>{totalDebits.toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}</span>
-            </div>
-            <div className="flex justify-between font-medium">
-                <span>Total Haben:</span>
-                <span>{totalCredits.toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}</span>
-            </div>
-            {Math.abs(totalDebits - totalCredits) >= 0.001 && (
-                <p className="text-destructive text-sm mt-1">Summe Soll und Haben müssen übereinstimmen.</p>
-            )}
-        </div>
-
 
         <Button type="submit" disabled={isSubmitting || !activeFiscalYear} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? 'Speichern...' : buttonText}
@@ -634,7 +645,7 @@ function AccountAutocomplete({ options, value, onChange, placeholder }: AccountA
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} 
+                  value={option.label} // This is what CMDK uses for searching
                   onSelect={() => {
                     onChange(option.value);
                     setOpen(false);
