@@ -1,18 +1,23 @@
 "use client";
 
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Tenant } from '@/types';
+import { useGetChartOfAccountsTemplates } from '@/hooks/useChartOfAccountsTemplates';
+import { Skeleton } from '../ui/skeleton';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Mandantenname muss mindestens 2 Zeichen lang sein." }),
+  chartOfAccountsTemplateId: z.string().optional(),
 });
 
-type TenantFormValues = z.infer<typeof formSchema>;
+export type TenantFormValues = z.infer<typeof formSchema>;
 
 interface TenantFormProps {
   onSubmit: (values: TenantFormValues) => void;
@@ -21,10 +26,24 @@ interface TenantFormProps {
 }
 
 export function TenantForm({ onSubmit, initialData, isSubmitting }: TenantFormProps) {
+  const { data: templates, isLoading: isLoadingTemplates } = useGetChartOfAccountsTemplates();
+  
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData ? { name: initialData.name } : { name: '' },
+    defaultValues: initialData 
+      ? { name: initialData.name, chartOfAccountsTemplateId: initialData.chartOfAccountsTemplateId || '' } 
+      : { name: '', chartOfAccountsTemplateId: '' },
   });
+
+  React.useEffect(() => {
+    if (initialData) {
+        form.reset({
+            name: initialData.name,
+            chartOfAccountsTemplateId: initialData.chartOfAccountsTemplateId || ''
+        });
+    }
+  }, [initialData, form]);
+
 
   const handleSubmit = (values: TenantFormValues) => {
     onSubmit(values);
@@ -46,7 +65,40 @@ export function TenantForm({ onSubmit, initialData, isSubmitting }: TenantFormPr
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+
+        {!initialData && ( // Only show template selection on create
+            <FormField
+            control={form.control}
+            name="chartOfAccountsTemplateId"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Kontenplan Vorlage (optional)</FormLabel>
+                {isLoadingTemplates ? (
+                    <Skeleton className="h-10 w-full" />
+                ) : (
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <FormControl>
+                        <SelectTrigger>
+                        <SelectValue placeholder="Standardvorlage wählen..." />
+                        </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                        <SelectItem value="">Keine Vorlage (leerer Kontenplan)</SelectItem>
+                        {templates?.map(template => (
+                        <SelectItem key={template.id} value={template.id}>
+                            {template.name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                )}
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        )}
+
+        <Button type="submit" disabled={isSubmitting || isLoadingTemplates} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? 'Speichern...' : (initialData ? 'Änderungen speichern' : 'Mandant erstellen')}
         </Button>
       </form>

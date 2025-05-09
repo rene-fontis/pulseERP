@@ -1,10 +1,10 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
-import { db } from '@/lib/firebase'; // Import the initialized db from firebase.ts
-import type { Tenant } from '@/types';
+import { db } from '@/lib/firebase';
+import type { Tenant } from '@/types'; // Removed ChartOfAccountsTemplate as it's not directly used here.
+import { createTenantChartOfAccountsFromTemplate } from './tenantChartOfAccountsService';
 
 const tenantsCollectionRef = collection(db, 'tenants');
 
-// Helper function to safely convert Firestore createdAt to ISO string
 const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
   if (timestamp instanceof Timestamp) {
     return timestamp.toDate().toISOString();
@@ -15,7 +15,7 @@ const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOpt
       const dateFromObject = new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate();
       return dateFromObject.toISOString();
     } catch (e) {
-      // Fall through to default handling if conversion fails
+      // Fall through
     }
   }
 
@@ -27,33 +27,26 @@ const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOpt
   }
   
   const defaultDate = defaultDateOption === 'epoch' ? new Date(0) : new Date();
-  // const idPart = docId ? `for tenant ID ${docId} ` : '';
-  // console.warn(`[tenantService.ts] Invalid or missing createdAt value ${idPart} encountered: ${JSON.stringify(timestamp)}. Falling back to ${defaultDateOption} date: ${defaultDate.toISOString()}.`);
   return defaultDate.toISOString();
 };
 
 
 export const getTenants = async (): Promise<Tenant[]> => {
-  // console.log("[tenantService.ts] Fetching tenants from Firestore...");
-  // Simplified query by removing orderBy to troubleshoot potential issues with 'createdAt' field
-  const q = query(tenantsCollectionRef); 
+  const q = query(tenantsCollectionRef, orderBy("createdAt", "desc")); 
   const querySnapshot = await getDocs(q);
-  // console.log(`[tenantService.ts] Fetched ${querySnapshot.docs.length} tenants.`);
   
-  // Sort tenants client-side if an order is still desired after fetching
-  // This is a workaround if server-side ordering causes issues
-  const tenants = querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    const createdAtValue = formatFirestoreTimestamp(data.createdAt, doc.id);
+  const tenants = querySnapshot.docs.map(docSnapshot => {
+    const data = docSnapshot.data();
+    const createdAtValue = formatFirestoreTimestamp(data.createdAt, docSnapshot.id);
     return { 
-      id: doc.id, 
+      id: docSnapshot.id, 
       name: data.name,
-      createdAt: createdAtValue
+      createdAt: createdAtValue,
+      chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
+      chartOfAccountsId: data.chartOfAccountsId,
     } as Tenant;
   });
-
-  // Client-side sorting by date (descending)
-  return tenants.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return tenants;
 };
 
 export const getTenantById = async (id: string): Promise<Tenant | undefined> => {
@@ -64,36 +57,71 @@ export const getTenantById = async (id: string): Promise<Tenant | undefined> => 
     return { 
       id: docSnapshot.id, 
       name: data.name,
-      createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id) 
+      createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id),
+      chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
+      chartOfAccountsId: data.chartOfAccountsId,
     } as Tenant;
   }
   return undefined;
 };
 
-export const addTenant = async (name: string): Promise<Tenant> => {
-  const newTenantData = {
+// Type for new tenant data before Firestore interaction
+interface NewTenantData {
+    name: string;
+    createdAt: any; // For serverTimestamp
+    chartOfAccountsTemplateId?: string;
+    chartOfAccountsId?: string;
+}
+
+export const addTenant = async (name: string, chartOfAccountsTemplateId?: string): Promise<Tenant> => {
+  const newTenantFirestoreData: NewTenantData = {
     name,
     createdAt: serverTimestamp(),
   };
-  const docRef = await addDoc(tenantsCollectionRef, newTenantData);
-  // console.log("[tenantService.ts] Tenant added with ID:", docRef.id);
-  const newDocSnapshot = await getDoc(docRef); // Fetch the document to get the server-generated timestamp
+
+  if (chartOfAccountsTemplateId) {
+    newTenantFirestoreData.chartOfAccountsTemplateId = chartOfAccountsTemplateId;
+  }
+
+  const docRef = await addDoc(tenantsCollectionRef, newTenantFirestoreData);
+  
+  let finalChartOfAccountsId: string | undefined = undefined;
+  if (chartOfAccountsTemplateId && chartOfAccountsTemplateId !== "") {
+    try {
+      // Pass tenant name for better naming of the created COA
+      const createdCoa = await createTenantChartOfAccountsFromTemplate(chartOfAccountsTemplateId, docRef.id, name); 
+      if (createdCoa) {
+        finalChartOfAccountsId = createdCoa.id;
+        await updateDoc(docRef, { chartOfAccountsId: finalChartOfAccountsId });
+      }
+    } catch (error) {
+      console.error("Error creating tenant chart of accounts from template:", error);
+      // Tenant created, but COA creation failed. Tenant will have templateId but no chartOfAccountsId.
+    }
+  } else {
+    // No template selected, create a blank CoA or handle as needed.
+    // For now, we just won't create a specific CoA.
+    console.log(`No chart of accounts template selected for tenant ${name}.`);
+  }
+  
+  const newDocSnapshot = await getDoc(docRef);
   if (newDocSnapshot.exists()) {
       const data = newDocSnapshot.data();
-      // console.log("[tenantService.ts] New tenant data after fetch:", data);
       return {
           id: newDocSnapshot.id,
           name: data.name,
-          createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'), 
+          createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'),
+          chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
+          chartOfAccountsId: data.chartOfAccountsId, // This will be populated if COA was created and linked
       } as Tenant;
   }
-  // console.error("[tenantService.ts] Could not retrieve tenant after creation for ID:", docRef.id);
   throw new Error("Could not retrieve tenant after creation.");
 };
 
 export const updateTenant = async (id: string, name: string): Promise<Tenant | undefined> => {
   const tenantDocRef = doc(db, 'tenants', id);
-  await updateDoc(tenantDocRef, { name });
+  // Assuming 'updatedAt' might be a field you want to manage
+  await updateDoc(tenantDocRef, { name, updatedAt: serverTimestamp() }); 
   
   const updatedDocSnapshot = await getDoc(tenantDocRef);
   if (updatedDocSnapshot.exists()) {
@@ -101,7 +129,10 @@ export const updateTenant = async (id: string, name: string): Promise<Tenant | u
     return { 
         id: updatedDocSnapshot.id,
         name: data.name,
-        createdAt: formatFirestoreTimestamp(data.createdAt, updatedDocSnapshot.id)
+        createdAt: formatFirestoreTimestamp(data.createdAt, updatedDocSnapshot.id),
+        chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
+        chartOfAccountsId: data.chartOfAccountsId,
+        // updatedAt: formatFirestoreTimestamp(data.updatedAt, updatedDocSnapshot.id) // if you add updatedAt
     } as Tenant;
   }
   return undefined;
@@ -109,6 +140,10 @@ export const updateTenant = async (id: string, name: string): Promise<Tenant | u
 
 export const deleteTenant = async (id: string): Promise<boolean> => {
   const tenantDocRef = doc(db, 'tenants', id);
+  // TODO: Optionally, also delete related data like tenantChartOfAccounts, users, journal entries
+  // This requires careful consideration of cascading deletes or marking as inactive.
+  // For now, only the tenant document is deleted.
+  // Example: if (tenant.chartOfAccountsId) await deleteTenantChartOfAccounts(tenant.chartOfAccountsId);
   await deleteDoc(tenantDocRef);
   return true; 
 };

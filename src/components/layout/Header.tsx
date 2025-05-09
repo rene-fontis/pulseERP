@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Briefcase, Settings, ChevronDown, Building2 } from 'lucide-react';
+import { Briefcase, Settings, ChevronDown, Building2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import {
@@ -42,31 +42,39 @@ export function Header() {
   }, [currentTenantId, tenants]);
 
   const getTriggerLabel = () => {
-    if (isLoadingTenants && !activeTenantName) {
+    if (isLoadingTenants && !activeTenantName && !pathname.startsWith('/manage-templates')) { // Don't show skeleton if on templates page
       return <Skeleton className="h-4 w-[150px]" />;
     }
     if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
       return activeTenantName;
     }
+    if (pathname.startsWith('/manage-templates')) {
+        return "Vorlagenverwaltung";
+    }
     return "Mandant wählen...";
   };
+  
+  const getTriggerIcon = () => {
+    if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
+        return <Building2 className="h-4 w-4 text-primary" />;
+    }
+    if (pathname.startsWith('/manage-templates')) {
+        return <FileText className="h-4 w-4 text-primary" />;
+    }
+    return <Settings className="h-4 w-4" />;
+  };
 
-  const isTenantSelectedAndOnTenantPage = !!(activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`));
 
-  // Base classes that are always present
   const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
   const divBaseClasses = "flex items-center gap-2";
-
-  // Header itself has no dynamic padding, ensuring it's 100% wide.
-  // Padding for inner content is applied consistently on server and client.
-  const headerDynamicClasses = "";
+  
+  const headerDynamicClasses = ""; 
   const leftDivPaddingClasses = "pl-4 sm:pl-6";
   const rightDivPaddingClasses = "pr-4 sm:pr-6";
-
-  // Construct class names directly using template literals to ensure explicitness
-  const headerClasses = `${headerBaseClasses} ${headerDynamicClasses}`.trim();
-  const leftDivClasses = `${divBaseClasses} ${leftDivPaddingClasses}`.trim();
-  const rightNavClasses = `${divBaseClasses} ${rightDivPaddingClasses}`.trim();
+  
+  const headerClasses = cn(headerBaseClasses, headerDynamicClasses);
+  const leftDivClasses = cn(divBaseClasses, leftDivPaddingClasses);
+  const rightNavClasses = cn(divBaseClasses, rightDivPaddingClasses);
 
 
   return (
@@ -82,7 +90,7 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start">
-              {isTenantSelectedAndOnTenantPage ? <Building2 className="h-4 w-4 text-primary" /> : <Settings className="h-4 w-4" /> }
+              {getTriggerIcon()}
               <span className="truncate">{getTriggerLabel()}</span>
               <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
             </Button>
@@ -105,15 +113,21 @@ export function Header() {
                  <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
+            <DropdownMenuLabel>Verwaltung</DropdownMenuLabel>
+            <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
               <Link href="/manage-tenants" className="flex items-center">
                 <Settings className="mr-2 h-4 w-4" />
                 Alle Mandanten verwalten
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild data-active={pathname === '/manage-templates'}>
+              <Link href="/manage-templates" className="flex items-center">
+                <FileText className="mr-2 h-4 w-4" />
+                Vorlagen verwalten
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Future user menu can go here */}
       </nav>
     </header>
   );

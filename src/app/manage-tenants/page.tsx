@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Edit, Trash2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // CardDescription removed
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { TenantForm } from '@/components/tenants/TenantForm';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'; // DialogFooter removed
+import { TenantForm, type TenantFormValues } from '@/components/tenants/TenantForm';
 import { useGetTenants, useAddTenant, useUpdateTenant, useDeleteTenant } from '@/hooks/useTenants';
+import { useGetChartOfAccountsTemplates } from '@/hooks/useChartOfAccountsTemplates';
 import type { Tenant } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,11 +25,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-// Removed: import { getDocs, collection } from 'firebase/firestore';
-// Removed: import { db } from '@/lib/firebase';
 
 export default function ManageTenantsPage() {
-  const { data: tenants, isLoading, error } = useGetTenants();
+  const { data: tenants, isLoading: isLoadingTenants, error: tenantsError } = useGetTenants();
+  const { data: templates, isLoading: isLoadingTemplates } = useGetChartOfAccountsTemplates();
   const addTenantMutation = useAddTenant();
   const updateTenantMutation = useUpdateTenant();
   const deleteTenantMutation = useDeleteTenant();
@@ -38,38 +38,42 @@ export default function ManageTenantsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
-
-  // console.log("[ManageTenantsPage] useGetTenants state:", { tenants, isLoading, error });
+  const [clientLoaded, setClientLoaded] = useState(false);
 
   useEffect(() => {
-    if (tenants) {
-      // console.log("[ManageTenantsPage] tenants received:", tenants);
+    setClientLoaded(true);
+  }, []);
+
+
+  useEffect(() => {
+    if (tenants && clientLoaded) {
       const newFormattedDates: Record<string, string> = {};
       tenants.forEach(tenant => {
         try {
-          // console.log(`[ManageTenantsPage] Formatting date for tenant ${tenant.id}, createdAt: ${tenant.createdAt}`);
           const dateToFormat = new Date(tenant.createdAt);
           if (isNaN(dateToFormat.getTime())) {
-            // This error means tenant.createdAt was not a valid date string/number for new Date()
             throw new Error(`Invalid date value for tenant.createdAt: ${tenant.createdAt}`);
           }
           newFormattedDates[tenant.id] = format(dateToFormat, "PPP p", { locale: de });
         } catch (e) {
-          // console.error("[ManageTenantsPage] Error formatting date for tenant in useEffect:", tenant.id, tenant.createdAt, e);
           newFormattedDates[tenant.id] = "Ungültiges Datum";
         }
       });
       setFormattedDates(newFormattedDates);
     }
-  }, [tenants]);
+  }, [tenants, clientLoaded]);
 
-  const handleCreateTenant = async (values: { name: string }) => {
+  const handleCreateTenant = async (values: TenantFormValues) => {
     try {
-      await addTenantMutation.mutateAsync(values.name);
+      await addTenantMutation.mutateAsync({ 
+        name: values.name, 
+        chartOfAccountsTemplateId: values.chartOfAccountsTemplateId || undefined // Pass undefined if empty string
+      });
       toast({ title: "Erfolg", description: "Mandant erfolgreich erstellt.", variant: "default" });
       setIsCreateModalOpen(false);
     } catch (e) {
-      toast({ title: "Fehler", description: "Mandant konnte nicht erstellt werden.", variant: "destructive" });
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Mandant konnte nicht erstellt werden: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -78,15 +82,17 @@ export default function ManageTenantsPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateTenant = async (values: { name: string }) => {
+  const handleUpdateTenant = async (values: TenantFormValues) => { 
     if (!selectedTenant) return;
     try {
+      // Currently only name is updated via this form. Template selection is on create only.
       await updateTenantMutation.mutateAsync({ id: selectedTenant.id, name: values.name });
       toast({ title: "Erfolg", description: "Mandant erfolgreich aktualisiert.", variant: "default" });
       setIsEditModalOpen(false);
       setSelectedTenant(null);
     } catch (e) {
-      toast({ title: "Fehler", description: "Mandant konnte nicht aktualisiert werden.", variant: "destructive" });
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Mandant konnte nicht aktualisiert werden: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -94,18 +100,28 @@ export default function ManageTenantsPage() {
     try {
       await deleteTenantMutation.mutateAsync(tenantId);
       toast({ title: "Erfolg", description: "Mandant erfolgreich gelöscht.", variant: "default" });
-    } catch (e) {
-      toast({ title: "Fehler", description: "Mandant konnte nicht gelöscht werden.", variant: "destructive" });
+    } catch (e)
+       {
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Mandant konnte nicht gelöscht werden: ${errorMessage}`, variant: "destructive" });
     }
   };
 
-  if (error) {
-    // console.error("[ManageTenantsPage] Error from useGetTenants:", error);
+  const getTemplateName = (templateId?: string) => {
+    if (!templates || !templateId) return 'Nicht zugewiesen';
+    const template = templates.find(t => t.id === templateId);
+    return template ? template.name : 'Unbekannte Vorlage';
+  };
+  
+  const isLoading = isLoadingTenants || isLoadingTemplates || !clientLoaded;
+
+
+  if (tenantsError) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive">
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Mandanten</h2>
-        <p>{error.message}</p>
+        <p>{tenantsError.message}</p>
       </div>
     );
   }
@@ -128,7 +144,7 @@ export default function ManageTenantsPage() {
               <DialogHeader>
                 <DialogTitle>Neuen Mandant erstellen</DialogTitle>
                 <DialogDescription>
-                  Geben Sie den Namen für den neuen Mandanten ein.
+                  Geben Sie die Details für den neuen Mandanten ein.
                 </DialogDescription>
               </DialogHeader>
               <TenantForm onSubmit={handleCreateTenant} isSubmitting={addTenantMutation.isPending} />
@@ -157,6 +173,8 @@ export default function ManageTenantsPage() {
                   <TableRow>
                     <TableHead className="w-[200px]">Name</TableHead>
                     <TableHead>Erstellt am</TableHead>
+                    <TableHead>Kontenplan Vorlage</TableHead>
+                    <TableHead>Aktiver Kontenplan</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -165,14 +183,16 @@ export default function ManageTenantsPage() {
                     <TableRow key={tenant.id}>
                       <TableCell className="font-medium">{tenant.name}</TableCell>
                       <TableCell>{formattedDates[tenant.id] || 'Lädt...'}</TableCell>
+                      <TableCell>{getTemplateName(tenant.chartOfAccountsTemplateId)}</TableCell>
+                      <TableCell>{tenant.chartOfAccountsId ? `Ja (ID: ...${tenant.chartOfAccountsId.slice(-4)})` : 'Nein'}</TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleEditTenant(tenant)}>
+                        <Button variant="outline" size="icon" onClick={() => handleEditTenant(tenant)} title="Mandant bearbeiten">
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Mandant bearbeiten</span>
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon">
+                            <Button variant="destructive" size="icon" title="Mandant löschen">
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Mandant löschen</span>
                             </Button>
@@ -181,7 +201,7 @@ export default function ManageTenantsPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Diese Aktion kann nicht rückgängig gemacht werden. Dadurch wird der Mandant "{tenant.name}" dauerhaft gelöscht.
+                                Diese Aktion kann nicht rückgängig gemacht werden. Dadurch wird der Mandant "{tenant.name}" dauerhaft gelöscht. Zugehörige Daten wie der Kontenplan dieses Mandanten werden NICHT automatisch gelöscht.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -200,7 +220,7 @@ export default function ManageTenantsPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                         Keine Mandanten gefunden. Erstellen Sie einen, um loszulegen!
                       </TableCell>
                     </TableRow>
@@ -221,8 +241,10 @@ export default function ManageTenantsPage() {
             <DialogTitle>Mandant bearbeiten</DialogTitle>
             <DialogDescription>
               Aktualisieren Sie den Namen für den Mandanten: {selectedTenant?.name}.
+              Die Kontenplan-Vorlage kann nach der Erstellung nicht mehr geändert werden.
             </DialogDescription>
           </DialogHeader>
+          {/* TenantForm for edit mode might need to disable template selection or handle it differently */}
           <TenantForm 
             onSubmit={handleUpdateTenant} 
             initialData={selectedTenant} 
