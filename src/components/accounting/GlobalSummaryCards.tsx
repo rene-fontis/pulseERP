@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Scale, Landmark, DollarSign, Minus, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, Landmark, DollarSign, Minus, Plus, ArrowRightLeft } from 'lucide-react';
 import type { FinancialSummary } from '@/lib/accounting';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,35 +61,44 @@ export function GlobalSummaryCards({ summary, isLoading }: GlobalSummaryCardsPro
       </div>
     );
   }
+  
+  const netProfitLossTitle = summary.netProfitLoss >= 0 ? "Gewinn (Periode)" : "Verlust (Periode)";
+  const netProfitLossIcon = summary.netProfitLoss >= 0 ? TrendingUp : TrendingDown;
+  const netProfitLossColor = summary.netProfitLoss > 0 ? 'text-green-600' : summary.netProfitLoss < 0 ? 'text-red-600' : '';
+
+  const equityChangeIcon = summary.equityPeriodChange >= 0 ? Plus : Minus;
+  const equityChangeColor = summary.equityPeriodChange > 0 ? 'text-green-600' : summary.equityPeriodChange < 0 ? 'text-red-600' : '';
+
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 px-4 md:px-0">
       <StatCard
         title="Veränderung Aktiven (Periode)"
-        value={formatCurrency(summary.totalAssets)}
-        icon={summary.totalAssets >= 0 ? Plus : Minus}
+        value={formatCurrency(summary.totalAssetsPeriodChange)}
+        icon={summary.totalAssetsPeriodChange >= 0 ? Plus : Minus}
         description="Zunahme/Abnahme der Vermögenswerte in der Periode"
-        valueColorClass={summary.totalAssets > 0 ? 'text-green-600' : summary.totalAssets < 0 ? 'text-red-600' : ''}
+        valueColorClass={summary.totalAssetsPeriodChange > 0 ? 'text-green-600' : summary.totalAssetsPeriodChange < 0 ? 'text-red-600' : ''}
       />
       <StatCard
         title="Veränderung Passiven (Periode)"
-        value={formatCurrency(summary.totalLiabilities)}
-        icon={summary.totalLiabilities >= 0 ? Plus : Minus}
+        value={formatCurrency(summary.totalLiabilitiesPeriodChange)}
+        icon={summary.totalLiabilitiesPeriodChange >= 0 ? Plus : Minus} // Increase in liability value (less negative) is an increase in liabilities
         description="Zunahme/Abnahme der Verbindlichkeiten in der Periode"
-        valueColorClass={summary.totalLiabilities > 0 ? 'text-red-600' : summary.totalLiabilities < 0 ? 'text-green-600' : ''} // Increase in liability is usually "bad" for net worth view
-      />
-      <StatCard
-        title="Eigenkapital (Ende Periode)"
-        value={formatCurrency(summary.equity)}
-        icon={DollarSign}
-        description="Reinvermögen (Aktiven - Passiven) am Periodenende"
+        valueColorClass={summary.totalLiabilitiesPeriodChange > 0 ? 'text-red-600' : summary.totalLiabilitiesPeriodChange < 0 ? 'text-green-600' : ''}
       />
        <StatCard
-        title={summary.netProfitLoss >= 0 ? "Gewinn (Periode)" : "Verlust (Periode)"}
+        title="Veränderung Eigenkapital (Periode)"
+        value={formatCurrency(summary.equityPeriodChange)}
+        icon={equityChangeIcon}
+        description="Zunahme/Abnahme des Eigenkapitals in der Periode"
+        valueColorClass={equityChangeColor}
+      />
+       <StatCard
+        title={netProfitLossTitle}
         value={formatCurrency(summary.netProfitLoss)}
-        icon={summary.netProfitLoss >= 0 ? TrendingUp : TrendingDown}
+        icon={netProfitLossIcon}
         description="Ergebnis aus Erträgen und Aufwänden der Periode"
-        valueColorClass={summary.netProfitLoss > 0 ? 'text-green-600' : summary.netProfitLoss < 0 ? 'text-red-600' : ''}
+        valueColorClass={netProfitLossColor}
       />
       <StatCard
         title="Gesamtertrag (Periode)"
@@ -103,7 +112,7 @@ export function GlobalSummaryCards({ summary, isLoading }: GlobalSummaryCardsPro
         value={formatCurrency(summary.totalExpenses)}
         icon={TrendingDown}
         description="Summe aller Aufwände in der Periode"
-        valueColorClass={summary.totalExpenses > 0 ? 'text-red-600' : summary.totalExpenses < 0 ? 'text-green-600' : ''} // Higher expense is "bad"
+        valueColorClass={summary.totalExpenses > 0 ? 'text-red-600' : summary.totalExpenses < 0 ? 'text-green-600' : ''}
       />
     </div>
   );

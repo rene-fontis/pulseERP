@@ -166,14 +166,15 @@ export interface MonthlyBreakdownItem {
 }
 
 export interface FinancialSummary {
-  totalAssets: number; // Represents period change for summary cards
-  totalLiabilities: number; // Represents period change for summary cards
-  closingTotalAssets: number; // Absolute closing balance for equity calculation
-  closingTotalLiabilities: number; // Absolute closing balance for equity calculation
+  totalAssetsPeriodChange: number;
+  totalLiabilitiesPeriodChange: number;
+  equityPeriodChange: number;
+  closingTotalAssets: number;
+  closingTotalLiabilities: number;
   totalRevenue: number;
   totalExpenses: number;
   netProfitLoss: number;
-  equity: number; // Closing equity
+  closingEquity: number;
   accountBalances: AccountBalances; // Closing balances for all accounts
   monthlyBreakdown: MonthlyBreakdownItem[];
 }
