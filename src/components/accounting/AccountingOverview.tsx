@@ -95,7 +95,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
   const monthlyChartData = summary.monthlyBreakdown?.map(item => ({ 
     name: item.monthYear, 
     Ertrag: item.revenue,
-    Aufwand: -item.expenses, // Expenses as negative values for downward bars
+    Aufwand: item.expenses, // Expenses as positive values, will be plotted as negative by Recharts if domain allows
     GewinnVerlust: item.revenue - item.expenses,
   })) || [];
 
@@ -159,11 +159,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
                                         const closingBalance = summary.accountBalances[account.id] || 0;
-                                        const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
-                                        let periodChange = closingBalance - openingBalance;
+                                        // const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
+                                        // let periodChange = closingBalance - openingBalance;
                                         let displayBalanceForBilanz = closingBalance;
                                         if (category.type === 'Liability' || category.type === 'Equity') {
-                                          displayBalanceForBilanz = -closingBalance;
+                                          displayBalanceForBilanz = -closingBalance; // Show as positive for convention
                                         }
 
 
@@ -205,11 +205,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                 <CardContent>
                   <ChartContainer config={chartConfig} className="h-[400px] w-full">
                     <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} horizontalStroke="hsl(var(--border))" />
                       <XAxis
                         dataKey="name"
                         tickLine={false}
-                        axisLine={true}
+                        axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1.5 }}
                         tickMargin={8}
                       />
                       <YAxis
@@ -218,14 +218,11 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                         axisLine={true}
                         tickMargin={8}
                         allowDataOverflow={true}
-                        domain={['auto', 'auto']} // Explicitly set domain to auto for both ends
+                        domain={['auto', 'auto']} 
                       />
                       <ChartTooltip
                         cursor={true}
                         content={<ChartTooltipContent formatter={(value, name) => {
-                            if (name === 'Aufwand' && typeof value === 'number') {
-                                return [formatCurrency(-value), String(name)];
-                            }
                             return [formatCurrency(value as number), String(name)];
                         }} />}
                       />
@@ -233,8 +230,14 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                       <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
-                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
-                        <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(-value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
+                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20} stackId="a">
+                        {(barProps) => {
+                          const { x, y, width, height, value } = barProps;
+                          if (typeof value !== 'number' || value === 0) return null;
+                          // Render expenses as negative bars if they are positive values in data
+                          return <rect x={x} y={y} width={width} height={height > 0 ? height : -height} fill={barProps.fill} />;
+                        }}
+                        <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                        <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
                     </ComposedChart>
@@ -286,6 +289,9 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                         const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
                                         let periodChange = closingBalance - openingBalance;
                                         
+                                        // Ertrag wird als positive Zahl dargestellt, Aufwand auch (aber wird vom Ertrag abgezogen)
+                                        // In der Buchhaltung ist Ertrag Haben (negativ), Aufwand Soll (positiv)
+                                        // Für die Anzeige wollen wir Ertrag positiv, Aufwand positiv.
                                         const displayAmount = (category.type === 'Revenue') ? -periodChange : periodChange;
                                         
                                         return (
