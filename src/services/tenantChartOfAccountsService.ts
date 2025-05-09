@@ -35,8 +35,9 @@ const mapDocToTenantCoa = (docSnapshot: any): TenantChartOfAccounts => {
       accounts: g.accounts ? g.accounts.map((a: any) => ({ 
         ...a, 
         id: a.id || crypto.randomUUID(),
-        description: a.description || '', // Ensure description is a string
-        balance: a.balance || 0, // Ensure balance exists
+        description: a.description || '', 
+        balance: a.balance || 0, 
+        isSystemAccount: a.isSystemAccount || false, // Ensure isSystemAccount
     })) : [],
     })) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
@@ -48,7 +49,6 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
   const template = await getChartOfAccountsTemplateById(templateId);
   if (!template) {
     console.error(`Template with ID ${templateId} not found.`);
-    // Instead of returning null, which might hide issues, throw an error or return a specific status
     throw new Error(`Chart of Accounts Template with ID ${templateId} not found.`);
   }
 
@@ -64,6 +64,7 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
       name: accountTemplate.name,
       description: accountTemplate.description || '',
       balance: 0, 
+      isSystemAccount: accountTemplate.isSystemAccount || false, // Carry over isSystemAccount
     })),
   }));
 
@@ -81,7 +82,6 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
   if (newDocSnapshot.exists()) {
     return mapDocToTenantCoa(newDocSnapshot);
   }
-  // This state should ideally not be reached if addDoc was successful.
   throw new Error("Could not retrieve Tenant Chart of Accounts after creation from template.");
 };
 
@@ -104,12 +104,13 @@ export const updateTenantChartOfAccounts = async (coaId: string, data: Partial<O
   if (data.groups) {
     updatePayload.groups = data.groups.map(group => ({
         ...group,
-        id: group.id || crypto.randomUUID(), // Ensure IDs exist or generate new ones
+        id: group.id || crypto.randomUUID(), 
         accounts: group.accounts.map(account => ({
             ...account,
             id: account.id || crypto.randomUUID(),
             description: account.description || '',
             balance: account.balance || 0,
+            isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount on update
         })),
     }));
    }
@@ -120,10 +121,6 @@ export const updateTenantChartOfAccounts = async (coaId: string, data: Partial<O
 
 export const deleteTenantChartOfAccounts = async (coaId: string): Promise<boolean> => {
   const docRef = doc(db, 'tenantChartOfAccounts', coaId);
-  // Add checks here: e.g., ensure no journal entries are using this CoA before deleting.
-  // This is a critical step for data integrity.
-  // For now, direct deletion:
   await deleteDoc(docRef);
   return true;
 };
-

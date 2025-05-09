@@ -24,16 +24,17 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
     },
     {
-      name: "Passiven",
-      mainType: "Liability",
+      name: "Passiven & Eigenkapital", // Renamed for clarity
+      mainType: "Liability", // Main type remains Liability for group, specific accounts can be Equity
       accounts: [
         { number: "2000", name: "Verbindlichkeiten aus Lieferungen und Leistungen (VLL)", description: "Offene Lieferantenrechnungen"},
         { number: "2100", name: "Kurzfristige verzinsliche Verbindlichkeiten", description: "Kontokorrentkredite Bank"},
         { number: "2300", name: "Passive Rechnungsabgrenzungen (PRA)", description: "Noch nicht bezahlter Aufwand / Im Voraus erhaltener Ertrag"},
         { number: "2400", name: "Langfristige verzinsliche Verbindlichkeiten", description: "Darlehen, Hypotheken"},
-        { number: "2800", name: "Eigenkapital (Grund-/Stammkapital)", description: "Gezeichnetes Kapital"},
-        { number: "2900", name: "Reserven", description: "Gesetzliche und freie Reserven"},
-        { number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto." },
+        // Sub-grouping within 'Passiven & Eigenkapital' for clarity, or separate main 'Equity' group
+        { number: "2800", name: "Eigenkapital (Grund-/Stammkapital)", description: "Gezeichnetes Kapital", isSystemAccount: false }, // This is Equity
+        { number: "2900", name: "Reserven", description: "Gesetzliche und freie Reserven", isSystemAccount: false }, // This is Equity
+        { number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true }, // This is Equity System Account
       ],
     },
     {
@@ -83,13 +84,13 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
       ],
     },
     {
-      name: "Passiven",
+      name: "Passiven & Eigenkapital",
       mainType: "Liability",
       accounts: [
         { number: "2000", name: "Verbindlichkeiten", description: "Kurzfristige Schulden des Vereins" },
-        { number: "2800", name: "Vereinsvermögen / Fondskapital", description: "Eigenmittel des Vereins" },
-        { number: "2850", name: "Zweckgebundene Fonds", description: "Mittel für spezifische Projekte" },
-        { number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Vereinsjahres. Dient dem Bilanzausgleich. Systemkonto." },
+        { number: "2800", name: "Vereinsvermögen / Fondskapital", description: "Eigenmittel des Vereins", isSystemAccount: false }, // Equity
+        { number: "2850", name: "Zweckgebundene Fonds", description: "Mittel für spezifische Projekte", isSystemAccount: false }, // Equity/Liability depending on nature
+        { number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Vereinsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true }, // Equity System Account
       ],
     },
     {
@@ -138,8 +139,8 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
       accounts: [
         { number: "2000", name: "Privatkredite / Darlehen", description: "Konsumkredite, Darlehen von Privatpersonen" },
         { number: "2100", name: "Hypotheken", description: "Schulden für Immobilienfinanzierung" },
-        { number: "2800", name: "Eigenmittel / Reinvermögen", description: "Differenz Vermögen - Schulden" },
-        { number: "2979", name: "Laufender Überschuss/Fehlbetrag", description: "Ergebnis der laufenden Periode. Dient dem Bilanzausgleich. Systemkonto." },
+        { number: "2800", name: "Eigenmittel / Reinvermögen", description: "Differenz Vermögen - Schulden", isSystemAccount: false }, // Equity
+        { number: "2979", name: "Laufender Überschuss/Fehlbetrag", description: "Ergebnis der laufenden Periode. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true }, // Equity System Account
       ],
     },
     {
@@ -170,6 +171,20 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
   ],
 };
 
+// To create distinct Equity groups if needed, adjust the structure:
+// For example, for KMU:
+// const kmuEquityGroup: AccountGroupTemplate = {
+//   name: "Eigenkapital",
+//   mainType: "Equity",
+//   accounts: [
+//     { number: "2800", name: "Grund-/Stammkapital", description: "Gezeichnetes Kapital" },
+//     { number: "2900", name: "Reserven", description: "Gesetzliche und freie Reserven" },
+//     { number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres.", isSystemAccount: true },
+//   ],
+// };
+// Then, the Passives group would only contain liability accounts, and kmuEquityGroup would be added to kmuTemplate.groups.
+// For simplicity in this seed, Equity accounts are listed under "Passiven & Eigenkapital" and their type will be used by the summary logic.
+
 const defaultTemplates: ChartOfAccountsTemplateFormValues[] = [kmuTemplate, vereinTemplate, privatTemplate];
 
 export async function seedDefaultChartOfAccountsTemplates() {
@@ -179,18 +194,18 @@ export async function seedDefaultChartOfAccountsTemplates() {
 
     for (const template of defaultTemplates) {
       if (!existingTemplateNames.includes(template.name)) {
-        // Ensure IDs are not part of the submission for accounts/groups, service will generate them
         const templateToSubmit: ChartOfAccountsTemplateFormValues = {
           ...template,
           groups: template.groups.map(g => ({
             name: g.name,
-            mainType: g.mainType,
+            mainType: g.mainType, // This should be the group's main type
             accounts: g.accounts.map(a => ({
               name: a.name,
               number: a.number,
               description: a.description || '',
+              isSystemAccount: a.isSystemAccount || false, // Ensure isSystemAccount is passed
             })),
-          } as Omit<AccountGroupTemplate, 'id'>)) // Cast to ensure no `id` field if present in definition
+          } as Omit<AccountGroupTemplate, 'id'>)) 
         };
         await addChartOfAccountsTemplate(templateToSubmit);
         console.log(`Seeded template: ${template.name}`);
@@ -201,32 +216,5 @@ export async function seedDefaultChartOfAccountsTemplates() {
     console.log("Default templates seeding process completed.");
   } catch (error) {
     console.error("Error seeding default chart of accounts templates:", error);
-    // Consider re-throwing or handling more gracefully depending on where this is called
   }
 }
-
-// Example of how you might call this, e.g., in a useEffect in a top-level component or an admin utility page:
-//
-// import { useEffect } from 'react';
-// import { seedDefaultChartOfAccountsTemplates } from '@/lib/seedTemplates';
-//
-// function AppInitializer() {
-//   useEffect(() => {
-//     const runSeed = async () => {
-//       await seedDefaultChartOfAccountsTemplates();
-//     };
-//     // Check if seeding has already been done (e.g., via localStorage flag or a specific Firestore document)
-//     // to prevent running it on every app load.
-//     const hasSeeded = localStorage.getItem('hasSeededDefaultTemplates');
-//     if (!hasSeeded) {
-//       runSeed().then(() => {
-//         localStorage.setItem('hasSeededDefaultTemplates', 'true');
-//       });
-//     }
-//   }, []);
-//
-//   return null; // This component doesn't render anything
-// }
-//
-// Then, include <AppInitializer /> in your main layout.
-// This is a simple client-side approach. A more robust solution for production might involve a backend script or a dedicated admin interface action.

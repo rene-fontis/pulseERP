@@ -32,7 +32,12 @@ const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
     groups: data.groups ? data.groups.map((g: any) => ({
       ...g,
       id: g.id || crypto.randomUUID(), 
-      accounts: g.accounts ? g.accounts.map((a: any) => ({ ...a, id: a.id || crypto.randomUUID(), description: a.description || '' })) : [],
+      accounts: g.accounts ? g.accounts.map((a: any) => ({ 
+          ...a, 
+          id: a.id || crypto.randomUUID(), 
+          description: a.description || '',
+          isSystemAccount: a.isSystemAccount || false, // Ensure isSystemAccount is mapped
+        })) : [],
     })) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
@@ -66,6 +71,7 @@ export const addChartOfAccountsTemplate = async (templateData: ChartOfAccountsTe
         ...account,
         id: account.id || crypto.randomUUID(),
         description: account.description || '',
+        isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount is included
       })),
     })),
     createdAt: now,
@@ -83,7 +89,7 @@ export const updateChartOfAccountsTemplate = async (id: string, templateData: Pa
   const docRef = doc(db, 'chartOfAccountsTemplates', id);
    const updateData: any = { ...templateData, updatedAt: serverTimestamp() };
    
-   if (templateData.description === undefined) updateData.description = ''; // ensure empty string if undefined
+   if (templateData.description === undefined) updateData.description = '';
 
    if (templateData.groups) {
     updateData.groups = templateData.groups.map(group => ({
@@ -93,6 +99,7 @@ export const updateChartOfAccountsTemplate = async (id: string, templateData: Pa
             ...account,
             id: account.id || crypto.randomUUID(),
             description: account.description || '',
+            isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount is included on update
         })),
     }));
    }
@@ -110,4 +117,3 @@ export const deleteChartOfAccountsTemplate = async (id: string): Promise<boolean
   await deleteDoc(docRef);
   return true;
 };
-

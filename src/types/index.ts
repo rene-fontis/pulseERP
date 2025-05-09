@@ -16,13 +16,13 @@ export interface AccountTemplate {
   number: string; // Account number, e.g., "1000"
   name: string; // Account name, e.g., "Kasse"
   description?: string;
-  // isSystemAccount?: boolean; // For special accounts like profit/loss
+  isSystemAccount?: boolean; // For special accounts like profit/loss, non-deletable/modifiable by user
 }
 
 export interface AccountGroupTemplate {
   id?: string; // Unique within the template
   name: string; // e.g., "Umlaufvermögen", "Bank"
-  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue'; // Main COA categories
+  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity'; // Main COA categories, Added Equity
   accounts: AccountTemplate[];
 }
 
@@ -45,14 +45,14 @@ export interface Account {
   number: string;
   name: string;
   description?: string;
-  balance?: number; // Current balance, might be calculated or stored
-  // isSystemAccount?: boolean; // For special accounts like profit/loss
+  balance?: number; // Opening balance for the fiscal period
+  isSystemAccount?: boolean; // For special accounts like profit/loss
 }
 
 export interface AccountGroup {
   id: string;
   name: string;
-  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue';
+  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity'; // Added Equity
   accounts: Account[];
 }
 

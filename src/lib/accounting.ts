@@ -10,8 +10,8 @@ export interface FinancialSummary {
   totalRevenue: number;
   totalExpenses: number;
   netProfitLoss: number;
-  equity: number; // Assets - Liabilities
-  accountBalances: AccountBalances; // Balances for each individual account
+  equity: number; 
+  accountBalances: AccountBalances; 
 }
 
 export function calculateFinancialSummary(
@@ -32,88 +32,82 @@ export function calculateFinancialSummary(
     return initialSummary;
   }
 
-  const accountBalances: AccountBalances = {};
+  const accountBalances: AccountBalances = {}; 
 
-  // Initialize balances for all accounts in the CoA from their stored/initial balance
+  // Initialize accountBalances with the opening balances from the Chart of Accounts.
   chartOfAccounts.groups.forEach(group => {
     group.accounts.forEach(account => {
-      // Use the balance from CoA as starting point if it exists, otherwise 0
-      // This 'balance' on the account object is the one stored in Firestore for the CoA structure.
-      // We will adjust it with journal entries.
       accountBalances[account.id] = account.balance || 0;
     });
   });
-  
-  // Adjust balances based on journal entries
-  // This logic assumes that the account.balance in CoA is an *opening* balance or a static value.
-  // If account.balance in CoA is meant to be *the* real-time balance, then this calculation
-  // should start from 0 for each account and sum up all transactions.
-  // Given current setup, let's assume we calculate from scratch for the overview.
-  
-  // Re-initialize to 0 to calculate current balance from all transactions
-  chartOfAccounts.groups.forEach(group => {
-    group.accounts.forEach(account => {
-      accountBalances[account.id] = 0; 
-    });
-  });
 
-
+  // Adjust balances based on journal entries for the current period
   journalEntries.forEach(entry => {
     entry.lines.forEach(line => {
       const account = chartOfAccounts.groups
         .flatMap(g => g.accounts)
         .find(a => a.id === line.accountId);
 
-      if (account) {
+      if (account) { 
         const debitAmount = line.debit || 0;
         const creditAmount = line.credit || 0;
-
-        switch (account.mainType) {
-          case 'Asset':
-          case 'Expense':
-            accountBalances[account.id] = (accountBalances[account.id] || 0) + debitAmount - creditAmount;
-            break;
-          case 'Liability':
-          case 'Revenue':
-            accountBalances[account.id] = (accountBalances[account.id] || 0) + creditAmount - debitAmount;
-            break;
-          default:
-            break;
-        }
+        // Update the running balance.
+        // For accounts that naturally increase with a debit (Assets, Expenses): Balance = Opening + Debits - Credits
+        // For accounts that naturally increase with a credit (Liabilities, Equity, Revenue): Balance = Opening - Debits + Credits
+        // Our current `accountBalances[account.id]` holds the opening balance.
+        // So, we add debits and subtract credits. The interpretation of this value depends on the account type.
+        accountBalances[account.id] = (accountBalances[account.id] || 0) + debitAmount - creditAmount;
       }
     });
   });
 
-  // Calculate totals
   let totalAssets = 0;
   let totalLiabilities = 0;
-  let totalRevenue = 0;
+  let totalEquity = 0; // Sum of equity accounts directly
+  let totalRevenue = 0; 
   let totalExpenses = 0;
 
   chartOfAccounts.groups.forEach(group => {
     group.accounts.forEach(account => {
-      const balance = accountBalances[account.id] || 0;
+      const currentBalance = accountBalances[account.id] || 0;
+      // currentBalance = OpeningBalance + DebitsForPeriod - CreditsForPeriod
+
       switch (account.mainType) {
         case 'Asset':
-          totalAssets += balance;
+          // Assets have a natural debit balance. Positive currentBalance adds to totalAssets.
+          totalAssets += currentBalance;
           break;
         case 'Liability':
-          totalLiabilities += balance;
+          // Liabilities have a natural credit balance.
+          // If currentBalance is negative (more credits than debits), it's a liability.
+          // We sum the absolute value of credit balances.
+          totalLiabilities -= currentBalance; 
+          break;
+        case 'Equity':
+          // Equity has a natural credit balance.
+          totalEquity -= currentBalance;
           break;
         case 'Revenue':
-          // Revenue typically has credit balance. If we sum them directly, a positive value means revenue.
-          totalRevenue += balance; 
+          // Revenue has a natural credit balance.
+          totalRevenue -= currentBalance;
           break;
         case 'Expense':
-          // Expenses typically have debit balance. If we sum them directly, a positive value means expense.
-          totalExpenses += balance;
+          // Expenses have a natural debit balance.
+          totalExpenses += currentBalance;
           break;
       }
     });
   });
 
   const netProfitLoss = totalRevenue - totalExpenses;
-  const equity = totalAssets - totalLiabilities; // Basic equity calculation
+  
+  // Final Equity: Opening Equity (from equity accounts) + Net Profit/Loss for the period
+  // Note: If a "Current Year Earnings" system account is part of Equity, its balance
+  // should automatically reflect netProfitLoss after all calculations if journal entries are posted correctly.
+  // For display, often Equity = Initial Equity Accounts + Current P&L
+  // Or simply Assets - Liabilities (which should include P&L impact implicitly)
+  const calculatedEquityFromAssetsLiabilities = totalAssets - totalLiabilities;
+
 
   return {
     totalAssets,
@@ -121,7 +115,7 @@ export function calculateFinancialSummary(
     totalRevenue,
     totalExpenses,
     netProfitLoss,
-    equity,
-    accountBalances,
+    equity: calculatedEquityFromAssetsLiabilities, // Displaying A-L
+    accountBalances, 
   };
 }

@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import type { ChartOfAccountsTemplate, AccountGroupTemplate } from '@/types'; // ChartOfAccountsTemplateFormValues removed
+import type { ChartOfAccountsTemplate, AccountGroupTemplate } from '@/types'; 
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Re-define form values type locally if not exporting from types/index.ts
 export type ChartOfAccountsTemplateFormValues = Omit<ChartOfAccountsTemplate, 'id' | 'createdAt' | 'updatedAt'>;
 
 
@@ -23,12 +22,13 @@ const accountTemplateSchema = z.object({
   number: z.string().min(1, "Kontonummer ist erforderlich."),
   name: z.string().min(1, "Kontoname ist erforderlich."),
   description: z.string().optional().default(''),
+  isSystemAccount: z.boolean().optional().default(false),
 });
 
 const accountGroupTemplateSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
   name: z.string().min(1, "Gruppenname ist erforderlich."),
-  mainType: z.enum(['Asset', 'Liability', 'Expense', 'Revenue'], { required_error: "Haupttyp ist erforderlich." }),
+  mainType: z.enum(['Asset', 'Liability', 'Expense', 'Revenue', 'Equity'], { required_error: "Haupttyp ist erforderlich." }),
   accounts: z.array(accountTemplateSchema).default([]),
 });
 
@@ -48,6 +48,7 @@ interface ChartOfAccountsTemplateFormProps {
 const mainTypeOptions: { value: AccountGroupTemplate['mainType']; label: string }[] = [
   { value: 'Asset', label: 'Aktiven (Asset)' },
   { value: 'Liability', label: 'Passiven (Liability)' },
+  { value: 'Equity', label: 'Eigenkapital (Equity)' },
   { value: 'Expense', label: 'Aufwand (Expense)' },
   { value: 'Revenue', label: 'Ertrag (Revenue)' },
 ];
@@ -61,11 +62,16 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
           description: initialData.description || '',
           groups: initialData.groups.map(g => ({
             ...g,
-            id: g.id || crypto.randomUUID(), // Ensure IDs
-            accounts: g.accounts.map(a => ({...a, id: a.id || crypto.randomUUID(), description: a.description || ''})) 
+            id: g.id || crypto.randomUUID(), 
+            accounts: g.accounts.map(a => ({
+                ...a, 
+                id: a.id || crypto.randomUUID(), 
+                description: a.description || '',
+                isSystemAccount: a.isSystemAccount || false,
+            })) 
           }))
         } 
-      : { name: '', description: '', groups: [{ id: crypto.randomUUID(), name: 'Gruppe 1', mainType: 'Asset', accounts: [{id: crypto.randomUUID(), number: '1000', name: 'Kasse', description: ''}] }] },
+      : { name: '', description: '', groups: [{ id: crypto.randomUUID(), name: 'Gruppe 1', mainType: 'Asset', accounts: [{id: crypto.randomUUID(), number: '1000', name: 'Kasse', description: '', isSystemAccount: false}] }] },
   });
 
   const { fields: groupFields, append: appendGroup, remove: removeGroup } = useFieldArray({
@@ -84,7 +90,8 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
                 accounts: g.accounts.map(a => ({
                     ...a,
                     id: a.id || crypto.randomUUID(),
-                    description: a.description || ''
+                    description: a.description || '',
+                    isSystemAccount: a.isSystemAccount || false,
                 }))
             }))
         });
@@ -99,7 +106,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <ScrollArea className="h-[calc(90vh-220px)] pr-4"> {/* Adjusted height */}
+        <ScrollArea className="h-[calc(90vh-220px)] pr-4"> 
           <div className="space-y-6">
             <FormField
               control={form.control}
@@ -190,7 +197,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
                         )}
                       />
                       
-                      <AccountsArrayField control={form.control} groupIndex={groupIndex} />
+                      <AccountsArrayField control={form.control} groupIndex={groupIndex} form={form} />
 
                     </CardContent>
                   </Card>
@@ -208,7 +215,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
           </div>
         </ScrollArea>
 
-        <div className="pt-6 border-t mt-auto"> {/* Ensure this is at the bottom */}
+        <div className="pt-6 border-t mt-auto"> 
           <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
             {isSubmitting ? 'Speichern...' : (initialData ? 'Änderungen speichern' : 'Vorlage erstellen')}
           </Button>
@@ -222,9 +229,10 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 interface AccountsArrayFieldProps {
   control: ReturnType<typeof useForm<ChartOfAccountsTemplateFormValues>>['control'];
   groupIndex: number;
+  form: ReturnType<typeof useForm<ChartOfAccountsTemplateFormValues>>; // Pass the form instance
 }
 
-function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
+function AccountsArrayField({ control, groupIndex, form }: AccountsArrayFieldProps) { // Added form to props
   const { fields, append, remove } = useFieldArray({
     control,
     name: `groups.${groupIndex}.accounts`,
@@ -241,6 +249,7 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
               size="icon"
               className="absolute top-1 right-1 text-muted-foreground hover:text-destructive h-6 w-6 z-10"
               onClick={() => remove(accountIndex)}
+              disabled={form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`)}
             >
               <Trash2 className="h-3 w-3" />
               <span className="sr-only">Konto entfernen</span>
@@ -253,7 +262,7 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
                 <FormItem>
                   <FormLabel className="text-xs">Nr.</FormLabel>
                   <FormControl>
-                    <Input placeholder="1000" {...field} className="h-8 text-sm" />
+                    <Input placeholder="1000" {...field} className="h-8 text-sm" disabled={form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -266,7 +275,7 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
                 <FormItem>
                   <FormLabel className="text-xs">Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Kasse" {...field} className="h-8 text-sm" />
+                    <Input placeholder="Kasse" {...field} className="h-8 text-sm" disabled={form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -280,19 +289,22 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
               <FormItem className="mt-2">
                 <FormLabel className="text-xs">Beschreibung (opt.)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Details zum Konto" {...field} className="h-8 text-sm" />
+                  <Input placeholder="Details zum Konto" {...field} className="h-8 text-sm" disabled={form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`)} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+           {form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`) && (
+             <p className="text-xs text-muted-foreground mt-1">Systemkonto, nicht vollständig bearbeitbar.</p>
+           )}
         </Card>
       ))}
       <Button
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '' })}
+        onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', isSystemAccount: false })}
         className="w-full mt-2"
       >
         <PlusCircle className="mr-2 h-4 w-4" /> Konto hinzufügen
@@ -300,4 +312,3 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
     </div>
   );
 }
-
