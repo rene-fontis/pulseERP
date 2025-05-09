@@ -21,7 +21,8 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as React from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
+// Button import is removed as it's no longer directly used for AccordionTrigger children with asChild
+// import { Button } from '@/components/ui/button'; 
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -111,20 +112,28 @@ export function AppSidebar() {
             <SidebarMenuItem>
                 <Accordion type="single" collapsible className="w-full" defaultValue={isAccountingActive ? "accounting-item" : undefined}>
                     <AccordionItem value="accounting-item" className="border-none">
-                        <AccordionTrigger asChild>
-                             <Button variant="ghost" className={cn("w-full justify-between p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
-                                <div className="flex items-center">
-                                    <BookOpen className="mr-2 h-4 w-4 shrink-0" />
-                                    <span>Buchhaltung</span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                             </Button>
+                        <AccordionTrigger className={cn(
+                            "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            // Targeting the ChevronDown rendered by AccordionTrigger itself
+                            "[&>svg]:text-sidebar-foreground [&>svg]:hover:text-sidebar-accent-foreground",
+                            isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
+                        )}>
+                            <div className="flex items-center">
+                                <BookOpen className="mr-2 h-4 w-4 shrink-0" />
+                                <span>Buchhaltung</span>
+                            </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/journal`}>
                                     <Link href={`/tenants/${currentTenantId}/accounting/journal`}>Journal</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                 {/* Placeholder for future reports link */}
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`} disabled>
+                                        <span className="cursor-not-allowed">Berichte (Demn.)</span>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                             </SidebarMenuSub>
@@ -136,14 +145,16 @@ export function AppSidebar() {
             <SidebarMenuItem>
                  <Accordion type="single" collapsible className="w-full" defaultValue={isSettingsActive ? "settings-item" : undefined}>
                     <AccordionItem value="settings-item" className="border-none">
-                        <AccordionTrigger asChild>
-                             <Button variant="ghost" className={cn("w-full justify-between p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
-                                <div className="flex items-center">
-                                 <Settings className="mr-2 h-4 w-4 shrink-0" />
-                                 <span>Einstellungen</span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                             </Button>
+                        <AccordionTrigger className={cn(
+                            "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                             // Targeting the ChevronDown rendered by AccordionTrigger itself
+                            "[&>svg]:text-sidebar-foreground [&>svg]:hover:text-sidebar-accent-foreground",
+                            isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg]:text-sidebar-primary-foreground"
+                        )}>
+                            <div className="flex items-center">
+                                <Settings className="mr-2 h-4 w-4 shrink-0" />
+                                <span>Einstellungen</span>
+                            </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
@@ -190,7 +201,7 @@ export function AppSidebar() {
                     isActive={isAccountingActive}
                     tooltip="Buchhaltung"
                 >
-                    <Link href={`/tenants/${currentTenantId}/accounting/journal`}>
+                    <Link href={`/tenants/${currentTenantId}/accounting`}>
                         <BookOpen />
                     </Link>
                 </SidebarMenuButton>
@@ -287,3 +298,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
