@@ -2,26 +2,9 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { JournalEntry, NewJournalEntryPayload, JournalEntryLine } from '@/types';
+import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils';
 
 const journalEntriesCollectionRef = collection(db, 'journalEntries');
-
-const formatFirestoreTimestamp = (timestamp: any, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
-  if (timestamp instanceof Timestamp) {
-    return timestamp.toDate().toISOString();
-  }
-  if (timestamp && typeof timestamp.seconds === 'number' && typeof timestamp.nanoseconds === 'number') {
-    try {
-      return new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate().toISOString();
-    } catch (e) { /* fallback */ }
-  }
-  if (typeof timestamp === 'string') {
-    const date = new Date(timestamp);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString();
-    }
-  }
-  return (defaultDateOption === 'epoch' ? new Date(0) : new Date()).toISOString();
-};
 
 const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
   const data = docSnapshot.data();
@@ -30,17 +13,16 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
     tenantId: data.tenantId,
     fiscalYearId: data.fiscalYearId, 
     entryNumber: data.entryNumber,
-    date: formatFirestoreTimestamp(data.date, 'now'),
+    date: formatFirestoreTimestamp(data.date, docSnapshot.id, 'now'),
     description: data.description,
     lines: data.lines ? data.lines.map((line: any) => ({
       ...line,
       id: line.id || crypto.randomUUID(),
-      // description: line.description, // Removed as per user request
     })) : [],
     attachments: data.attachments || [], 
     posted: data.posted || false,
-    createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
-    updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
+    createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, 'now'),
+    updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, 'now'),
   } as JournalEntry;
 };
 
@@ -90,7 +72,6 @@ export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promis
       if (sanitizedLine.credit === undefined) {
         delete sanitizedLine.credit;
       }
-      // Removed line.description as per user request
       return sanitizedLine;
     });
   } else {
@@ -125,7 +106,6 @@ export const updateJournalEntry = async (entryId: string, entryData: Partial<New
       const sanitizedLine: { [key: string]: any } = { ...line };
       if (sanitizedLine.debit === undefined) delete sanitizedLine.debit;
       if (sanitizedLine.credit === undefined) delete sanitizedLine.credit;
-      // Removed line.description as per user request
       return sanitizedLine;
     });
   }

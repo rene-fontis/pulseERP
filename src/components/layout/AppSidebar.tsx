@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays } from 'lucide-react'; // ChevronDown removed, CalendarDays added
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +33,7 @@ export function AppSidebar() {
 
   const isSettingsActive = pathname.startsWith(`/tenants/${currentTenantId}/settings`);
   const isAccountingActive = pathname.startsWith(`/tenants/${currentTenantId}/accounting`);
+  const isBudgetingActive = pathname.startsWith(`/tenants/${currentTenantId}/budgeting`);
   
   const commonMandantenVerwaltenButton = (
      <SidebarMenuItem>
@@ -70,10 +71,10 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            // disabled // Temporarily re-enable if needed for testing, then disable
+            disabled // Re-enabled, but generally should be disabled after first import
         >
             <Link href="/admin/import">
-                <Users /> {/* Placeholder icon, replace if a better one exists */}
+                <Users /> 
                 <span>Vorlagen Importieren</span>
             </Link>
         </SidebarMenuButton>
@@ -84,19 +85,19 @@ export function AppSidebar() {
   const renderTenantSpecificLinks = () => {
     if (!currentTenantId) return null;
 
-    if (isLoadingActiveTenant) {
+    if (isLoadingActiveTenant && clientLoaded) { // Only show skeleton if client has loaded and still loading tenant
       return (
         <>
           <SidebarMenuSkeleton showIcon />
           <SidebarMenuSkeleton showIcon />
           <SidebarMenuSkeleton showIcon />
+           <SidebarMenuSkeleton showIcon />
         </>
       );
     }
 
-    if (!activeTenant) {
+    if (!activeTenant && !isLoadingActiveTenant && clientLoaded) { // If client loaded and no tenant found
       return (
-        !isLoadingActiveTenant && (
           <SidebarMenuItem>
             <div className={cn(
               "px-4 py-2 text-xs text-sidebar-foreground/70",
@@ -105,8 +106,12 @@ export function AppSidebar() {
               Mandant nicht gefunden.
             </div>
           </SidebarMenuItem>
-        )
       );
+    }
+    
+    // If still loading on server or initial client, don't render tenant links yet to avoid hydration mismatch
+    if (!clientLoaded && isLoadingActiveTenant) {
+        return null;
     }
     
     const expandedOrMobileContent = (
@@ -157,6 +162,19 @@ export function AppSidebar() {
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+                 <SidebarMenuButton
+                    asChild
+                    isActive={isBudgetingActive}
+                    tooltip="Budgeting"
+                >
+                    <Link href={`/tenants/${currentTenantId}/budgeting`}>
+                    <BarChartBig />
+                    <span>Budgeting</span>
+                    </Link>
+                </SidebarMenuButton>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
@@ -233,6 +251,17 @@ export function AppSidebar() {
             <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
+                    isActive={isBudgetingActive}
+                    tooltip="Budgeting"
+                >
+                    <Link href={`/tenants/${currentTenantId}/budgeting`}>
+                        <BarChartBig />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
                     isActive={isSettingsActive} 
                     tooltip="Einstellungen"
                 >
@@ -246,6 +275,11 @@ export function AppSidebar() {
     
     return (sidebarState === 'expanded' || isMobile) ? expandedOrMobileContent : collapsedContent;
   };
+
+  const [clientLoaded, setClientLoaded] = React.useState(false);
+  React.useEffect(() => {
+    setClientLoaded(true);
+  }, []);
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r">
@@ -274,11 +308,11 @@ export function AppSidebar() {
                     <div className={cn(
                       "px-4 py-2 text-sm font-semibold text-sidebar-foreground truncate",
                     )}>
-                      {isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
+                      {clientLoaded && isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
                     </div>
                   ) : sidebarState === 'collapsed' && !isMobile ? ( 
                     <SidebarMenuButton 
-                      tooltip={isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
+                      tooltip={clientLoaded && isLoadingActiveTenant ? "Lade Mandant..." : (activeTenant?.name || "Aktiver Mandant")}
                       asChild={false} 
                       className="flex items-center justify-center w-full pointer-events-none"
                       isActive={pathname.startsWith(`/tenants/${currentTenantId}`)}
@@ -290,7 +324,7 @@ export function AppSidebar() {
 
                 {renderTenantSpecificLinks()}
                 
-                {((sidebarState === 'expanded' || isMobile) || (sidebarState === 'collapsed' && !isMobile && (activeTenant || isLoadingActiveTenant))) && 
+                {((sidebarState === 'expanded' || isMobile) || (sidebarState === 'collapsed' && !isMobile && (activeTenant || (clientLoaded && isLoadingActiveTenant)) )) && 
                     <div className="my-2 border-t border-sidebar-border mx-2"></div>
                 }
                 <SidebarMenuItem className="mt-2 text-xs font-semibold text-sidebar-foreground/70 px-4 py-1 group-data-[collapsible=icon]:hidden">

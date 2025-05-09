@@ -2,38 +2,21 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { FiscalYear, FiscalYearFormValues } from '@/types';
+import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils';
 
 const getFiscalYearsCollectionRef = (tenantId: string) => collection(db, 'tenants', tenantId, 'fiscalYears');
-
-const formatFirestoreTimestamp = (timestamp: any, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
-  if (timestamp instanceof Timestamp) {
-    return timestamp.toDate().toISOString();
-  }
-  if (timestamp && typeof timestamp.seconds === 'number' && typeof timestamp.nanoseconds === 'number') {
-    try {
-      return new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate().toISOString();
-    } catch (e) { /* fallback */ }
-  }
-  if (typeof timestamp === 'string') {
-    const date = new Date(timestamp);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString();
-    }
-  }
-  return (defaultDateOption === 'epoch' ? new Date(0) : new Date()).toISOString();
-};
 
 const mapDocToFiscalYear = (docSnapshot: any): FiscalYear => {
   const data = docSnapshot.data();
   return {
     id: docSnapshot.id,
     name: data.name,
-    startDate: formatFirestoreTimestamp(data.startDate),
-    endDate: formatFirestoreTimestamp(data.endDate),
+    startDate: formatFirestoreTimestamp(data.startDate, docSnapshot.id),
+    endDate: formatFirestoreTimestamp(data.endDate, docSnapshot.id),
     isClosed: data.isClosed || false,
     carryForwardSourceFiscalYearId: data.carryForwardSourceFiscalYearId || null,
-    createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
-    updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
+    createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, 'now'),
+    updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, 'now'),
   } as FiscalYear;
 };
 

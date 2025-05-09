@@ -181,3 +181,45 @@ export interface CarryForwardBalancesPayload {
   sourceFiscalYearId: string;
   targetFiscalYearId: string; // Target is implicitly the one whose CoA is being updated
 }
+
+// --- Budgeting Types ---
+export type BudgetScenario = "Actual" | "Best Case" | "Worst Case";
+export type BudgetEntryType = "Income" | "Expense";
+export type BudgetRecurrence = "None" | "Monthly" | "Quarterly" | "Yearly";
+
+export interface Budget {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  scenario: BudgetScenario;
+  createdAt: string;
+  updatedAt: string;
+}
+export type BudgetFormValues = Omit<Budget, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>;
+
+
+export interface BudgetEntry {
+  id: string;
+  budgetId: string;
+  accountId: string; // P&L account ID
+  accountNumber?: string; // For display
+  accountName?: string; // For display
+  counterAccountId?: string; // Balance sheet account ID (e.g., bank)
+  counterAccountNumber?: string; // For display
+  counterAccountName?: string; // For display
+  description: string;
+  amount: number;
+  type: BudgetEntryType;
+  startDate?: string; // ISO string, optional
+  endDate?: string; // ISO string, optional
+  isRecurring: boolean;
+  recurrence: BudgetRecurrence;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type BudgetEntryFormValues = Omit<BudgetEntry, 'id' | 'budgetId' | 'createdAt' | 'updatedAt' | 'accountNumber' | 'accountName' | 'counterAccountNumber' | 'counterAccountName'>;
+export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
+
+```

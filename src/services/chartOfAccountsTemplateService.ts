@@ -2,6 +2,7 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/types';
+import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils';
 
 // Canonical IDs for fixed groups, must match those used in seeding/template creation
 const fixedGroupCanonicalIds: Record<AccountGroupTemplate['mainType'], string> = {
@@ -13,25 +14,6 @@ const fixedGroupCanonicalIds: Record<AccountGroupTemplate['mainType'], string> =
 };
 
 const templatesCollectionRef = collection(db, 'chartOfAccountsTemplates');
-
-const formatFirestoreTimestamp = (timestamp: any, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
-  if (timestamp instanceof Timestamp) {
-    return timestamp.toDate().toISOString();
-  }
-  if (timestamp && typeof timestamp.seconds === 'number' && typeof timestamp.nanoseconds === 'number') {
-    try {
-      return new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate().toISOString();
-    } catch (e) { /* fallback */ }
-  }
-   // If it's already a string (e.g. from client-side generation before save), try to parse it
-  if (typeof timestamp === 'string') {
-    const date = new Date(timestamp);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString();
-    }
-  }
-  return (defaultDateOption === 'epoch' ? new Date(0) : new Date()).toISOString();
-};
 
 const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
   const data = docSnapshot.data();
@@ -65,8 +47,8 @@ const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
         level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0),
       };
     }) : [],
-    createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
-    updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
+    createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, 'now'),
+    updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, 'now'),
   } as ChartOfAccountsTemplate;
 };
 
@@ -153,4 +135,3 @@ export const deleteChartOfAccountsTemplate = async (id: string): Promise<boolean
   await deleteDoc(docRef);
   return true;
 };
-
