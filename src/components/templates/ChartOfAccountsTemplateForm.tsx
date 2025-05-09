@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 export type ChartOfAccountsTemplateFormValues = Omit<ChartOfAccountsTemplate, 'id' | 'createdAt' | 'updatedAt'>;
 
-const fixedGroupIdsSeed = { // Using different IDs than seed to avoid potential client/server mismatches if seed IDs are reused
+const fixedGroupIdsSeed = { 
   asset: 'form_fixed_asset_group',
   liability: 'form_fixed_liability_group',
   equity: 'form_fixed_equity_group',
@@ -51,6 +51,7 @@ const accountGroupTemplateSchema = z.object({
   isFixed: z.boolean().optional().default(false),
   parentId: z.string().nullable().optional().default(null),
   level: z.number().optional().default(0),
+  fieldId: z.string().optional(), // For useFieldArray key compatibility if source data has it
 });
 
 const formSchema = z.object({
@@ -74,14 +75,6 @@ interface ChartOfAccountsTemplateFormProps {
   isSubmitting?: boolean;
 }
 
-const mainTypeOptions: { value: AccountGroupTemplate['mainType']; label: string }[] = [
-  { value: 'Asset', label: 'Aktiven (Asset)' },
-  { value: 'Liability', label: 'Passiven (Liability)' },
-  { value: 'Equity', label: 'Eigenkapital (Equity)' },
-  { value: 'Expense', label: 'Aufwand (Expense)' },
-  { value: 'Revenue', label: 'Ertrag (Revenue)' },
-];
-
 export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmitting }: ChartOfAccountsTemplateFormProps) {
   
   const mergedInitialGroups = useMemo(() => {
@@ -92,16 +85,14 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 
     let processedGroups = [...initialData.groups];
 
-    // Ensure all 5 fixed groups are present and correctly marked
     defaultFixed.forEach(dfg => {
       const existing = processedGroups.find(g => g.id === dfg.id || (g.isFixed && g.mainType === dfg.mainType));
       if (existing) {
         existing.isFixed = true;
         existing.level = 0;
         existing.parentId = null;
-        existing.name = dfg.name; // Enforce fixed name
-        existing.mainType = dfg.mainType; // Enforce fixed mainType
-         // Ensure P&L account for Equity
+        existing.name = dfg.name; 
+        existing.mainType = dfg.mainType; 
         if (dfg.mainType === 'Equity' && !existing.accounts.some(acc => acc.isSystemAccount)) {
           const profitLossAccount = dfg.accounts.find(acc => acc.isSystemAccount);
           if (profitLossAccount) existing.accounts.push({...profitLossAccount, id: crypto.randomUUID() });
@@ -112,7 +103,6 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
       }
     });
     
-    // Ensure all groups have IDs and accounts have IDs
     return processedGroups.map(g => ({
       ...g,
       id: g.id || crypto.randomUUID(),
@@ -133,14 +123,14 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
       : { 
           name: '', 
           description: '', 
-          groups: getDefaultFixedGroups().map(g => ({...g, id: g.id || crypto.randomUUID()})) // Ensure IDs on default
+          groups: getDefaultFixedGroups().map(g => ({...g, id: g.id || crypto.randomUUID()})) 
         },
   });
 
-  const { fields: groupFields, append: appendGroup, remove: removeGroup, update: updateGroup } = useFieldArray({
+  const { fields: groupFields, append: appendGroup, remove: removeGroup } = useFieldArray({
     control: form.control,
     name: "groups",
-    keyName: "fieldId" // Use a different key name than 'id' to avoid conflict
+    keyName: "fieldId" 
   });
   
   useEffect(() => {
@@ -161,7 +151,6 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 
 
   const handleSubmit = async (values: ChartOfAccountsTemplateFormValues) => {
-    // Ensure P&L account for Equity group if missing just before submit
     const equityGroup = values.groups.find(g => g.mainType === 'Equity' && g.isFixed);
     if (equityGroup && !equityGroup.accounts.some(acc => acc.isSystemAccount)) {
         equityGroup.accounts.push({
@@ -177,34 +166,40 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 
   const watchedGroups = form.watch("groups");
 
-  const renderGroup = (group: AccountGroupTemplate, groupIndex: number, level: number = 0) => {
-    const isFixedGroup = group.isFixed;
-    const childSubgroups = watchedGroups.filter(g => g.parentId === group.id && !g.isFixed);
+  const renderGroup = (
+    groupField: AccountGroupTemplate & { fieldId: string },
+    groupIndexInForm: number,
+    level: number = 0
+  ) => {
+    const isFixedGroup = groupField.isFixed;
+    const childSubgroupFields = groupFields.filter(
+      (gf) => gf.parentId === groupField.id && gf.level === 1 && !gf.isFixed
+    );
 
     return (
-      <Card key={group.id} className={cn("p-4 relative bg-background/50", level > 0 && "ml-4")}>
+      <Card key={groupField.fieldId} className={cn("p-4 relative bg-background/50", level > 0 && "ml-4 mt-3")}>
         {!isFixedGroup && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
-            onClick={() => removeGroup(groupIndex)}
+            onClick={() => removeGroup(groupIndexInForm)}
           >
             <Trash2 className="h-4 w-4" />
             <span className="sr-only">Gruppe entfernen</span>
           </Button>
         )}
         <CardHeader className="p-0 mb-2">
-          <CardTitle className="text-lg">{group.name} {isFixedGroup ? `(${group.mainType})` : ''}</CardTitle>
+          <CardTitle className="text-lg">{groupField.name} {isFixedGroup ? `(${groupField.mainType})` : ''}</CardTitle>
           {isFixedGroup && <FormDescription>Fixe Hauptgruppe. Untergruppen können hinzugefügt werden.</FormDescription>}
         </CardHeader>
         <CardContent className="p-0 space-y-3">
-          {!isFixedGroup && ( // Only allow editing name/mainType for non-fixed groups (subgroups)
+          {!isFixedGroup && (
             <>
               <FormField
                 control={form.control}
-                name={`groups.${groupIndex}.name`}
+                name={`groups.${groupIndexInForm}.name`}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Name der Untergruppe</FormLabel>
@@ -215,44 +210,42 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
                   </FormItem>
                 )}
               />
-               {/* MainType for subgroups should be derived from parent, or hidden */}
             </>
           )}
           
-          {/* Accounts for this group (only if it's a subgroup, level 1) */}
           {level === 1 && (
-            <AccountsArrayField control={form.control} groupIndex={groupIndex} form={form} isFixedGroup={isFixedGroup}/>
+            <AccountsArrayField control={form.control} groupIndex={groupIndexInForm} form={form} isFixedGroup={!!isFixedGroup}/>
+          )}
+          
+          {level === 0 && childSubgroupFields.length > 0 && (
+            <div className="ml-0 mt-4 space-y-0 pt-3 border-t">
+              {childSubgroupFields.map(subGField => {
+                const subGFieldIndex = groupFields.findIndex(gf => gf.fieldId === subGField.fieldId);
+                if (subGFieldIndex === -1) return null;
+                return renderGroup(subGField, subGFieldIndex, 1);
+              })}
+            </div>
           )}
 
-          {/* Render child subgroups recursively (not implemented for > level 1 to keep simple) */}
-          {childSubgroups.map(subG => {
-             const subGIndex = watchedGroups.findIndex(g => g.id === subG.id);
-             // This recursive call is disabled for now to keep to level 1 subgroups.
-             // To enable deeper nesting, this part and the form logic for adding deeper subgroups would need to be fleshed out.
-             // return renderGroup(subG, subGIndex, level + 1); 
-             return null; // Placeholder if not rendering deeper
-          })}
-
-          {/* Add subgroup button for fixed groups */}
           {isFixedGroup && level === 0 && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="mt-2 w-full"
+              className="mt-3 w-full"
               onClick={() => {
                 appendGroup({
                   id: crypto.randomUUID(),
                   name: 'Neue Untergruppe',
-                  mainType: group.mainType, // Subgroup inherits mainType from fixed parent
+                  mainType: groupField.mainType, 
                   accounts: [],
                   isFixed: false,
-                  parentId: group.id,
+                  parentId: groupField.id,
                   level: 1
-                });
+                } as AccountGroupTemplate);
               }}
             >
-              <PlusCircle className="mr-2 h-4 w-4" /> Untergruppe zu "{group.name}" hinzufügen
+              <PlusCircle className="mr-2 h-4 w-4" /> Untergruppe zu "{groupField.name}" hinzufügen
             </Button>
           )}
         </CardContent>
@@ -301,24 +294,13 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
               {form.formState.errors.groups?.root?.message && <FormMessage>{form.formState.errors.groups.root.message}</FormMessage>}
 
               <div className="space-y-4 mt-2">
-                {/* Render Fixed Groups (Level 0) */}
-                {groupFields.filter(g => g.level === 0 && g.isFixed).map((groupItem) => {
-                    const groupIndex = watchedGroups.findIndex(g => g.id === groupItem.id);
-                    return renderGroup(watchedGroups[groupIndex], groupIndex, 0);
+                {groupFields
+                  .filter((groupFieldItem) => groupFieldItem.level === 0 && groupFieldItem.isFixed)
+                  .map((groupFieldItem) => {
+                    const originalIndex = groupFields.findIndex(item => item.fieldId === groupFieldItem.fieldId);
+                    if (originalIndex === -1) return null;
+                    return renderGroup(groupFieldItem, originalIndex, 0);
                 })}
-
-                {/* Render Subgroups (Level 1) under their respective fixed parent */}
-                 {groupFields.filter(g => g.level === 0 && g.isFixed).map((fixedGroupItem) => (
-                    <div key={`subgroups-for-${fixedGroupItem.id}`} className="ml-6 mt-2 space-y-3 border-l pl-4">
-                        {groupFields.filter(subG => subG.parentId === fixedGroupItem.id && subG.level === 1 && !subG.isFixed)
-                            .map((subgroupItem) => {
-                               const subgroupIndex = watchedGroups.findIndex(g => g.id === subgroupItem.id);
-                               return renderGroup(watchedGroups[subgroupIndex], subgroupIndex, 1);
-                            })
-                        }
-                    </div>
-                 ))}
-
               </div>
             </div>
           </div>
@@ -339,7 +321,7 @@ interface AccountsArrayFieldProps {
   control: ReturnType<typeof useForm<ChartOfAccountsTemplateFormValues>>['control'];
   groupIndex: number;
   form: UseFormReturn<ChartOfAccountsTemplateFormValues>;
-  isFixedGroup: boolean; // To disable adding accounts directly to fixed groups
+  isFixedGroup: boolean; 
 }
 
 function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: AccountsArrayFieldProps) { 
@@ -349,17 +331,19 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
     keyName: "accountFieldId"
   });
 
-  if (isFixedGroup) { // Do not render account fields for fixed top-level groups
+  if (isFixedGroup) { 
     const groupData = form.getValues(`groups.${groupIndex}`);
-    // Only allow managing accounts for system P&L account in fixed Equity group
     if (groupData.mainType === 'Equity' && groupData.isFixed) {
-        const systemAccount = fields.find(f => form.getValues(`groups.${groupIndex}.accounts.${fields.indexOf(f)}.isSystemAccount`));
-        if (systemAccount) {
-            const systemAccountIndex = fields.indexOf(systemAccount);
+        const systemAccountField = fields.find(f => {
+            const accountData = form.getValues(`groups.${groupIndex}.accounts.${fields.indexOf(f)}`);
+            return accountData && accountData.isSystemAccount;
+        });
+        if (systemAccountField) {
+            const systemAccountIndex = fields.indexOf(systemAccountField);
              return (
                  <div className="space-y-3 pl-4 border-l border-border">
                      <FormLabel className="text-base">Systemkonten</FormLabel>
-                     <Card key={systemAccount.id} className="p-3 bg-muted/30 relative">
+                     <Card key={systemAccountField.accountFieldId} className="p-3 bg-muted/30 relative">
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                              <FormField
                                  control={control}
@@ -396,7 +380,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
       {fields.map((accountItem, accountIndex) => {
          const isSystemAcc = form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`);
         return (
-        <Card key={accountItem.id} className="p-3 bg-muted/30 relative">
+        <Card key={accountItem.accountFieldId} className="p-3 bg-muted/30 relative">
            <Button
               type="button"
               variant="ghost"
@@ -466,3 +450,4 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
     </div>
   );
 }
+

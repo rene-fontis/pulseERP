@@ -6,11 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Removed Textarea as it's not used for CoA name.
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { TenantChartOfAccounts, AccountGroup, Account, TenantChartOfAccountsFormValues as FormValues } from '@/types';
 import { PlusCircle, Trash2 } from 'lucide-react';
-// Select is not used for mainType editing in subgroups directly here, as it's derived or fixed.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -24,7 +22,7 @@ const fixedGroupIdsSeed = {
 };
 
 const getDefaultFixedGroupsForTenant = (): AccountGroup[] => [
-  { id: fixedGroupIdsSeed.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0, balance:0 }, // Added balance for Account compatibility
+  { id: fixedGroupIdsSeed.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0, balance:0 }, 
   { id: fixedGroupIdsSeed.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0, balance:0 },
   { id: fixedGroupIdsSeed.equity, name: "Eigenkapital", mainType: "Equity", accounts: [
       { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true, balance: 0 },
@@ -34,7 +32,6 @@ const getDefaultFixedGroupsForTenant = (): AccountGroup[] => [
 ];
 
 
-// Local Zod schemas for validation
 const accountSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
   number: z.string().min(1, "Kontonummer ist erforderlich."),
@@ -55,6 +52,8 @@ const accountGroupSchema = z.object({
   isFixed: z.boolean().optional().default(false),
   parentId: z.string().nullable().optional().default(null),
   level: z.number().optional().default(0),
+  balance: z.number().optional().default(0), // Added for AccountGroup
+  fieldId: z.string().optional(), // For useFieldArray key compatibility
 });
 
 const formSchema = z.object({
@@ -159,25 +158,32 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
 
   const watchedGroups = form.watch("groups");
 
-  const renderGroup = (group: AccountGroup, groupIndex: number, level: number = 0) => {
-    const isFixedGroup = group.isFixed;
+  const renderGroup = (
+    groupField: AccountGroup & { fieldId: string },
+    groupIndexInForm: number,
+    level: number = 0
+  ) => {
+    const isFixedGroup = groupField.isFixed;
+    const childSubgroupFields = groupFields.filter(
+      (gf) => gf.parentId === groupField.id && gf.level === 1 && !gf.isFixed
+    );
 
     return (
-      <Card key={group.id} className={cn("p-4 relative bg-background/50", level > 0 && "ml-6")}>
+      <Card key={groupField.fieldId} className={cn("p-4 relative bg-background/50", level > 0 && "ml-4 mt-3")}>
         {!isFixedGroup && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
-            onClick={() => removeGroup(groupIndex)}
+            onClick={() => removeGroup(groupIndexInForm)}
           >
             <Trash2 className="h-4 w-4" />
             <span className="sr-only">Gruppe entfernen</span>
           </Button>
         )}
         <CardHeader className="p-0 mb-2">
-          <CardTitle className="text-lg">{group.name} {isFixedGroup ? `(${group.mainType})` : ''}</CardTitle>
+          <CardTitle className="text-lg">{groupField.name} {isFixedGroup ? `(${groupField.mainType})` : ''}</CardTitle>
           {isFixedGroup && <FormDescription>Fixe Hauptgruppe. Untergruppen können hinzugefügt werden.</FormDescription>}
         </CardHeader>
         <CardContent className="p-0 space-y-3">
@@ -185,7 +191,7 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
             <>
               <FormField
                 control={form.control}
-                name={`groups.${groupIndex}.name`}
+                name={`groups.${groupIndexInForm}.name`}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Name der Untergruppe</FormLabel>
@@ -200,7 +206,17 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
           )}
           
           {level === 1 && (
-            <AccountsArrayField control={form.control} groupIndex={groupIndex} form={form} isFixedGroup={!!isFixedGroup}/>
+            <AccountsArrayField control={form.control} groupIndex={groupIndexInForm} form={form} isFixedGroup={!!isFixedGroup}/>
+          )}
+
+          {level === 0 && childSubgroupFields.length > 0 && (
+            <div className="ml-0 mt-4 space-y-0 pt-3 border-t">
+              {childSubgroupFields.map(subGField => {
+                const subGFieldIndex = groupFields.findIndex(gf => gf.fieldId === subGField.fieldId);
+                if (subGFieldIndex === -1) return null;
+                return renderGroup(subGField, subGFieldIndex, 1);
+              })}
+            </div>
           )}
 
           {isFixedGroup && level === 0 && (
@@ -208,21 +224,21 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
               type="button"
               variant="outline"
               size="sm"
-              className="mt-2 w-full"
+              className="mt-3 w-full"
               onClick={() => {
                 appendGroup({
                   id: crypto.randomUUID(),
                   name: 'Neue Untergruppe',
-                  mainType: group.mainType, 
+                  mainType: groupField.mainType, 
                   accounts: [],
                   isFixed: false,
-                  parentId: group.id,
+                  parentId: groupField.id,
                   level: 1,
-                  balance: 0 // Added for AccountGroup compatibility with Account.balance
-                });
+                  balance: 0 
+                } as AccountGroup);
               }}
             >
-              <PlusCircle className="mr-2 h-4 w-4" /> Untergruppe zu "{group.name}" hinzufügen
+              <PlusCircle className="mr-2 h-4 w-4" /> Untergruppe zu "{groupField.name}" hinzufügen
             </Button>
           )}
         </CardContent>
@@ -256,21 +272,13 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
               {form.formState.errors.groups?.root?.message && <FormMessage>{form.formState.errors.groups.root.message}</FormMessage>}
 
               <div className="space-y-4 mt-2">
-                {groupFields.filter(g => g.level === 0 && g.isFixed).map((groupItem) => {
-                    const groupIndex = watchedGroups.findIndex(g => g.id === groupItem.id);
-                    return renderGroup(watchedGroups[groupIndex], groupIndex, 0);
+                {groupFields
+                  .filter((groupFieldItem) => groupFieldItem.level === 0 && groupFieldItem.isFixed)
+                  .map((groupFieldItem) => {
+                    const originalIndex = groupFields.findIndex(item => item.fieldId === groupFieldItem.fieldId);
+                    if (originalIndex === -1) return null;
+                    return renderGroup(groupFieldItem, originalIndex, 0);
                 })}
-
-                 {groupFields.filter(g => g.level === 0 && g.isFixed).map((fixedGroupItem) => (
-                    <div key={`subgroups-for-${fixedGroupItem.id}`} className="ml-6 mt-2 space-y-3 border-l pl-4">
-                        {groupFields.filter(subG => subG.parentId === fixedGroupItem.id && subG.level === 1 && !subG.isFixed)
-                            .map((subgroupItem) => {
-                               const subgroupIndex = watchedGroups.findIndex(g => g.id === subgroupItem.id);
-                               return renderGroup(watchedGroups[subgroupIndex], subgroupIndex, 1);
-                            })
-                        }
-                    </div>
-                 ))}
               </div>
             </div>
           </div>
@@ -304,19 +312,21 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
   const groupData = form.getValues(`groups.${groupIndex}`);
   if (isFixedGroup) {
     if (groupData.mainType === 'Equity' && groupData.isFixed) {
-      const systemAccountField = fields.find(f => form.getValues(`groups.${groupIndex}.accounts.${fields.indexOf(f)}.isSystemAccount`));
+        const systemAccountField = fields.find(f => {
+            const accountData = form.getValues(`groups.${groupIndex}.accounts.${fields.indexOf(f)}`);
+            return accountData && accountData.isSystemAccount;
+        });
       if (systemAccountField) {
         const systemAccountIndex = fields.indexOf(systemAccountField);
         return (
           <div className="space-y-3 pl-4 border-l border-border">
             <FormLabel className="text-base">Systemkonten</FormLabel>
-            <Card key={systemAccountField.id} className="p-3 bg-muted/30 relative">
+            <Card key={systemAccountField.accountFieldId} className="p-3 bg-muted/30 relative">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField control={control} name={`groups.${groupIndex}.accounts.${systemAccountIndex}.number`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Nr.</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>)} />
                 <FormField control={control} name={`groups.${groupIndex}.accounts.${systemAccountIndex}.name`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Name</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>)} />
               </div>
               <FormField control={control} name={`groups.${groupIndex}.accounts.${systemAccountIndex}.description`} render={({ field }) => (<FormItem className="mt-2"><FormLabel className="text-xs">Beschreibung</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>)} />
-              {/* Balance for system account is usually not directly editable here */}
               <FormField control={control} name={`groups.${groupIndex}.accounts.${systemAccountIndex}.balance`} render={({ field }) => (<FormItem className="mt-2"><FormLabel className="text-xs">Saldo (CHF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))} className="h-8 text-sm" disabled /></FormControl></FormItem>)} />
               <p className="text-xs text-muted-foreground mt-1">Systemkonto, nicht bearbeitbar.</p>
             </Card>
@@ -324,7 +334,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
         );
       }
     }
-    return null; // No editable accounts for other fixed groups directly
+    return null; 
   }
 
 
@@ -334,7 +344,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
       {fields.map((accountItem, accountIndex) => {
         const isSystemAcc = form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`);
         return (
-        <Card key={accountItem.id} className="p-3 bg-muted/30 relative">
+        <Card key={accountItem.accountFieldId} className="p-3 bg-muted/30 relative">
            <Button
               type="button"
               variant="ghost"
@@ -417,7 +427,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', balance: 0, isSystemAccount: false })}
+        onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', balance: 0, isSystemAccount: false } as Account)}
         className="w-full mt-2"
       >
         <PlusCircle className="mr-2 h-4 w-4" /> Konto zu dieser Untergruppe hinzufügen
@@ -425,3 +435,4 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
     </div>
   );
 }
+
