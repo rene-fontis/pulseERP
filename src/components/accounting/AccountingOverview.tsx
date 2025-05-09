@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -15,6 +14,7 @@ import {
   Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
   ResponsiveContainer,
   LabelList,
 } from 'recharts';
@@ -69,7 +69,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                 <Skeleton className="h-4 w-2/3" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-[200px] w-full" />
+                <Skeleton className="h-[350px] w-full" />
               </CardContent>
             </Card>
             <Skeleton className="h-32 w-full rounded-lg" />
@@ -78,15 +78,17 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
     );
   }
 
-  if (!summary || !chartOfAccounts || !summary.accountBalances) {
+  if (!summary || !chartOfAccounts || !summary.accountBalances || !summary.monthlyBreakdown) {
     return (
         <p className="text-muted-foreground">Keine Daten für die detaillierte Finanzübersicht verfügbar. Bitte überprüfen Sie, ob ein Kontenplan zugewiesen und Buchungen vorhanden sind.</p>
     );
   }
   
-  const chartData = summary ? [
-    { name: "Erfolg", Ertrag: summary.totalRevenue, Aufwand: summary.totalExpenses },
-  ] : [];
+  const monthlyChartData = summary.monthlyBreakdown.map(item => ({
+    name: item.monthYear, // e.g., "Jan '24"
+    Ertrag: item.revenue,
+    Aufwand: item.expenses,
+  }));
 
   const chartConfig = {
     Ertrag: {
@@ -114,7 +116,12 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                 .flatMap(group => group.accounts)
                 .sort((a, b) => a.number.localeCompare(b.number));
 
-                if (accountsForCategory.length === 0) return null;
+                if (accountsForCategory.length === 0 && !chartOfAccounts.groups.some(g => g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)) {
+                     // Also check subgroups if the main fixed group itself has no direct accounts
+                    const subgroupsWithAccounts = chartOfAccounts.groups.filter(sg => sg.parentId && chartOfAccounts.groups.find(pg => pg.id === sg.parentId)?.mainType === category.type && sg.accounts.length > 0);
+                    if (subgroupsWithAccounts.length === 0) return null;
+                }
+
 
                 return (
                 <AccordionItem value={category.id} key={category.id}>
@@ -132,20 +139,27 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {accountsForCategory.map((account) => {
-                                const balance = summary.accountBalances[account.id] || 0;
-                                const displayBalance = (category.type === 'Liability' || category.type === 'Equity') ? -balance : balance;
-                                return (
-                                    <TableRow key={account.id}>
-                                    <TableCell className="font-medium">{account.number}</TableCell>
-                                    <TableCell>{account.name}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
-                                    </TableRow>
-                                );
+                                {chartOfAccounts.groups
+                                    .filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type))
+                                    .sort((a,b) => (a.isFixed ? -1 : 1)) // Fixed groups first, then subgroups
+                                    .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
+                                    .map((account) => {
+                                        const balance = summary.accountBalances[account.id] || 0;
+                                        const displayBalance = (category.type === 'Liability' || category.type === 'Equity') ? -balance : balance;
+                                        return (
+                                            <TableRow key={account.id}>
+                                            <TableCell className="font-medium">{account.number}</TableCell>
+                                            <TableCell>{account.name}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
+                                            </TableRow>
+                                        );
                                 })}
                             </TableBody>
                             </Table>
                         </div>
+                         {accountsForCategory.length === 0 && 
+                            chartOfAccounts.groups.filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)).flatMap(g => g.accounts).length === 0 &&
+                            (<p className="text-sm text-muted-foreground p-2">Keine Konten in dieser Kategorie.</p>)}
                     </AccordionContent>
                 </AccordionItem>
                 );
@@ -160,46 +174,48 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                 <h3 className="text-xl font-semibold">Erfolgsrechnung</h3>
             </div>
 
-            {/* Chart for Revenue vs Expenses */}
-            {summary && (summary.totalRevenue > 0 || summary.totalExpenses > 0) && (
+            {/* Chart for Monthly Revenue vs Expenses */}
+            {monthlyChartData.length > 0 ? (
               <Card className="mb-6 shadow-md">
                 <CardHeader>
-                  <CardTitle>Aufwand vs. Ertrag</CardTitle>
+                  <CardTitle>Monatlicher Aufwand vs. Ertrag</CardTitle>
                   <CardDescription>
-                    Vergleich von Gesamtertrag und Gesamtaufwand.
+                    Vergleich von Ertrag und Aufwand pro Monat.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-[300px] w-full"> {/* Changed: Explicit height */}
-                    <BarChart 
-                        accessibilityLayer 
-                        data={chartData} 
-                        layout="vertical"
-                        margin={{ top: 5, right: 50, left: 5, bottom: 20 }} 
-                    >
-                      <XAxis type="number" hide />
-                      <YAxis
+                  <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                    <BarChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
                         dataKey="name"
-                        type="category"
                         tickLine={false}
-                        axisLine={false}
-                        tick={false} 
+                        axisLine={true}
+                        tickMargin={8}
+                      />
+                      <YAxis
+                        tickFormatter={(value) => `${(value / 1000)}k`}
+                        tickLine={false}
+                        axisLine={true}
+                        tickMargin={8}
                       />
                       <ChartTooltip
-                        cursor={false}
-                        content={<ChartTooltipContent hideLabel formatter={(value, name) => <div className="flex flex-col items-start"><span className="font-medium">{name === 'Ertrag' ? 'Ertrag' : 'Aufwand'}</span><span className="text-sm text-muted-foreground">{formatCurrency(value as number)}</span></div>} />}
+                        cursor={true}
+                        content={<ChartTooltipContent formatter={(value, name) => [formatCurrency(value as number), name]} />}
                       />
-                       <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" wrapperStyle={{paddingTop: '20px'}}/>
-                      <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[0, 4, 4, 0]} barSize={35}>
-                         <LabelList dataKey="Ertrag" position="right" offset={8} className="fill-foreground font-medium" formatter={(value: number) => formatCurrency(value)} />
+                       <ChartLegend content={<ChartLegendContent />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}}/>
+                      <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
+                        <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
-                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[0, 4, 4, 0]} barSize={35}>
-                         <LabelList dataKey="Aufwand" position="right" offset={8} className="fill-foreground font-medium" formatter={(value: number) => formatCurrency(value)} />
+                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
+                        <LabelList dataKey="Aufwand" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                     </BarChart>
                   </ChartContainer>
                 </CardContent>
               </Card>
+            ) : (
+                 <p className="text-muted-foreground mb-6">Keine monatlichen Daten für das Diagramm verfügbar.</p>
             )}
 
             <Accordion type="multiple" className="w-full" defaultValue={erfolgsrechnungCategories.map(c => c.id)}>
@@ -209,7 +225,10 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                 .flatMap(group => group.accounts)
                 .sort((a, b) => a.number.localeCompare(b.number));
 
-                if (accountsForCategory.length === 0) return null;
+                if (accountsForCategory.length === 0 && !chartOfAccounts.groups.some(g => g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)) {
+                     const subgroupsWithAccounts = chartOfAccounts.groups.filter(sg => sg.parentId && chartOfAccounts.groups.find(pg => pg.id === sg.parentId)?.mainType === category.type && sg.accounts.length > 0);
+                    if (subgroupsWithAccounts.length === 0) return null;
+                }
 
                 return (
                 <AccordionItem value={category.id} key={category.id}>
@@ -227,20 +246,29 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {accountsForCategory.map((account) => {
-                                const balance = summary.accountBalances[account.id] || 0;
-                                const displayBalance = (category.type === 'Revenue') ? -balance : balance;
-                                return (
-                                    <TableRow key={account.id}>
-                                    <TableCell className="font-medium">{account.number}</TableCell>
-                                    <TableCell>{account.name}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
-                                    </TableRow>
-                                );
+                                {chartOfAccounts.groups
+                                    .filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type))
+                                    .sort((a,b) => (a.isFixed ? -1 : 1))
+                                    .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
+                                    .map((account) => {
+                                        const balance = summary.accountBalances[account.id] || 0;
+                                        // For Revenue, a credit balance (negative in our system usually for assets) means positive revenue.
+                                        // For Expenses, a debit balance (positive) means positive expense.
+                                        const displayBalance = (category.type === 'Revenue') ? -balance : balance;
+                                        return (
+                                            <TableRow key={account.id}>
+                                            <TableCell className="font-medium">{account.number}</TableCell>
+                                            <TableCell>{account.name}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
+                                            </TableRow>
+                                        );
                                 })}
                             </TableBody>
                             </Table>
                         </div>
+                         {accountsForCategory.length === 0 && 
+                            chartOfAccounts.groups.filter(g => (g.mainType === category.type && g.isFixed) || (g.parentId && chartOfAccounts.groups.find(pg => pg.id === g.parentId)?.mainType === category.type)).flatMap(g => g.accounts).length === 0 &&
+                            (<p className="text-sm text-muted-foreground p-2">Keine Konten in dieser Kategorie.</p>)}
                     </AccordionContent>
                 </AccordionItem>
                 );
@@ -250,4 +278,3 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
     </div>
   );
 }
-

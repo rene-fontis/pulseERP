@@ -117,7 +117,6 @@ export interface JournalEntryLine {
   accountName: string; // For display
   debit?: number; // Soll
   credit?: number; // Haben
-  description?: string; // Optional line description
 }
 
 export interface JournalEntry {
@@ -150,3 +149,27 @@ export interface FiscalYear {
 }
 
 export type FiscalYearFormValues = Omit<FiscalYear, 'id' | 'isClosed' | 'createdAt' | 'updatedAt'>;
+
+// --- Financial Summary Types ---
+export interface AccountBalances {
+  [accountId: string]: number;
+}
+
+export interface MonthlyBreakdownItem {
+  month: string; // e.g., "Jan", "Feb"
+  year: number;  // e.g., 2024
+  monthYear: string; // e.g., "Jan 2024" for display
+  revenue: number;
+  expenses: number;
+}
+
+export interface FinancialSummary {
+  totalAssets: number;
+  totalLiabilities: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfitLoss: number;
+  equity: number;
+  accountBalances: AccountBalances;
+  monthlyBreakdown: MonthlyBreakdownItem[];
+}
