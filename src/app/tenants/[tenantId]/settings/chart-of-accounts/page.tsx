@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileText as FileTextIcon, AlertCircle, Edit, Loader2 } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
 import { useGetTenantChartOfAccountsById, useUpdateTenantChartOfAccounts } from '@/hooks/useTenantChartOfAccounts'; 
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TenantChartOfAccountsForm, type TenantChartOfAccountsFormValues } from '@/components/tenants/TenantChartOfAccountsForm';
 import { useToast } from '@/hooks/use-toast';
 import type { TenantChartOfAccounts } from '@/types';
@@ -25,6 +25,12 @@ export default function TenantChartOfAccountsPage() {
   const { toast } = useToast();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [clientLoaded, setClientLoaded] = useState(false);
+
+  useEffect(() => {
+    setClientLoaded(true);
+  }, []);
+
 
   const handleUpdateCoA = async (values: TenantChartOfAccountsFormValues) => {
     if (!chartOfAccounts) {
@@ -43,7 +49,7 @@ export default function TenantChartOfAccountsPage() {
   };
 
 
-  if (isLoadingTenant || (tenant?.chartOfAccountsId && isLoadingCoA)) {
+  if (isLoadingTenant || (clientLoaded && tenant?.chartOfAccountsId && isLoadingCoA)) {
     return (
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
@@ -93,7 +99,7 @@ export default function TenantChartOfAccountsPage() {
   }
   
   const hasCoaAssigned = !!tenant.chartOfAccountsId;
-  const coaStillLoading = tenant.chartOfAccountsId && isLoadingCoA;
+  const coaStillLoading = clientLoaded && tenant.chartOfAccountsId && isLoadingCoA;
 
 
   return (
@@ -164,7 +170,6 @@ export default function TenantChartOfAccountsPage() {
                                 <TableHead className="w-[100px] h-8">Nummer</TableHead>
                                 <TableHead className="h-8">Name</TableHead>
                                 <TableHead className="h-8">Beschreibung</TableHead>
-                                <TableHead className="text-right h-8">Saldo</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -173,7 +178,6 @@ export default function TenantChartOfAccountsPage() {
                                     <TableCell className="font-medium py-2">{account.number}</TableCell>
                                     <TableCell className="py-2">{account.name}</TableCell>
                                     <TableCell className="py-2">{account.description || '-'}</TableCell>
-                                    <TableCell className="text-right py-2">{new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(account.balance || 0)}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
@@ -196,9 +200,9 @@ export default function TenantChartOfAccountsPage() {
                     <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh]">
                       <DialogHeader>
                         <DialogTitle>Kontenplan bearbeiten: {chartOfAccounts.name}</DialogTitle>
-                        <DialogDescription>
+                        <DialogDescriptionComponent>
                           Aktualisieren Sie die Details des Kontenplans.
-                        </DialogDescription>
+                        </DialogDescriptionComponent>
                       </DialogHeader>
                       <TenantChartOfAccountsForm
                         onSubmit={handleUpdateCoA}
