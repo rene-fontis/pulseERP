@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useEffect} from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,10 @@ const accountSchema = z.object({
   number: z.string().min(1, "Kontonummer ist erforderlich."),
   name: z.string().min(1, "Kontoname ist erforderlich."),
   description: z.string().optional().default(''),
-  balance: z.number().optional().default(0), 
+  balance: z.preprocess(
+    (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
+    z.number().optional().default(0)
+  ), 
   isSystemAccount: z.boolean().optional().default(false),
 });
 
@@ -181,7 +184,7 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
                         )}
                       />
                       
-                      <AccountsArrayField control={form.control} groupIndex={groupIndex} />
+                      <AccountsArrayField control={form.control} groupIndex={groupIndex} form={form} />
 
                     </CardContent>
                   </Card>
@@ -213,9 +216,10 @@ export function TenantChartOfAccountsForm({ onSubmit, initialData, isSubmitting 
 interface AccountsArrayFieldProps {
   control: ReturnType<typeof useForm<FormValues>>['control'];
   groupIndex: number;
+  form: UseFormReturn<FormValues>; // Pass the entire form instance
 }
 
-function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
+function AccountsArrayField({ control, groupIndex, form }: AccountsArrayFieldProps) {
   const { fields, append, remove } = useFieldArray({
     control,
     name: `groups.${groupIndex}.accounts`,

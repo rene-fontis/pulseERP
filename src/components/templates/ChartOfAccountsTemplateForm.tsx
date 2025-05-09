@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useEffect} from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -229,10 +229,10 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 interface AccountsArrayFieldProps {
   control: ReturnType<typeof useForm<ChartOfAccountsTemplateFormValues>>['control'];
   groupIndex: number;
-  form: ReturnType<typeof useForm<ChartOfAccountsTemplateFormValues>>; // Pass the form instance
+  form: UseFormReturn<ChartOfAccountsTemplateFormValues>; // Pass the form instance
 }
 
-function AccountsArrayField({ control, groupIndex, form }: AccountsArrayFieldProps) { // Added form to props
+function AccountsArrayField({ control, groupIndex, form }: AccountsArrayFieldProps) { 
   const { fields, append, remove } = useFieldArray({
     control,
     name: `groups.${groupIndex}.accounts`,
