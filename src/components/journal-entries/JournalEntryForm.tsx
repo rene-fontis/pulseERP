@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -15,7 +14,7 @@ import { CalendarIcon, Check, ChevronsUpDown, PlusCircle, Trash2 } from 'lucide-
 import { cn } from '@/lib/utils';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Account, NewJournalEntryPayload, FiscalYear, JournalEntryLine } from '@/types';
+import type { Account, NewJournalEntryPayload, FiscalYear, JournalEntryLine, JournalEntry } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -80,6 +79,7 @@ interface JournalEntryFormProps {
   onSubmit: (values: NewJournalEntryPayload) => Promise<void>;
   isSubmitting?: boolean;
   defaultEntryNumber?: string;
+  initialData?: JournalEntry | null; 
 }
 
 interface AccountOption {
@@ -88,20 +88,34 @@ interface AccountOption {
   account: Account;
 }
 
-export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmit, isSubmitting, defaultEntryNumber }: JournalEntryFormProps) {
+export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmit, isSubmitting, defaultEntryNumber, initialData }: JournalEntryFormProps) {
   const formSchema = createJournalEntryFormSchema(activeFiscalYear);
   
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      date: activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date(),
-      entryNumber: defaultEntryNumber || '',
-      description: '',
-      lines: [
-        { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-        { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-      ],
-    },
+    // Default values are set based on whether initialData is present (edit mode) or not (create mode)
+    defaultValues: initialData && activeFiscalYear
+      ? {
+          date: parseISO(initialData.date),
+          entryNumber: initialData.entryNumber,
+          description: initialData.description,
+          lines: initialData.lines.map(line => ({
+            // id: line.id, // useFieldArray handles internal 'id' for keys, we map data
+            accountId: line.accountId,
+            debit: line.debit,
+            credit: line.credit,
+            lineDescription: line.description,
+          })),
+        }
+      : {
+          date: activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date(),
+          entryNumber: defaultEntryNumber || '',
+          description: '',
+          lines: [
+            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+            ],
+        },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -110,18 +124,40 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   });
   
   useEffect(() => {
-    if (activeFiscalYear) {
-      const today = new Date();
-      const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
-      let defaultDate = today;
-      if (today < fiscalYearStartDate) defaultDate = fiscalYearStartDate;
-      const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
-      if (today > fiscalYearEndDate) defaultDate = fiscalYearEndDate; 
-       if(!isWithinInterval(form.getValues("date"), {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
-         form.setValue("date", defaultDate, { shouldValidate: true });
-       }
+    // This effect ensures the form resets if initialData or activeFiscalYear changes after initial render.
+    // It's particularly useful if the form component remains mounted while these props change.
+    if (initialData && activeFiscalYear) {
+      form.reset({
+        date: parseISO(initialData.date),
+        entryNumber: initialData.entryNumber,
+        description: initialData.description,
+        lines: initialData.lines.map(line => ({
+          accountId: line.accountId,
+          debit: line.debit,
+          credit: line.credit,
+          lineDescription: line.description,
+        })),
+      });
+    } else if (!initialData && activeFiscalYear) {
+        const today = new Date();
+        const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
+        let defaultDate = today;
+        if (today < fiscalYearStartDate) defaultDate = fiscalYearStartDate;
+        const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
+        if (today > fiscalYearEndDate) defaultDate = fiscalYearEndDate;
+        
+        if(!isWithinInterval(form.getValues("date"), {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
+           form.setValue("date", defaultDate, { shouldValidate: true });
+        }
+        // Reset other fields for create mode if necessary, or rely on defaultValues from useForm
+        // For example, if defaultEntryNumber is dynamic and could change:
+        if(form.getValues("entryNumber") !== (defaultEntryNumber || '') && !initialData) {
+             form.setValue("entryNumber", defaultEntryNumber || '');
+        }
+
     }
-  }, [activeFiscalYear, form]);
+  }, [initialData, form, activeFiscalYear, defaultEntryNumber]);
+
 
   const accountOptions: AccountOption[] = accounts.map(acc => ({
     value: acc.id,
@@ -129,12 +165,14 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     account: acc,
   }));
 
-  const handleSubmit = async (values: JournalEntryFormValues) => {
+  const handleSubmitInternal = async (values: JournalEntryFormValues) => {
     const mappedLines: JournalEntryLine[] = values.lines.map(line => {
       const account = accounts.find(acc => acc.id === line.accountId);
       if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
       return {
-        id: crypto.randomUUID(),
+        // For updates, if line IDs need to be preserved, this logic might need adjustment
+        // Currently, new IDs are generated, effectively replacing old lines.
+        id: crypto.randomUUID(), 
         accountId: account.id,
         accountNumber: account.number,
         accountName: account.name,
@@ -146,7 +184,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     
     const newJournalEntryPayload: NewJournalEntryPayload = {
       tenantId,
-      fiscalYearId: activeFiscalYear?.id,
+      fiscalYearId: activeFiscalYear?.id, // This will be undefined if activeFiscalYear is null
       entryNumber: values.entryNumber,
       date: values.date.toISOString(),
       description: values.description,
@@ -155,15 +193,17 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     };
     
     await onSubmit(newJournalEntryPayload); 
-    form.reset({ 
-        date: values.date, 
-        entryNumber: '', 
-        description: '',
-        lines: [
-            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-        ],
-    });
+    if (!initialData) { // Only reset fully for create mode
+        form.reset({ 
+            date: values.date, // Keep the date as it's often reused for multiple entries
+            entryNumber: '', // Clear entry number for next creation
+            description: '',
+            lines: [
+                { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+                { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+            ],
+        });
+    }
   };
   
   const fiscalYearStart = activeFiscalYear ? parseISO(activeFiscalYear.startDate) : undefined;
@@ -173,10 +213,12 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   const totalDebits = watchedLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
   const totalCredits = watchedLines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
 
+  const buttonText = initialData ? 'Änderungen speichern' : 'Buchung erstellen';
+
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmitInternal)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
@@ -381,7 +423,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
 
 
         <Button type="submit" disabled={isSubmitting || !activeFiscalYear} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          {isSubmitting ? 'Speichern...' : 'Buchung erstellen'}
+          {isSubmitting ? 'Speichern...' : buttonText}
         </Button>
       </form>
     </Form>
@@ -445,3 +487,4 @@ function AccountAutocomplete({ options, value, onChange, placeholder }: AccountA
     </Popover>
   );
 }
+

@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useParams } from 'next/navigation';
@@ -9,8 +7,8 @@ import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2, CalendarOff }
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
-import { useGetJournalEntries, useAddJournalEntry, useDeleteJournalEntry } from '@/hooks/useJournalEntries'; 
-import type { Account, NewJournalEntryPayload, FiscalYear } from '@/types';
+import { useGetJournalEntries, useAddJournalEntry, useDeleteJournalEntry, useUpdateJournalEntry } from '@/hooks/useJournalEntries'; 
+import type { Account, NewJournalEntryPayload, FiscalYear, JournalEntry } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,6 +31,9 @@ export default function TenantJournalPage() {
   const { toast } = useToast();
   const [clientLoaded, setClientLoaded] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<JournalEntry | null>(null);
+
 
   useEffect(() => {
     setClientLoaded(true);
@@ -40,6 +41,7 @@ export default function TenantJournalPage() {
 
   const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, tenant?.activeFiscalYearId);
   const addEntryMutation = useAddJournalEntry(tenantId);
+  const updateEntryMutation = useUpdateJournalEntry(tenantId);
   const deleteEntryMutation = useDeleteJournalEntry(tenantId);
 
 
@@ -60,6 +62,31 @@ export default function TenantJournalPage() {
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
       toast({ title: "Fehler", description: `Buchungssatz konnte nicht erstellt werden: ${errorMessage}`, variant: "destructive" });
+    }
+  };
+
+  const handleOpenEditModal = (entry: JournalEntry) => {
+    setSelectedEntryForEdit(entry);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateJournalEntry = async (values: NewJournalEntryPayload) => {
+    if (!selectedEntryForEdit || !tenant?.activeFiscalYearId) return;
+    try {
+      await updateEntryMutation.mutateAsync({
+        entryId: selectedEntryForEdit.id,
+        data: {
+          ...values,
+          tenantId: tenantId, 
+          fiscalYearId: tenant.activeFiscalYearId,
+        }
+      });
+      toast({ title: "Erfolg", description: "Buchungssatz aktualisiert." });
+      setIsEditModalOpen(false);
+      setSelectedEntryForEdit(null);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Buchungssatz konnte nicht aktualisiert werden: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -275,12 +302,23 @@ export default function TenantJournalPage() {
                       <TableCell className="max-w-[200px] truncate" title={creditAccountsDisplay}>{creditAccountsDisplay || '-'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(totalAmount)}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="icon" disabled title="Buchung bearbeiten (Demnächst)">
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleOpenEditModal(entry)}
+                            title="Buchung bearbeiten"
+                            disabled={(updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id) || (deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id)}
+                        >
                             <Edit className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                             <Button variant="destructive" size="icon" title="Buchung löschen" disabled={deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id}>
+                             <Button 
+                                variant="destructive" 
+                                size="icon" 
+                                title="Buchung löschen" 
+                                disabled={(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) || (updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id)}
+                             >
                                 <Trash2 className="h-4 w-4" />
                              </Button>
                           </AlertDialogTrigger>
@@ -318,6 +356,38 @@ export default function TenantJournalPage() {
           )}
         </CardContent>
       </Card>
+
+      {selectedEntryForEdit && (
+        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
+          setIsEditModalOpen(isOpen);
+          if (!isOpen) setSelectedEntryForEdit(null); 
+        }}>
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Buchung bearbeiten: {selectedEntryForEdit.entryNumber}</DialogTitle>
+              <DialogDescriptionComponent>
+                Bearbeiten Sie den Buchungssatz für {tenant?.name} im Geschäftsjahr {activeFiscalYear?.name}.
+              </DialogDescriptionComponent>
+            </DialogHeader>
+            {(isLoadingCoA || isLoadingActiveFiscalYear || !allAccounts.length || !activeFiscalYear) && !clientLoaded ? (
+              <div className="flex justify-center items-center h-32">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="ml-2">Daten werden geladen...</p>
+                </div>
+            ) : (
+              <JournalEntryForm
+                tenantId={tenantId}
+                accounts={allAccounts}
+                activeFiscalYear={activeFiscalYear}
+                onSubmit={handleUpdateJournalEntry}
+                isSubmitting={updateEntryMutation.isPending}
+                initialData={selectedEntryForEdit} 
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
+
