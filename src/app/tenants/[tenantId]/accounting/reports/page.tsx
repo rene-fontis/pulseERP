@@ -34,6 +34,7 @@ import {
   type ChartConfig
 } from "@/components/ui/chart";
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/utils';
 
 const chartConfig = {
     Ertrag: {
