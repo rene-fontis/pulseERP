@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -34,23 +33,34 @@ export function Header() {
   }, []);
 
   React.useEffect(() => {
-    if (currentTenantId && tenants) {
+    if (isClient && currentTenantId && tenants) {
       const tenant = tenants.find(t => t.id === currentTenantId);
       setActiveTenantName(tenant ? tenant.name : null);
-    } else {
+    } else if (isClient) {
       setActiveTenantName(null);
     }
-  }, [currentTenantId, tenants, pathname]);
+  }, [currentTenantId, tenants, pathname, isClient]);
 
-  const getTenantDropdownTriggerLabel = () => {
+  const getTenantDropdownTriggerLabelContents = () => {
+    if (!isClient) {
+      // Consistent output for SSR and initial client render
+      // Using Skeleton as it's generally safe if its props are deterministic.
+      // Alternatively, a simple string like "Lädt..." could be used.
+      return <Skeleton className="h-4 w-[150px]" />;
+    }
+
+    // Client-side only logic (after isClient is true)
+    if (isLoadingTenants) {
+      return <Skeleton className="h-4 w-[150px]" />;
+    }
     if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
       return activeTenantName;
     }
     if (pathname.startsWith('/manage-tenants')) {
       return "Mandantenübersicht";
     }
-    if (isLoadingTenants) {
-      return <Skeleton className="h-4 w-[150px]" />;
+    if (pathname.startsWith('/manage-templates')) {
+        return "Vorlagenübersicht";
     }
     return "Mandant wählen...";
   };
@@ -62,7 +72,7 @@ export function Header() {
   
   const headerDynamicClasses = ""; 
   const leftDivPaddingClasses = "pl-4 sm:pl-6";
-  const rightDivPaddingClasses = "pr-4 sm:pr-6";
+  const rightDivPaddingClasses = "pr-4 sm:pr-6"; 
   
   const headerClasses = cn(headerBaseClasses, headerDynamicClasses);
   const leftDivClasses = cn(divBaseClasses, leftDivPaddingClasses);
@@ -83,14 +93,14 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center gap-2 min-w-[180px] justify-start px-3">
               {tenantDropdownTriggerIcon}
-              <span className="truncate">{getTenantDropdownTriggerLabel()}</span>
+              <span className="truncate">{getTenantDropdownTriggerLabelContents()}</span>
               <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Mandant auswählen</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {isLoadingTenants ? (
+            {isLoadingTenants && isClient ? ( // Show skeleton only on client if still loading
               <DropdownMenuItem disabled>
                 <Skeleton className="h-4 w-full" />
               </DropdownMenuItem>
@@ -101,8 +111,13 @@ export function Header() {
                 </DropdownMenuItem>
               ))
             )}
-            {(!isLoadingTenants && tenants && tenants.length === 0) && (
+            {(!isLoadingTenants && tenants && tenants.length === 0 && isClient) && (
                  <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
+            )}
+             {!isClient && ( // Placeholder for SSR / initial client render
+                <DropdownMenuItem disabled>
+                    <Skeleton className="h-4 w-full" />
+                </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
@@ -118,7 +133,7 @@ export function Header() {
             variant="ghost" 
             size="sm" 
             asChild 
-            className={cn(pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
+            className={cn("ml-2", pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
         >
           <Link href="/manage-templates" className="flex items-center gap-2 px-3">
             <FileText className="h-4 w-4 text-primary" />
@@ -129,3 +144,4 @@ export function Header() {
     </header>
   );
 }
+
