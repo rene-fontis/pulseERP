@@ -12,14 +12,14 @@ import type { JournalEntry, NewJournalEntryPayload } from '@/types';
 
 const journalEntryQueryKeys = {
   all: (tenantId?: string) => ['journalEntries', tenantId || 'allScope'] as const,
-  list: (tenantId: string, fiscalYearId?: string) => [...journalEntryQueryKeys.all(tenantId), 'list', fiscalYearId || 'allYears'] as const,
+  list: (tenantId: string, fiscalYearId?: string | null) => [...journalEntryQueryKeys.all(tenantId), 'list', fiscalYearId ?? 'allFiscalYears'] as const,
   detail: (tenantId: string, entryId: string) => [...journalEntryQueryKeys.all(tenantId), 'detail', entryId] as const,
 };
 
 export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: string | null) {
   return useQuery<JournalEntry[], Error>({
-    queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId ?? undefined),
-    queryFn: () => (tenantId ? getJournalEntries(tenantId, fiscalYearId ?? undefined) : Promise.resolve([])),
+    queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId),
+    queryFn: () => (tenantId ? getJournalEntries(tenantId, fiscalYearId === null ? undefined : fiscalYearId) : Promise.resolve([])),
     enabled: !!tenantId, // Entries are always tenant-specific
   });
 }
@@ -31,6 +31,8 @@ export function useAddJournalEntry(tenantId: string) {
     onSuccess: (data) => {
       // Invalidate list for the specific tenant and fiscal year of the new entry
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data.fiscalYearId) });
+      // Also invalidate the "all fiscal years" list if it was used
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
     },
   });
 }
@@ -42,6 +44,7 @@ export function useUpdateJournalEntry(tenantId: string) {
     onSuccess: (data, variables) => {
       // Invalidate list for the specific tenant and potentially the fiscal year of the updated entry
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data?.fiscalYearId) });
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.detail(tenantId, variables.entryId) });
     },
   });
@@ -57,6 +60,7 @@ export function useDeleteJournalEntry(tenantId: string) {
         // To properly invalidate, we'd need to know which fiscal year list to update.
         // This might require fetching the entry before deleting or passing fiscalYearId.
         // For now, invalidate all lists for the tenant, or refine if fiscalYearId is available.
+        // Invalidate both specific fiscal year lists and the "all fiscal years" list.
         queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.all(tenantId) }); 
       }
     },

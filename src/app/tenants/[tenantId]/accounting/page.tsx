@@ -1,16 +1,20 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2 } from 'lucide-react';
+import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2, CalendarDays } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetJournalEntries } from '@/hooks/useJournalEntries';
+import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { Skeleton } from '@/components/ui/skeleton';
 import React, { useMemo, useEffect, useState } from 'react';
 import { AccountingOverview } from '@/components/accounting/AccountingOverview';
 import { calculateFinancialSummary, type FinancialSummary } from '@/lib/accounting';
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 interface AccountingFeatureCardProps {
   title: string;
@@ -49,7 +53,11 @@ export default function TenantAccountingPage() {
   const tenantId = params.tenantId as string;
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
-  const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId);
+  
+  // Fetch journal entries based on active fiscal year, or all if not set
+  const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, tenant?.activeFiscalYearId);
+  const { data: activeFiscalYear, isLoading: isLoadingActiveFiscalYear } = useGetFiscalYearById(tenantId, tenant?.activeFiscalYearId ?? null);
+  
   const [clientLoaded, setClientLoaded] = useState(false);
 
   useEffect(() => {
@@ -61,8 +69,18 @@ export default function TenantAccountingPage() {
     return calculateFinancialSummary(chartOfAccounts, journalEntries);
   }, [chartOfAccounts, journalEntries, clientLoaded]);
   
-  const isLoadingData = isLoadingTenant || (clientLoaded && isLoadingCoA) || (clientLoaded && isLoadingEntries);
+  const isLoadingData = isLoadingTenant || (clientLoaded && isLoadingCoA) || (clientLoaded && isLoadingEntries) || (clientLoaded && tenant?.activeFiscalYearId && isLoadingActiveFiscalYear);
   const combinedError = tenantError || coaError || entriesError;
+
+  const formatDate = (dateString: string | Date | undefined) => {
+    if (!clientLoaded || !dateString) return "";
+    try {
+      const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+      return format(date, "dd.MM.yyyy", { locale: de });
+    } catch (e) {
+      return "Ungültiges Datum";
+    }
+  };
 
   if (isLoadingData && !clientLoaded) { // Initial full page skeleton
     return (
@@ -148,6 +166,17 @@ export default function TenantAccountingPage() {
     }
   ];
 
+  const getOverviewSubtitle = () => {
+    if (isLoadingActiveFiscalYear && tenant?.activeFiscalYearId) return "Lade Geschäftsjahres Info...";
+    if (activeFiscalYear) {
+      return `Zusammenfassung für Geschäftsjahr: ${activeFiscalYear.name} (${formatDate(activeFiscalYear.startDate)} - ${formatDate(activeFiscalYear.endDate)})`;
+    }
+    if (tenant && !tenant.activeFiscalYearId) {
+      return "Gesamte finanzielle Zusammenfassung (kein spezifisches Geschäftsjahr aktiv)";
+    }
+    return "Finanzielle Zusammenfassung";
+  }
+
 
   return (
     <div className="container mx-auto py-8">
@@ -164,7 +193,12 @@ export default function TenantAccountingPage() {
       {isLoadingData && clientLoaded && <Loader2 className="mx-auto my-8 h-12 w-12 animate-spin text-primary" />}
       
       {!isLoadingData && clientLoaded && chartOfAccounts && (
-        <AccountingOverview summary={financialSummary} isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} />
+        <>
+         <CardDescription className="mb-4 px-4 md:px-0 flex items-center">
+            <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground"/> {getOverviewSubtitle()}
+          </CardDescription>
+          <AccountingOverview summary={financialSummary} isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} />
+        </>
       )}
       
       {!isLoadingData && clientLoaded && !chartOfAccounts && tenant?.chartOfAccountsId && (
@@ -188,3 +222,4 @@ export default function TenantAccountingPage() {
     </div>
   );
 }
+
