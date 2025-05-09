@@ -18,6 +18,7 @@ import { de } from 'date-fns/locale';
 import React, { useState, useEffect, useMemo } from 'react';
 import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionRadix, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { formatCurrency } from '@/lib/utils';
 
 
 export default function TenantJournalPage() {
@@ -109,13 +110,9 @@ export default function TenantJournalPage() {
       return "Ungültiges Datum";
     }
   };
-
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined || amount === null || !clientLoaded) return '';
-    return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount);
-  }
   
-  const isLoading = isLoadingTenant || isLoadingActiveFiscalYear || (tenantId && isLoadingEntries && !clientLoaded) || (tenant?.chartOfAccountsId && isLoadingCoA);
+  const isLoading = isLoadingTenant || isLoadingActiveFiscalYear || (clientLoaded && tenantId && isLoadingEntries && !clientLoaded) || (clientLoaded && tenant?.chartOfAccountsId && isLoadingCoA);
+
 
   if (isLoading && !clientLoaded) { 
     return (
@@ -149,7 +146,7 @@ export default function TenantJournalPage() {
     );
   }
   
-  if (!tenant && !isLoadingTenant) {
+  if (!tenant && !isLoadingTenant && clientLoaded) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
@@ -159,7 +156,7 @@ export default function TenantJournalPage() {
     );
   }
 
-   if (tenant && !tenant.chartOfAccountsId && !isLoadingCoA) {
+   if (tenant && !tenant.chartOfAccountsId && !isLoadingCoA && clientLoaded) {
     return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
@@ -173,7 +170,7 @@ export default function TenantJournalPage() {
     );
   }
 
-  if (tenant && tenant.chartOfAccountsId && !chartOfAccounts && !isLoadingCoA) {
+  if (tenant && tenant.chartOfAccountsId && !chartOfAccounts && !isLoadingCoA && clientLoaded) {
      return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
@@ -187,7 +184,7 @@ export default function TenantJournalPage() {
     );
   }
 
-  if (tenant && !tenant.activeFiscalYearId && !isLoadingActiveFiscalYear) {
+  if (tenant && !tenant.activeFiscalYearId && !isLoadingActiveFiscalYear && clientLoaded) {
     return (
       <div className="container mx-auto py-8 text-center">
         <CalendarOff className="w-16 h-16 mb-4 mx-auto text-primary" />
@@ -197,7 +194,7 @@ export default function TenantJournalPage() {
       </div>
     );
   }
-    if (tenant && tenant.activeFiscalYearId && !activeFiscalYear && !isLoadingActiveFiscalYear) {
+    if (tenant && tenant.activeFiscalYearId && !activeFiscalYear && !isLoadingActiveFiscalYear && clientLoaded) {
     return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
@@ -277,75 +274,83 @@ export default function TenantJournalPage() {
                   <TableRow>
                     <TableHead>Datum</TableHead>
                     <TableHead>Nr.</TableHead>
-                    <TableHead>Beschreibung</TableHead>
-                    <TableHead>Soll</TableHead>
-                    <TableHead>Haben</TableHead>
-                    <TableHead className="text-right">Betrag</TableHead>
+                    <TableHead>Beschreibung (Buchung)</TableHead>
+                    <TableHead>Konto-Nr.</TableHead>
+                    <TableHead>Konto-Name</TableHead>
+                    <TableHead className="text-right">Soll</TableHead>
+                    <TableHead className="text-right">Haben</TableHead>
+                    <TableHead>Beschreibung (Zeile)</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {journalEntries.length > 0 ? journalEntries.map((entry) => {
-                    const debitLines = entry.lines.filter(l => l.debit && l.debit > 0);
-                    const creditLines = entry.lines.filter(l => l.credit && l.credit > 0);
-                    const totalAmount = debitLines.reduce((sum, l) => sum + (l.debit || 0), 0);
-
-                    const debitAccountsDisplay = debitLines.map(l => `${l.accountNumber} ${l.accountName}`).join(', ');
-                    const creditAccountsDisplay = creditLines.map(l => `${l.accountNumber} ${l.accountName}`).join(', ');
-                    
-                    return (
-                    <TableRow key={entry.id}>
-                      <TableCell>{formatDate(entry.date)}</TableCell>
-                      <TableCell>{entry.entryNumber}</TableCell>
-                      <TableCell className="font-medium max-w-xs truncate" title={entry.description}>{entry.description}</TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={debitAccountsDisplay}>{debitAccountsDisplay || '-'}</TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={creditAccountsDisplay}>{creditAccountsDisplay || '-'}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalAmount)}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button 
-                            variant="outline" 
-                            size="icon" 
-                            onClick={() => handleOpenEditModal(entry)}
-                            title="Buchung bearbeiten"
-                            disabled={(updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id) || (deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id)}
-                        >
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                             <Button 
-                                variant="destructive" 
+                  {journalEntries.length > 0 ? journalEntries.map((entry) => (
+                    entry.lines.map((line, lineIndex) => (
+                      <TableRow key={`${entry.id}-${line.id}`}>
+                        {lineIndex === 0 && (
+                          <>
+                            <TableCell rowSpan={entry.lines.length || 1}>{formatDate(entry.date)}</TableCell>
+                            <TableCell rowSpan={entry.lines.length || 1}>{entry.entryNumber}</TableCell>
+                            <TableCell rowSpan={entry.lines.length || 1} className="max-w-xs truncate" title={entry.description}>
+                              {entry.description}
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell>{line.accountNumber}</TableCell>
+                        <TableCell>{line.accountName}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(line.debit)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(line.credit)}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={line.description}>
+                          {line.description || '-'}
+                        </TableCell>
+                        {lineIndex === 0 && (
+                          <TableCell rowSpan={entry.lines.length || 1} className="text-right space-x-1 align-top">
+                            <Button 
+                                variant="outline" 
                                 size="icon" 
-                                title="Buchung löschen" 
-                                disabled={(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) || (updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id)}
-                             >
-                                <Trash2 className="h-4 w-4" />
-                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
-                              <AlertDialogDescriptionRadix>
-                                Diese Aktion kann nicht rückgängig gemacht werden. Der Buchungssatz "{entry.entryNumber}: {entry.description}" wird dauerhaft gelöscht.
-                              </AlertDialogDescriptionRadix>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteEntry(entry.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                disabled={deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id}
-                              >
-                                {(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) ? 'Löschen...' : 'Löschen'}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  )}) : (
+                                onClick={() => handleOpenEditModal(entry)}
+                                title="Buchung bearbeiten"
+                                disabled={(updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id) || (deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id)}
+                            >
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                 <Button 
+                                    variant="destructive" 
+                                    size="icon" 
+                                    title="Buchung löschen" 
+                                    disabled={(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) || (updateEntryMutation.isPending && updateEntryMutation.variables?.entryId === entry.id)}
+                                 >
+                                    <Trash2 className="h-4 w-4" />
+                                 </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
+                                  <AlertDialogDescriptionRadix>
+                                    Diese Aktion kann nicht rückgängig gemacht werden. Der Buchungssatz "{entry.entryNumber}: {entry.description}" wird dauerhaft gelöscht.
+                                  </AlertDialogDescriptionRadix>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteEntry(entry.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    disabled={deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id}
+                                  >
+                                    {(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) ? 'Löschen...' : 'Löschen'}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                         Keine Buchungssätze für das aktive Geschäftsjahr gefunden.
                       </TableCell>
                     </TableRow>
