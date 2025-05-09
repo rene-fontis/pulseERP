@@ -2,17 +2,19 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2, CalendarDays } from 'lucide-react';
+import { BookOpen, AlertCircle, LayoutGrid, FileText as FileTextIcon, Loader2, CalendarDays, Calendar } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetJournalEntries } from '@/hooks/useJournalEntries';
-import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
+import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { Skeleton } from '@/components/ui/skeleton';
 import React, { useMemo, useEffect, useState } from 'react';
 import { AccountingOverview } from '@/components/accounting/AccountingOverview';
 import { GlobalSummaryCards } from '@/components/accounting/GlobalSummaryCards';
 import { calculateFinancialSummary, type FinancialSummary } from '@/lib/accounting';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { FiscalYear } from '@/types';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -51,24 +53,41 @@ function AccountingFeatureCard({ title, description, icon: Icon, href, disabled 
 export default function TenantAccountingPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
+  
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
-  
-  const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, tenant?.activeFiscalYearId);
-  const { data: activeFiscalYear, isLoading: isLoadingActiveFiscalYear } = useGetFiscalYearById(tenantId, tenant?.activeFiscalYearId ?? null);
-  
+  const { data: fiscalYears, isLoading: isLoadingFiscalYears } = useGetFiscalYears(tenantId);
+
+  const [selectedFiscalYearId, setSelectedFiscalYearId] = useState<string | undefined>(undefined);
   const [clientLoaded, setClientLoaded] = useState(false);
 
   useEffect(() => {
     setClientLoaded(true);
   }, []);
 
-  const financialSummary: FinancialSummary | null = useMemo(() => {
-    if (!chartOfAccounts || !journalEntries || !clientLoaded) return null;
-    return calculateFinancialSummary(chartOfAccounts, journalEntries);
-  }, [chartOfAccounts, journalEntries, clientLoaded]);
+  useEffect(() => {
+    if (tenant?.activeFiscalYearId && !selectedFiscalYearId) {
+      setSelectedFiscalYearId(tenant.activeFiscalYearId);
+    } else if (!tenant?.activeFiscalYearId && fiscalYears && fiscalYears.length > 0 && !selectedFiscalYearId) {
+      // Default to the most recent fiscal year if no active one is set
+      setSelectedFiscalYearId(fiscalYears.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0].id);
+    }
+  }, [tenant, fiscalYears, selectedFiscalYearId]);
+
+  const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId, selectedFiscalYearId);
+  const { data: selectedFiscalYearDetails, isLoading: isLoadingSelectedFiscalYear } = useGetFiscalYearById(tenantId, selectedFiscalYearId ?? null);
   
-  const isLoadingData = isLoadingTenant || (clientLoaded && isLoadingCoA) || (clientLoaded && isLoadingEntries) || (clientLoaded && tenant?.activeFiscalYearId && isLoadingActiveFiscalYear);
+  const financialSummary: FinancialSummary | null = useMemo(() => {
+    if (!chartOfAccounts || !journalEntries || !clientLoaded || !selectedFiscalYearDetails) return null;
+    return calculateFinancialSummary(chartOfAccounts, journalEntries, selectedFiscalYearDetails);
+  }, [chartOfAccounts, journalEntries, clientLoaded, selectedFiscalYearDetails]);
+  
+  const isLoadingData = isLoadingTenant || 
+                        (clientLoaded && isLoadingCoA) || 
+                        (clientLoaded && isLoadingEntries) || 
+                        (clientLoaded && isLoadingFiscalYears) ||
+                        (clientLoaded && selectedFiscalYearId && isLoadingSelectedFiscalYear);
+
   const combinedError = tenantError || coaError || entriesError;
 
   const formatDate = (dateString: string | Date | undefined) => {
@@ -102,7 +121,7 @@ export default function TenantAccountingPage() {
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
         <Skeleton className="h-6 w-2/3 mb-6" />
-        {/* Skeleton for GlobalSummaryCards */}
+        <Skeleton className="h-10 w-1/2 mb-4" /> {/* Fiscal Year Selector Skeleton */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mb-6">
             {[...Array(6)].map((_, i) => (
             <Card key={`summary-skeleton-${i}`}>
@@ -117,13 +136,11 @@ export default function TenantAccountingPage() {
             </Card>
             ))}
         </div>
-        {/* Skeleton for Feature Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {[...Array(2)].map((_, i) => (
             <Skeleton key={`feature-skeleton-${i}`} className="h-32 w-full rounded-lg" />
           ))}
         </div>
-        {/* Skeleton for AccountingOverview (Detailed view) */}
         <Card>
             <CardHeader>
                 <Skeleton className="h-8 w-1/2" />
@@ -178,27 +195,59 @@ export default function TenantAccountingPage() {
   }
   
   const getOverviewSubtitle = () => {
-    if (isLoadingActiveFiscalYear && tenant?.activeFiscalYearId) return "Lade Geschäftsjahres Info...";
-    if (activeFiscalYear) {
-      return `Finanzübersicht für Geschäftsjahr: ${activeFiscalYear.name} (${formatDate(activeFiscalYear.startDate)} - ${formatDate(activeFiscalYear.endDate)})`;
+    if (isLoadingSelectedFiscalYear && selectedFiscalYearId) return "Lade Geschäftsjahres Info...";
+    if (selectedFiscalYearDetails) {
+      return `Finanzübersicht für Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - ${formatDate(selectedFiscalYearDetails.endDate)})`;
     }
-    if (tenant && !tenant.activeFiscalYearId) {
-      return "Gesamte finanzielle Zusammenfassung (kein spezifisches Geschäftsjahr aktiv)";
+    if (tenant && !selectedFiscalYearId && fiscalYears && fiscalYears.length === 0) {
+       return "Keine Geschäftsjahre definiert. Bitte in Einstellungen anlegen.";
     }
-    return "Finanzielle Zusammenfassung";
+    return "Finanzielle Zusammenfassung (Bitte Geschäftsjahr wählen)";
   }
 
 
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="px-4 md:px-0">
-        <div className="flex items-center mb-2">
-            <BookOpen className="h-8 w-8 mr-3 text-primary" />
-            <h1 className="text-3xl font-bold">Buchhaltung: {tenant?.name || (isLoadingTenant ? "Lade..." : "Unbekannt")}</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
+            <div className="flex items-center mb-2 sm:mb-0">
+                <BookOpen className="h-8 w-8 mr-3 text-primary" />
+                <h1 className="text-3xl font-bold">Buchhaltung: {tenant?.name || (isLoadingTenant ? "Lade..." : "Unbekannt")}</h1>
+            </div>
+            {clientLoaded && fiscalYears && fiscalYears.length > 0 && (
+                <div className="w-full sm:w-auto min-w-[250px]">
+                    <Select
+                        value={selectedFiscalYearId}
+                        onValueChange={setSelectedFiscalYearId}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Geschäftsjahr wählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {fiscalYears.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()).map((fy) => (
+                            <SelectItem key={fy.id} value={fy.id}>
+                            {fy.name} ({formatDate(fy.startDate)} - {formatDate(fy.endDate)})
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
         </div>
         <p className="text-lg text-muted-foreground">
           Finanzmanagement und Buchführung für {tenant?.name || (isLoadingTenant ? "Lade..." : "Unbekannt")}.
         </p>
+         {clientLoaded && fiscalYears && fiscalYears.length === 0 && !isLoadingFiscalYears && (
+            <Card className="mt-4 border-destructive">
+                <CardHeader className="flex-row items-center gap-2">
+                    <AlertCircle className="text-destructive h-5 w-5"/>
+                    <CardTitle className="text-destructive text-lg">Keine Geschäftsjahre</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>Für diesen Mandanten wurden noch keine Geschäftsjahre definiert. Bitte legen Sie zuerst Geschäftsjahre in den <a href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Einstellungen</a> an.</p>
+                </CardContent>
+            </Card>
+        )}
       </div>
 
       <GlobalSummaryCards summary={financialSummary} isLoading={isLoadingData || !clientLoaded} />
@@ -219,11 +268,12 @@ export default function TenantAccountingPage() {
         <CardContent>
             {isLoadingData && clientLoaded && <Loader2 className="mx-auto my-8 h-12 w-12 animate-spin text-primary" />}
             
-            {!isLoadingData && clientLoaded && chartOfAccounts && (
+            {!isLoadingData && clientLoaded && chartOfAccounts && selectedFiscalYearDetails && (
                 <AccountingOverview 
                     summary={financialSummary} 
-                    isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded} // Pass isLoading to control accordion skeletons
+                    isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded || isLoadingSelectedFiscalYear} 
                     chartOfAccounts={chartOfAccounts}
+                    selectedFiscalYear={selectedFiscalYearDetails}
                 />
             )}
             
@@ -233,8 +283,11 @@ export default function TenantAccountingPage() {
                     <p>Die Finanzübersicht kann nicht angezeigt werden, da der zugehörige Kontenplan nicht verfügbar ist.</p>
                 </div>
             )}
-             {!isLoadingData && clientLoaded && !financialSummary && chartOfAccounts && (
-                 <p className="text-muted-foreground">Keine Buchungsdaten für die detaillierte Übersicht vorhanden.</p>
+             {!isLoadingData && clientLoaded && !financialSummary && chartOfAccounts && selectedFiscalYearDetails && (
+                 <p className="text-muted-foreground">Keine Buchungsdaten für die detaillierte Übersicht im gewählten Geschäftsjahr vorhanden.</p>
+            )}
+             {!isLoadingData && clientLoaded && !selectedFiscalYearDetails && fiscalYears && fiscalYears.length > 0 && (
+                 <p className="text-muted-foreground">Bitte wählen Sie ein Geschäftsjahr aus, um die detaillierte Übersicht anzuzeigen.</p>
             )}
         </CardContent>
       </Card>
@@ -242,3 +295,4 @@ export default function TenantAccountingPage() {
     </div>
   );
 }
+

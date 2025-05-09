@@ -1,5 +1,5 @@
-import type { TenantChartOfAccounts, JournalEntry, Account, AccountGroup, MonthlyBreakdownItem } from '@/types';
-import { parseISO, format, getYear, getMonth } from 'date-fns';
+import type { TenantChartOfAccounts, JournalEntry, Account, AccountGroup, MonthlyBreakdownItem, FiscalYear } from '@/types';
+import { parseISO, format, getYear, getMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 export interface AccountBalances {
@@ -9,17 +9,18 @@ export interface AccountBalances {
 export interface FinancialSummary {
   totalAssets: number;
   totalLiabilities: number;
-  totalRevenue: number;
-  totalExpenses: number;
-  netProfitLoss: number;
-  equity: number;
-  accountBalances: AccountBalances;
-  monthlyBreakdown: MonthlyBreakdownItem[];
+  totalRevenue: number; // For the selected period
+  totalExpenses: number; // For the selected period
+  netProfitLoss: number; // For the selected period
+  equity: number; // As of end of selected period
+  accountBalances: AccountBalances; // As of end of selected period
+  monthlyBreakdown: MonthlyBreakdownItem[]; // For the selected period
 }
 
 export function calculateFinancialSummary(
   chartOfAccounts: TenantChartOfAccounts | undefined,
-  journalEntries: JournalEntry[] | undefined
+  allJournalEntriesForTenant: JournalEntry[] | undefined, // Should contain all entries for the tenant
+  selectedFiscalYear: FiscalYear | null | undefined
 ): FinancialSummary {
   const initialSummary: FinancialSummary = {
     totalAssets: 0,
@@ -32,7 +33,19 @@ export function calculateFinancialSummary(
     monthlyBreakdown: [],
   };
 
-  if (!chartOfAccounts || !journalEntries) {
+  if (!chartOfAccounts || !allJournalEntriesForTenant || !selectedFiscalYear) {
+    // If no fiscal year is selected, or base data is missing, return initial summary or handle opening balances only
+     if (chartOfAccounts) {
+        chartOfAccounts.groups.forEach(group => {
+            group.accounts.forEach(account => {
+            initialSummary.accountBalances[account.id] = account.balance || 0;
+            if (group.mainType === 'Asset') initialSummary.totalAssets += (account.balance || 0);
+            else if (group.mainType === 'Liability') initialSummary.totalLiabilities -= (account.balance || 0);
+            // Initial equity is assets - liabilities if no profit/loss considered yet
+            });
+        });
+        initialSummary.equity = initialSummary.totalAssets - initialSummary.totalLiabilities;
+    }
     return initialSummary;
   }
 
@@ -40,18 +53,28 @@ export function calculateFinancialSummary(
   const monthlyDataAggregator: Map<string, { revenue: number; expenses: number; year: number; monthIndex: number }> = new Map();
 
   // Initialize accountBalances with the opening balances from the Chart of Accounts.
+  // These are considered the balances at the START of the very first period OR after a year-end closing.
   chartOfAccounts.groups.forEach(group => {
     group.accounts.forEach(account => {
       accountBalances[account.id] = account.balance || 0;
     });
   });
+  
+  const fyStartDate = startOfDay(parseISO(selectedFiscalYear.startDate));
+  const fyEndDate = endOfDay(parseISO(selectedFiscalYear.endDate));
 
-  // Adjust balances based on journal entries for the current period
-  journalEntries.forEach(entry => {
+  // Filter entries relevant for P&L (within the selected fiscal year)
+  const periodJournalEntries = allJournalEntriesForTenant.filter(entry => {
+    const entryDate = parseISO(entry.date);
+    return isWithinInterval(entryDate, { start: fyStartDate, end: fyEndDate });
+  });
+
+  // Process journal entries for the selected fiscal year to calculate P&L and adjust BS accounts
+  periodJournalEntries.forEach(entry => {
     const entryDate = parseISO(entry.date);
     const year = getYear(entryDate);
-    const monthIndex = getMonth(entryDate); // 0-indexed (0 for January)
-    const monthYearKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`; // YYYY-MM for sorting
+    const monthIndex = getMonth(entryDate);
+    const monthYearKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
 
     if (!monthlyDataAggregator.has(monthYearKey)) {
       monthlyDataAggregator.set(monthYearKey, { revenue: 0, expenses: 0, year, monthIndex });
@@ -77,20 +100,16 @@ export function calculateFinancialSummary(
 
         const debitAmount = line.debit || 0;
         const creditAmount = line.credit || 0;
-        // For Asset/Expense: positive debit increases balance. For Liability/Equity/Revenue: positive credit increases "value" (decreases balance number).
-        const netChange = debitAmount - creditAmount; 
+        const netChange = debitAmount - creditAmount; // Positive for debit, negative for credit
 
-        // Update overall account balances (used for Bilanz items)
+        // Update overall account balances (these become closing balances for the period)
         accountBalances[line.accountId] = (accountBalances[line.accountId] || 0) + netChange;
-
-        // Aggregate monthly P&L
+        
+        // Aggregate P&L for monthly breakdown and period totals
         if (mainTypeForAggregation === 'Revenue') {
-            // Revenue increases with credits. A credit makes netChange negative for P&L calculation from balance perspective.
-            // We want positive revenue value, so -netChange if netChange represents change in balance.
-            currentMonthData.revenue -= netChange; 
+            currentMonthData.revenue -= netChange; // Revenue increases with credits (netChange is negative for credit)
         } else if (mainTypeForAggregation === 'Expense') {
-            // Expenses increase with debits. A debit makes netChange positive.
-            currentMonthData.expenses += netChange;
+            currentMonthData.expenses += netChange; // Expenses increase with debits (netChange is positive for debit)
         }
       }
     });
@@ -98,63 +117,65 @@ export function calculateFinancialSummary(
 
   let totalAssets = 0;
   let totalLiabilities = 0;
-  // totalEquityFromInitialBalances is not directly used for the final summary.equity, 
-  // but can be useful for understanding the components.
-  // let totalEquityFromInitialBalances = 0; 
-  let totalRevenue = 0; 
-  let totalExpenses = 0;
+  let periodRevenue = 0;
+  let periodExpenses = 0;
 
   chartOfAccounts.groups.forEach(group => {
     group.accounts.forEach(account => {
-      const currentBalance = accountBalances[account.id] || 0;
-      // currentBalance = OpeningBalance + DebitsForPeriod - CreditsForPeriod
-
+      const closingBalance = accountBalances[account.id] || 0;
       switch (group.mainType) { 
         case 'Asset':
-          totalAssets += currentBalance;
+          totalAssets += closingBalance;
           break;
         case 'Liability':
-          totalLiabilities -= currentBalance; 
+          totalLiabilities -= closingBalance; // Liabilities are credit balances
           break;
         case 'Equity':
-          // This sums the *current balances* of equity accounts.
-          // The profit/loss for the *current period* is handled separately.
-          // totalEquityFromInitialBalances -= currentBalance; 
-          break;
+          // Equity sum from accounts (excluding current period P&L, which is added later or implicitly via A-L)
+          // This part sums up the *closing balances* of equity accounts.
+          break; 
         case 'Revenue':
-          totalRevenue -= currentBalance; // Revenue accounts have credit balances, so subtract to get positive revenue figure
+          // Sum the *change* during the period for revenue accounts for P&L report
+          // The change is (closingBalance - openingBalance)
+          // Since revenue accounts are credit, their balance decreases (becomes more negative) with revenue
+          // So, change = closingBalance - openingBalance = (initial + periodCredits - periodDebits) - initial = periodCredits - periodDebits
+          // If we define revenue as positive: -(closingBalance - openingBalance)
+          periodRevenue -= (closingBalance - (account.balance || 0));
           break;
         case 'Expense':
-          totalExpenses += currentBalance; // Expense accounts have debit balances
+          // Sum the *change* during the period for expense accounts
+          // change = closingBalance - openingBalance = (initial + periodDebits - periodCredits) - initial = periodDebits - periodCredits
+          periodExpenses += (closingBalance - (account.balance || 0));
           break;
       }
     });
   });
-
-  const netProfitLoss = totalRevenue - totalExpenses;
   
-  // Equity on the balance sheet is Assets - Liabilities.
-  const calculatedEquityFromAssetsLiabilities = totalAssets - totalLiabilities;
+  const netProfitLossForPeriod = periodRevenue - periodExpenses;
+  
+  // Final Equity for Balance Sheet = Assets - Liabilities
+  // This automatically includes opening equity + all profit/loss up to the end of the selected period.
+  const equityAtPeriodEnd = totalAssets - totalLiabilities;
 
   const monthlyBreakdown: MonthlyBreakdownItem[] = Array.from(monthlyDataAggregator.entries())
-    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort by YYYY-MM key
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) 
     .map(([key, data]) => ({
-      month: format(new Date(data.year, data.monthIndex), "MMM", { locale: de }), // e.g., "Jan"
+      month: format(new Date(data.year, data.monthIndex), "MMM", { locale: de }),
       year: data.year,
-      monthYear: `${format(new Date(data.year, data.monthIndex), "MMM", { locale: de })} '${String(data.year).slice(-2)}`, // e.g., "Jan '24"
+      monthYear: `${format(new Date(data.year, data.monthIndex), "MMM", { locale: de })} '${String(data.year).slice(-2)}`,
       revenue: data.revenue,
       expenses: data.expenses,
     }));
 
-
   return {
     totalAssets,
     totalLiabilities,
-    totalRevenue,
-    totalExpenses,
-    netProfitLoss,
-    equity: calculatedEquityFromAssetsLiabilities, 
-    accountBalances, 
+    totalRevenue: periodRevenue,
+    totalExpenses: periodExpenses,
+    netProfitLoss: netProfitLossForPeriod,
+    equity: equityAtPeriodEnd, 
+    accountBalances, // These are closing balances for the selected period
     monthlyBreakdown,
   };
 }
+
