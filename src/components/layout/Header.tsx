@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -42,25 +43,18 @@ export function Header() {
   }, [currentTenantId, tenants, pathname, isClient]);
 
   const getTenantDropdownTriggerLabelContents = () => {
-    // This function is called only when isClient is true due to the wrapper below
-    if (isLoadingTenants) {
+    if (isLoadingTenants && isClient) {
       return <Skeleton className="h-4 w-[150px]" />;
     }
     if (activeTenantName && currentTenantId && pathname.startsWith(`/tenants/${currentTenantId}`)) {
       return activeTenantName;
-    }
-    if (pathname.startsWith('/manage-tenants')) {
-      return "Mandantenübersicht";
-    }
-    if (pathname.startsWith('/manage-templates')) {
-        return "Mandant wählen ...";
     }
     return "Mandant wählen...";
   };
 
   const tenantDropdownTriggerIcon = <Building2 className="h-4 w-4 text-primary" />;
 
-  const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
+  const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md w-full";
   const divBaseClasses = "flex items-center gap-2";
   
   const headerDynamicClasses = ""; 
@@ -109,37 +103,43 @@ export function Header() {
                 {(!isLoadingTenants && tenants && tenants.length === 0) && (
                      <DropdownMenuItem disabled>Keine Mandanten verfügbar</DropdownMenuItem>
                 )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 px-3 ml-2">
+                  <Settings className="h-4 w-4 text-primary" />
+                  <span>Einstellungen</span>
+                  <ChevronDown className="h-4 w-4 ml-auto flex-shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Verwaltung</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild data-active={pathname === '/manage-tenants'}>
                   <Link href="/manage-tenants" className="flex items-center">
-                    <Settings className="mr-2 h-4 w-4" />
+                    <Building2 className="mr-2 h-4 w-4" />
                     Mandantenübersicht
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild data-active={pathname === '/manage-templates'}>
+                  <Link href="/manage-templates" className="flex items-center">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Vorlagen verwalten
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                asChild 
-                className={cn("ml-2", pathname.startsWith('/manage-templates') && "bg-accent text-accent-foreground")}
-            >
-              <Link href="/manage-templates" className="flex items-center gap-2 px-3">
-                <FileText className="h-4 w-4 text-primary" />
-                <span>Vorlagen</span>
-              </Link>
-            </Button>
           </>
         ) : (
           <>
-            {/* Placeholder for Tenant Dropdown Button */}
             <Skeleton className="h-9 w-[180px] rounded-md" /> 
-            {/* Placeholder for Vorlagen Button */}
-            <Skeleton className="h-9 w-[100px] ml-2 rounded-md" />
+            <Skeleton className="h-9 w-[150px] ml-2 rounded-md" />
           </>
         )}
       </nav>
     </header>
   );
 }
+
