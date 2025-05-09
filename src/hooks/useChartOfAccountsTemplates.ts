@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -27,7 +28,7 @@ export function useGetChartOfAccountsTemplates() {
 
 export function useGetChartOfAccountsTemplateById(id: string | null) {
   return useQuery<ChartOfAccountsTemplate | undefined, Error>({
-    queryKey: templateQueryKeys.detail(id!),
+    queryKey: templateQueryKeys.detail(id as string),
     queryFn: () => id ? getChartOfAccountsTemplateById(id) : Promise.resolve(undefined),
     enabled: !!id,
   });
@@ -63,3 +64,4 @@ export function useDeleteChartOfAccountsTemplate() {
     },
   });
 }
+

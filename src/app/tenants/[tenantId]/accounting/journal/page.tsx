@@ -1,24 +1,59 @@
+
 "use client";
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
-// import { useGetJournalEntries, useDeleteJournalEntry } from '@/hooks/useJournalEntries'; 
-import type { JournalEntry } from '@/types';
+import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
+// import { useGetJournalEntries, useDeleteJournalEntry, useAddJournalEntry } from '@/hooks/useJournalEntries'; 
+import type { JournalEntry, Account } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
 
 // Placeholder hooks
 const useGetJournalEntries = (tenantId: string | null) => {
-    return { data: [] as JournalEntry[], isLoading: tenantId ? true : false, error: null };
+    // Simulate fetching some initial entries. In a real app, this would be from a DB.
+    const initialEntries: JournalEntry[] = tenantId ? [
+        // { 
+        //     id: 'entry1', tenantId, entryNumber: '2024-001', date: new Date('2024-01-15').toISOString(), 
+        //     description: 'Bareinzahlung Kasse', posted: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        //     lines: [
+        //         { id: 'line1a', accountId: 'kasse', accountNumber: '1000', accountName: 'Kasse', debit: 1000, description: 'Soll Kasse' },
+        //         { id: 'line1b', accountId: 'bank', accountNumber: '1020', accountName: 'Bank', credit: 1000, description: 'Haben Bank' },
+        //     ]
+        // },
+        // { 
+        //     id: 'entry2', tenantId, entryNumber: '2024-002', date: new Date('2024-01-20').toISOString(), 
+        //     description: 'Kauf Büromaterial', posted: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        //     lines: [
+        //         { id: 'line2a', accountId: 'buero', accountNumber: '6500', accountName: 'Büroaufwand', debit: 150.75, description: 'Soll Büroaufwand' },
+        //         { id: 'line2b', accountId: 'kasse', accountNumber: '1000', accountName: 'Kasse', credit: 150.75, description: 'Haben Kasse' },
+        //     ]
+        // }
+    ] : [];
+    const [entries, setEntries] = useState<JournalEntry[]>(initialEntries);
+    const addEntry = (newEntry: JournalEntry) => {
+        const fullEntry: JournalEntry = {
+            ...newEntry,
+            id: crypto.randomUUID(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+        setEntries(prev => [fullEntry, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.entryNumber.localeCompare(a.entryNumber)));
+    }
+    return { data: entries, isLoading: false, error: null, addEntry };
 }
+
 const useDeleteJournalEntry = () => {
+    // This would interact with the state from useGetJournalEntries or a global store/backend
     return { mutateAsync: async (id: string) => { console.log("Delete", id); return Promise.resolve(); }, isPending: false };
 }
 
@@ -27,24 +62,37 @@ export default function TenantJournalPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
+  const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
+  
   const { toast } = useToast();
   const [clientLoaded, setClientLoaded] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     setClientLoaded(true);
   }, []);
 
-  const { data: journalEntries, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId);
+  const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError, addEntry: addJournalEntry } = useGetJournalEntries(tenantId);
   // const deleteEntryMutation = useDeleteJournalEntry();
+  // const addEntryMutation = useAddJournalEntry(); // Assuming a mutation hook for adding
 
+  const allAccounts: Account[] = useMemo(() => {
+    if (!chartOfAccounts) return [];
+    return chartOfAccounts.groups.flatMap(group => group.accounts);
+  }, [chartOfAccounts]);
+
+  const handleCreateJournalEntry = async (values: JournalEntry) => {
+    try {
+      // await addEntryMutation.mutateAsync(values); // Use this with a real mutation
+      addJournalEntry(values); // Using placeholder state update
+      toast({ title: "Erfolg", description: "Buchungssatz erstellt." });
+      setIsCreateModalOpen(false);
+    } catch (e) {
+      toast({ title: "Fehler", description: "Buchungssatz konnte nicht erstellt werden.", variant: "destructive" });
+    }
+  };
 
   const handleDeleteEntry = async (entryId: string) => {
-    // try {
-    //   await deleteEntryMutation.mutateAsync(entryId);
-    //   toast({ title: "Erfolg", description: "Buchungssatz gelöscht." });
-    // } catch (e) {
-    //   toast({ title: "Fehler", description: "Buchungssatz konnte nicht gelöscht werden.", variant: "destructive" });
-    // }
     toast({title: "Platzhalter", description: `Löschen von ${entryId} noch nicht implementiert.`})
   };
   
@@ -61,9 +109,10 @@ export default function TenantJournalPage() {
     if (amount === undefined || amount === null || !clientLoaded) return '';
     return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount);
   }
+  
+  const isLoading = isLoadingTenant || (tenantId && isLoadingEntries && !clientLoaded) || (tenant?.chartOfAccountsId && isLoadingCoA);
 
-
-  if (isLoadingTenant || (tenantId && isLoadingEntries && !clientLoaded)) {
+  if (isLoading) {
     return (
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
@@ -84,12 +133,12 @@ export default function TenantJournalPage() {
     );
   }
 
-  if (tenantError || entriesError) {
+  if (tenantError || entriesError || coaError) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden des Journals</h2>
-        <p>{(tenantError as Error)?.message || (entriesError as Error)?.message}</p>
+        <p>{(tenantError as Error)?.message || (entriesError as Error)?.message || (coaError as Error)?.message}</p>
       </div>
     );
   }
@@ -104,6 +153,23 @@ export default function TenantJournalPage() {
     );
   }
 
+   if (!tenant.chartOfAccountsId || !chartOfAccounts) {
+    return (
+      <div className="container mx-auto py-8 text-center">
+        <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
+        <h2 className="text-2xl font-semibold mb-2">Kontenplan nicht gefunden</h2>
+        <p>Für diesen Mandanten wurde kein Kontenplan gefunden oder er konnte nicht geladen werden.</p>
+        <p>Bitte überprüfen Sie die Mandanteneinstellungen.</p>
+         <Button asChild variant="link" className="mt-4">
+            <a href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</a>
+        </Button>
+      </div>
+    );
+  }
+  
+  const journalEntries = journalEntriesData || [];
+
+
   return (
     <div className="container mx-auto py-8">
        <Card className="shadow-xl mx-4 md:mx-0">
@@ -112,15 +178,46 @@ export default function TenantJournalPage() {
             <BookOpen className="h-6 w-6 mr-3 text-primary" />
             <CardTitle className="text-2xl font-bold">Journal: {tenant.name}</CardTitle>
           </div>
-           <Button className="bg-accent text-accent-foreground hover:bg-accent/90" disabled>
-            <PlusCircle className="mr-2 h-4 w-4" /> Neue Buchung (Demnächst)
-          </Button>
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <PlusCircle className="mr-2 h-4 w-4" /> Neue Buchung
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Neue Buchung erstellen</DialogTitle>
+                <DialogDescription>
+                  Erfassen Sie einen neuen Buchungssatz für {tenant.name}.
+                </DialogDescription>
+              </DialogHeader>
+              {isLoadingCoA ? (
+                <div className="flex justify-center items-center h-32">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="ml-2">Kontenplan wird geladen...</p>
+                </div>
+              ) : allAccounts.length > 0 ? (
+                <JournalEntryForm
+                  tenantId={tenantId}
+                  accounts={allAccounts}
+                  onSubmit={handleCreateJournalEntry}
+                  isSubmitting={false} // Replace with addEntryMutation.isPending when implemented
+                  defaultEntryNumber={`BU-${String(journalEntries.length + 1).padStart(3, '0')}`}
+                />
+              ) : (
+                 <div className="text-center py-4">
+                    <p className="text-muted-foreground">Keine Konten im Kontenplan gefunden.</p>
+                    <p className="text-sm text-muted-foreground">Bitte zuerst Konten im Kontenplan anlegen.</p>
+                 </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </CardHeader>
         <CardContent>
             <CardDescription className="mb-4">
                 Erfassen und verwalten Sie hier alle Buchungssätze für {tenant.name}.
             </CardDescription>
-          {(isLoadingEntries && !clientLoaded) ? ( // Show skeleton only if entries are loading and client hasn't finished initial load
+          {(isLoadingEntries && !clientLoaded) ? ( 
             <div className="space-y-4">
               <Skeleton className="h-10 w-full" />
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
@@ -140,15 +237,17 @@ export default function TenantJournalPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {journalEntries && journalEntries.length > 0 ? journalEntries.map((entry) => (
+                  {journalEntries.length > 0 ? journalEntries.map((entry) => {
+                    const debitLine = entry.lines.find(l => l.debit && l.debit > 0);
+                    const creditLine = entry.lines.find(l => l.credit && l.credit > 0);
+                    return (
                     <TableRow key={entry.id}>
                       <TableCell>{formatDate(entry.date)}</TableCell>
                       <TableCell>{entry.entryNumber}</TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={entry.description}>{entry.description}</TableCell>
-                      {/* Assuming simple single debit/credit for placeholder */}
-                      <TableCell>{entry.lines[0]?.debit ? `${entry.lines[0].accountNumber} ${entry.lines[0].accountName}` : '-'}</TableCell>
-                      <TableCell>{entry.lines[0]?.credit ? `${entry.lines[0].accountNumber} ${entry.lines[0].accountName}` : '-'}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(entry.lines[0]?.debit || entry.lines[0]?.credit)}</TableCell>
+                      <TableCell>{debitLine ? `${debitLine.accountNumber} ${debitLine.accountName}` : '-'}</TableCell>
+                      <TableCell>{creditLine ? `${creditLine.accountNumber} ${creditLine.accountName}` : '-'}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(debitLine?.debit || creditLine?.credit)}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="outline" size="icon" disabled title="Buchung bearbeiten (Demnächst)">
                             <Edit className="h-4 w-4" />
@@ -158,7 +257,7 @@ export default function TenantJournalPage() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  )) : (
+                  )}) : (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                         Keine Buchungssätze gefunden. Erstellen Sie einen, um loszulegen!
@@ -171,9 +270,7 @@ export default function TenantJournalPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Dialog for new/edit journal entry will go here */}
-      {/* <JournalEntryForm tenantId={tenantId} /> */}
     </div>
   );
 }
+
