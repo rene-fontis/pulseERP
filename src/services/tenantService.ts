@@ -147,3 +147,4 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
   await deleteDoc(tenantDocRef);
   return true; 
 };
+

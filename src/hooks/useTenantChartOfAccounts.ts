@@ -17,3 +17,4 @@ export function useGetTenantChartOfAccountsById(coaId: string | null | undefined
     enabled: !!coaId, // Only run query if coaId is truthy
   });
 }
+

@@ -4,16 +4,10 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText as FileTextIcon, AlertCircle } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
-// import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts'; 
+import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-// Placeholder hook until the actual one is created
-const useGetTenantChartOfAccountsById = (id: string | null | undefined) => {
-    return { data: null, isLoading: id ? true : false, error: null };
-}
-
 
 export default function TenantChartOfAccountsPage() {
   const params = useParams();
@@ -107,8 +101,11 @@ export default function TenantChartOfAccountsPage() {
                 <FileTextIcon className="mx-auto h-12 w-12 mb-4 text-primary" />
                 <p className="font-semibold">Kein Kontenplan zugewiesen</p>
                 <p>Für diesen Mandanten ist noch kein spezifischer Kontenplan aktiv.</p>
-                <p>Ein Kontenplan wird basierend auf der Vorlage erstellt, die bei der Mandantenerstellung ausgewählt wurde.</p>
-                <p className="mt-2">Gewählte Vorlage: {tenant.chartOfAccountsTemplateId ? `ID ${tenant.chartOfAccountsTemplateId.slice(0,8)}...` : 'Keine'}</p>
+                {tenant.chartOfAccountsTemplateId ? (
+                   <p>Ein Kontenplan wurde basierend auf der Vorlage (ID: {tenant.chartOfAccountsTemplateId.slice(0,8)}...) bei der Mandantenerstellung angelegt. Wenn er hier nicht erscheint, könnte bei der Erstellung ein Fehler unterlaufen sein.</p>
+                ) : (
+                  <p>Es wurde keine Vorlage bei der Erstellung des Mandanten ausgewählt. Ein Kontenplan kann manuell erstellt oder eine Vorlage zugewiesen werden (Funktion Demnächst).</p>
+                )}
                 <Button asChild variant="link" className="mt-4">
                     <Link href="/manage-tenants">Zur Mandantenübersicht</Link>
                 </Button>
@@ -126,7 +123,7 @@ export default function TenantChartOfAccountsPage() {
                 <FileTextIcon className="mx-auto h-12 w-12 mb-4 text-primary" />
                 <p className="font-semibold">Kontenplan Verwaltung</p>
                 <p>Die detaillierte Ansicht und Bearbeitung des Kontenplans ist in Entwicklung.</p>
-                <p>Aktueller Kontenplan Name: {(chartOfAccounts as any).name || 'N/A'}</p>
+                <p>Aktueller Kontenplan Name: {chartOfAccounts.name || 'N/A'}</p>
              </div>
           )}
           <Button disabled className="bg-accent text-accent-foreground hover:bg-accent/90">Kontenplan bearbeiten (Demnächst)</Button>
@@ -135,3 +132,4 @@ export default function TenantChartOfAccountsPage() {
     </div>
   );
 }
+

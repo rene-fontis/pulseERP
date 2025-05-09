@@ -126,3 +126,4 @@ export const deleteTenantChartOfAccounts = async (coaId: string): Promise<boolea
   await deleteDoc(docRef);
   return true;
 };
+

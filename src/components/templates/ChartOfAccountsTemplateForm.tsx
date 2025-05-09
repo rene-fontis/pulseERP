@@ -62,7 +62,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
           groups: initialData.groups.map(g => ({
             ...g,
             id: g.id || crypto.randomUUID(), // Ensure IDs
-            accounts: g.accounts.map(a => ({...a, id: a.id || crypto.randomUUID()})) 
+            accounts: g.accounts.map(a => ({...a, id: a.id || crypto.randomUUID(), description: a.description || ''})) 
           }))
         } 
       : { name: '', description: '', groups: [{ id: crypto.randomUUID(), name: 'Gruppe 1', mainType: 'Asset', accounts: [{id: crypto.randomUUID(), number: '1000', name: 'Kasse', description: ''}] }] },
@@ -300,3 +300,4 @@ function AccountsArrayField({ control, groupIndex }: AccountsArrayFieldProps) {
     </div>
   );
 }
+
