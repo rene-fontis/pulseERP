@@ -1,13 +1,7 @@
-
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  getJournalEntries,
-  addJournalEntry,
-  updateJournalEntry,
-  deleteJournalEntry,
-} from '@/services/journalEntryService';
+import * as journalEntryService from '@/services/journalEntryService';
 import type { JournalEntry, NewJournalEntryPayload } from '@/types';
 
 const journalEntryQueryKeys = {
@@ -19,7 +13,7 @@ const journalEntryQueryKeys = {
 export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: string | null) {
   return useQuery<JournalEntry[], Error>({
     queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId),
-    queryFn: () => (tenantId ? getJournalEntries(tenantId, fiscalYearId === null ? undefined : fiscalYearId) : Promise.resolve([])),
+    queryFn: () => (tenantId ? journalEntryService.getJournalEntries(tenantId, fiscalYearId === null ? undefined : fiscalYearId) : Promise.resolve([])),
     enabled: !!tenantId, // Entries are always tenant-specific
   });
 }
@@ -27,7 +21,13 @@ export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: str
 export function useAddJournalEntry(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<JournalEntry, Error, NewJournalEntryPayload>({
-    mutationFn: (entryData) => addJournalEntry(entryData), // tenantId is part of entryData
+    mutationFn: (entryData) => {
+      if (typeof journalEntryService.addJournalEntry !== 'function') {
+        console.error('journalEntryService.addJournalEntry is not a function');
+        throw new Error('Service function addJournalEntry is not available.');
+      }
+      return journalEntryService.addJournalEntry(entryData);
+    },
     onSuccess: (data) => {
       // Invalidate list for the specific tenant and fiscal year of the new entry
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data.fiscalYearId) });
@@ -40,7 +40,7 @@ export function useAddJournalEntry(tenantId: string) {
 export function useUpdateJournalEntry(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<JournalEntry | undefined, Error, { entryId: string; data: Partial<NewJournalEntryPayload> }>({
-    mutationFn: ({ entryId, data }) => updateJournalEntry(entryId, data),
+    mutationFn: ({ entryId, data }) => journalEntryService.updateJournalEntry(entryId, data),
     onSuccess: (data, variables) => {
       // Invalidate list for the specific tenant and potentially the fiscal year of the updated entry
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data?.fiscalYearId) });
@@ -54,7 +54,7 @@ export function useDeleteJournalEntry(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, string, { previousEntry?: JournalEntry } >({
     // If optimistic updates were used, context would contain previousEntry for rollback
-    mutationFn: (entryId) => deleteJournalEntry(entryId),
+    mutationFn: (entryId) => journalEntryService.deleteJournalEntry(entryId),
     onSuccess: (success, entryId, context) => {
       if (success) {
         // To properly invalidate, we'd need to know which fiscal year list to update.
