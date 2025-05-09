@@ -1,4 +1,3 @@
-src/app/tenants/[tenantId]/accounting/page.tsx
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
