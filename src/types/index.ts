@@ -221,5 +221,3 @@ export interface BudgetEntry {
 
 export type BudgetEntryFormValues = Omit<BudgetEntry, 'id' | 'budgetId' | 'createdAt' | 'updatedAt' | 'accountNumber' | 'accountName' | 'counterAccountNumber' | 'counterAccountName'>;
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
-
-```

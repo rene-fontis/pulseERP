@@ -68,6 +68,12 @@ export const updateBudget = async (budgetId: string, budgetData: Partial<BudgetF
 export const deleteBudget = async (budgetId: string): Promise<boolean> => {
   const budgetDocRef = doc(db, 'budgets', budgetId);
   // TODO: Consider deleting all associated budget entries as well, or handle orphaned entries.
+  // For example, query budgetEntries collection where budgetId === budgetId and delete them.
+  const budgetEntriesQuery = query(collection(db, 'budgetEntries'), where('budgetId', '==', budgetId));
+  const budgetEntriesSnapshot = await getDocs(budgetEntriesQuery);
+  const deletePromises = budgetEntriesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+  await Promise.all(deletePromises);
+
   await deleteDoc(budgetDocRef);
   return true;
 };

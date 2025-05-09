@@ -60,16 +60,15 @@ export function useUpdateBudget() {
 export function useDeleteBudget() {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, string, { previousBudgets?: Budget[] }>({
-    mutationFn: (budgetId) => deleteBudget(budgetId),
+    mutationFn: deleteBudget, // Pass the function reference directly
     onSuccess: (success, budgetId, context) => {
       if (success) {
         // A bit aggressive, but ensures lists are updated.
         // If tenantId was available from the deleted budget (e.g. from context or by fetching before delete),
         // we could be more specific.
-        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }); // Consider a more specific invalidation if tenantId is known
         queryClient.removeQueries({queryKey: budgetQueryKeys.detail(budgetId)});
       }
     },
   });
 }
-

@@ -101,4 +101,3 @@ export const deleteBudgetEntry = async (entryId: string): Promise<boolean> => {
   await deleteDoc(entryDocRef);
   return true;
 };
-```

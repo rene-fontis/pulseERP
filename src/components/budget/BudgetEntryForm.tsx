@@ -387,5 +387,3 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
     </Popover>
   );
 }
-
-```

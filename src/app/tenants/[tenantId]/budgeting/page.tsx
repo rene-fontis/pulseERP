@@ -165,8 +165,10 @@ export default function ManageBudgetsPage() {
                 <TableBody>
                   {budgets && budgets.length > 0 ? budgets.map((budget) => (
                     <TableRow key={budget.id}>
-                      <TableCell className="font-medium hover:underline cursor-pointer" onClick={() => router.push(`/tenants/${tenantId}/budgeting/${budget.id}/entries`)}>
-                        {budget.name}
+                      <TableCell className="font-medium hover:underline cursor-pointer">
+                        <Link href={`/tenants/${tenantId}/budgeting/${budget.id}/entries`}>
+                          {budget.name}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
