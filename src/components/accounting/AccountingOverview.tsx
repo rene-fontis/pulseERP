@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -159,18 +158,15 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .sort((a,b) => (a.isFixed ? -1 : 1))
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
+                                        // For Bilanz, we use the periodChange to reflect the movement within the selected fiscal year
                                         const closingBalance = summary.accountBalances[account.id] || 0;
                                         const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
                                         let periodChange = closingBalance - openingBalance;
 
-                                        let displayBalanceForBilanz = periodChange; // Default to period change for Assets
-
+                                        let displayBalanceForBilanz = periodChange; 
                                         if (category.type === 'Liability' || category.type === 'Equity') {
-                                          // For Liabilities and Equity, a positive periodChange usually means increase in credit balance
-                                          // To show as positive on passive side (conventionally):
                                           displayBalanceForBilanz = -periodChange; 
                                         }
-
 
                                         return (
                                             <TableRow key={account.id}>
@@ -214,7 +210,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                       <XAxis
                         dataKey="name"
                         tickLine={false}
-                        axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1.5, strokeDasharray: "5 5" }}
+                        axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1, strokeDasharray: "3 3" }}
                         tickMargin={8}
                       />
                       <YAxis
@@ -235,7 +231,7 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                       <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={20}>
                         <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
-                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[4, 4, 0, 0]} barSize={20}>
+                      <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[0, 0, 4, 4]} barSize={20}>
                         <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5}/>
                       </Bar>
                        <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 6 }} name="Gewinn/Verlust" />
