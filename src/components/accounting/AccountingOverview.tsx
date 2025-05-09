@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { TrendingUp, TrendingDown, Scale, Landmark, DollarSign, List } from 'lucide-react';
 import type { FinancialSummary } from '@/lib/accounting';
-import type { TenantChartOfAccounts } from '@/types';
+import type { TenantChartOfAccounts, Account, AccountGroup } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,6 +28,14 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ElementType
     </CardContent>
   </Card>
 );
+
+const mainCategories: Array<{ type: AccountGroup['mainType'], displayName: string, id: string }> = [
+  { type: 'Asset', displayName: 'Aktiven', id: 'overview-assets' },
+  { type: 'Liability', displayName: 'Passiven', id: 'overview-liabilities' },
+  { type: 'Equity', displayName: 'Eigenkapital', id: 'overview-equity' },
+  { type: 'Revenue', displayName: 'Ertrag', id: 'overview-revenue' },
+  { type: 'Expense', displayName: 'Aufwand', id: 'overview-expenses' },
+];
 
 export function AccountingOverview({ summary, isLoading, chartOfAccounts }: AccountingOverviewProps) {
   if (isLoading) {
@@ -84,13 +92,13 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
         <h2 className="text-2xl font-semibold mb-4">Finanzübersicht</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
             <StatCard 
-                title="Aktiven (Assets)" 
+                title="Aktiven" 
                 value={formatCurrency(summary.totalAssets)} 
                 icon={Landmark} 
                 description="Gesamtwert aller Vermögenswerte"
             />
             <StatCard 
-                title="Passiven (Liabilities)" 
+                title="Passiven" 
                 value={formatCurrency(summary.totalLiabilities)} 
                 icon={Scale} 
                 description="Gesamtwert aller Verbindlichkeiten"
@@ -112,14 +120,14 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
         </div>
         <div className="grid gap-4 md:grid-cols-2 mt-4">
              <StatCard 
-                title="Gesamtertrag (Revenue)" 
+                title="Gesamtertrag" 
                 value={formatCurrency(summary.totalRevenue)} 
                 icon={TrendingUp} 
                 description="Summe aller Erträge"
                 positive
             />
             <StatCard 
-                title="Gesamtaufwand (Expenses)" 
+                title="Gesamtaufwand" 
                 value={formatCurrency(summary.totalExpenses)} 
                 icon={TrendingDown} 
                 description="Summe aller Aufwände"
@@ -137,53 +145,54 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
             </CardHeader>
             <CardContent>
             {chartOfAccounts && summary.accountBalances ? (
-                <Accordion type="multiple" className="w-full" defaultValue={chartOfAccounts.groups.map(g => g.id)}>
-                {chartOfAccounts.groups.map((group) => (
-                    <AccordionItem value={group.id} key={group.id}>
-                    <AccordionTrigger className="text-lg font-medium hover:bg-muted/50 px-2 py-3 rounded-md">
-                        {group.name} ({group.mainType})
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-0">
-                        {group.accounts.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                            <TableHeader>
-                                <TableRow>
-                                <TableHead className="w-[100px]">Nummer</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead className="text-right">Saldo (CHF)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {group.accounts.map((account) => {
-                                const balance = summary.accountBalances[account.id] || 0;
-                                // For Liability, Equity, Revenue, a negative balance in our calculation means a positive credit balance.
-                                // For display, we show the magnitude as a positive number for these types.
-                                const displayBalance = (account.mainType === 'Liability' || account.mainType === 'Equity' || account.mainType === 'Revenue')
-                                    ? -balance
-                                    : balance;
-                                
-                                // Skip rendering if balance is zero and it's not a system account (like P&L placeholder)
-                                // Or, always show all accounts. For now, showing all.
-                                // if (displayBalance === 0 && !account.isSystemAccount) return null;
-                                
-                                return (
-                                    <TableRow key={account.id}>
-                                    <TableCell className="font-medium">{account.number}</TableCell>
-                                    <TableCell>{account.name}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
+                <Accordion type="multiple" className="w-full" defaultValue={mainCategories.map(c => c.id)}>
+                  {mainCategories.map((category) => {
+                    const accountsForCategory: Account[] = chartOfAccounts.groups
+                      .filter(group => group.mainType === category.type)
+                      .flatMap(group => group.accounts)
+                      .sort((a, b) => a.number.localeCompare(b.number));
+
+                    if (accountsForCategory.length === 0) return null;
+
+                    return (
+                      <AccordionItem value={category.id} key={category.id}>
+                        <AccordionTrigger className="text-lg font-medium hover:bg-muted/50 px-2 py-3 rounded-md">
+                            {category.displayName}
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-0">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                    <TableHead className="w-[100px]">Nummer</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead className="text-right">Saldo (CHF)</TableHead>
                                     </TableRow>
-                                );
-                                })}
-                            </TableBody>
-                            </Table>
-                        </div>
-                        ) : (
-                        <p className="text-sm text-muted-foreground px-2 py-4">Keine Konten in dieser Gruppe.</p>
-                        )}
-                    </AccordionContent>
-                    </AccordionItem>
-                ))}
+                                </TableHeader>
+                                <TableBody>
+                                    {accountsForCategory.map((account) => {
+                                    const balance = summary.accountBalances[account.id] || 0;
+                                    const displayBalance = (
+                                        category.type === 'Liability' || 
+                                        category.type === 'Equity' || 
+                                        category.type === 'Revenue'
+                                    ) ? -balance : balance;
+                                    
+                                    return (
+                                        <TableRow key={account.id}>
+                                        <TableCell className="font-medium">{account.number}</TableCell>
+                                        <TableCell>{account.name}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(displayBalance)}</TableCell>
+                                        </TableRow>
+                                    );
+                                    })}
+                                </TableBody>
+                                </Table>
+                            </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
                 </Accordion>
             ) : (
                 <p className="text-muted-foreground">Kontenplan oder Saldoinformationen nicht verfügbar.</p>
