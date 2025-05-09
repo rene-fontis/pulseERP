@@ -1,13 +1,15 @@
+tsx
 "use client";
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText as FileTextIcon, AlertCircle } from 'lucide-react'; 
+import { FileText as FileTextIcon, AlertCircle, Edit } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export default function TenantChartOfAccountsPage() {
   const params = useParams();
@@ -84,9 +86,9 @@ export default function TenantChartOfAccountsPage() {
       
       <Card className="shadow-lg mx-4 md:mx-0">
         <CardHeader>
-          <CardTitle className="text-xl">Kontengruppen und Konten</CardTitle>
+          <CardTitle className="text-xl">Aktiver Kontenplan</CardTitle>
            <CardDescription>
-            Hier können Sie die Kontengruppen (Aktiven, Passiven, Aufwand, Ertrag) und deren Untergruppen sowie einzelne Konten bearbeiten.
+            Hier können Sie die Kontengruppen und deren Konten einsehen. Die Bearbeitungsfunktion wird in Kürze verfügbar sein.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -119,14 +121,52 @@ export default function TenantChartOfAccountsPage() {
              </div>
           )}
            {hasCoaAssigned && !coaStillLoading && chartOfAccounts && (
-             <div className="text-center py-10 text-muted-foreground">
-                <FileTextIcon className="mx-auto h-12 w-12 mb-4 text-primary" />
-                <p className="font-semibold">Kontenplan Verwaltung</p>
-                <p>Die detaillierte Ansicht und Bearbeitung des Kontenplans ist in Entwicklung.</p>
-                <p>Aktueller Kontenplan Name: {chartOfAccounts.name || 'N/A'}</p>
+             <div>
+                <div className="mb-4">
+                    <h2 className="text-lg font-semibold">Name: {chartOfAccounts.name}</h2>
+                </div>
+
+                <div className="space-y-6">
+                    {chartOfAccounts.groups.map((group) => (
+                    <Card key={group.id} className="bg-background/50">
+                        <CardHeader className="pb-2 pt-4 px-4">
+                        <CardTitle className="text-md">{group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span></CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4">
+                        {group.accounts.length > 0 ? (
+                            <Table>
+                            <TableHeader>
+                                <TableRow>
+                                <TableHead className="w-[100px] h-8">Nummer</TableHead>
+                                <TableHead className="h-8">Name</TableHead>
+                                <TableHead className="h-8">Beschreibung</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {group.accounts.map((account) => (
+                                <TableRow key={account.id}>
+                                    <TableCell className="font-medium py-2">{account.number}</TableCell>
+                                    <TableCell className="py-2">{account.name}</TableCell>
+                                    <TableCell className="py-2">{account.description || '-'}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-sm text-muted-foreground py-2">Keine Konten in dieser Gruppe.</p>
+                        )}
+                        </CardContent>
+                    </Card>
+                    ))}
+                </div>
+                <div className="mt-6 border-t pt-6 flex justify-end">
+                    <Button disabled className="bg-accent text-accent-foreground hover:bg-accent/90">
+                        <Edit className="mr-2 h-4 w-4" />
+                        Kontenplan bearbeiten (Demnächst)
+                    </Button>
+                </div>
              </div>
           )}
-          <Button disabled className="bg-accent text-accent-foreground hover:bg-accent/90">Kontenplan bearbeiten (Demnächst)</Button>
         </CardContent>
       </Card>
     </div>
