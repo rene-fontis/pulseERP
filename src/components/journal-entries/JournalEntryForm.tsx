@@ -15,7 +15,7 @@ import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Account, JournalEntry, JournalEntryLine } from '@/types';
+import type { Account, NewJournalEntryPayload } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 const journalEntryFormSchema = z.object({
@@ -35,7 +35,7 @@ export type JournalEntryFormValues = z.infer<typeof journalEntryFormSchema>;
 interface JournalEntryFormProps {
   tenantId: string;
   accounts: Account[];
-  onSubmit: (values: JournalEntry) => Promise<void>;
+  onSubmit: (values: NewJournalEntryPayload) => Promise<void>;
   isSubmitting?: boolean;
   defaultEntryNumber?: string;
 }
@@ -74,15 +74,15 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
       return;
     }
     
-    const newJournalEntry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newJournalEntryPayload: NewJournalEntryPayload = {
       tenantId,
       entryNumber: values.entryNumber,
       date: values.date.toISOString(),
       description: values.description,
-      posted: false, // Default to not posted
+      posted: false, // Default to not posted, can be changed later
       lines: [
         {
-          id: crypto.randomUUID(),
+          id: crypto.randomUUID(), // Client-generated ID for the line
           accountId: debitAccount.id,
           accountNumber: debitAccount.number,
           accountName: debitAccount.name,
@@ -90,7 +90,7 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
           description: "Sollbuchung",
         },
         {
-          id: crypto.randomUUID(),
+          id: crypto.randomUUID(), // Client-generated ID for the line
           accountId: creditAccount.id,
           accountNumber: creditAccount.number,
           accountName: creditAccount.name,
@@ -98,9 +98,18 @@ export function JournalEntryForm({ tenantId, accounts, onSubmit, isSubmitting, d
           description: "Habenbuchung",
         },
       ],
+      // attachments can be added later if needed
     };
-    // The full JournalEntry with id, createdAt, updatedAt will be formed by the service/mutation
-    await onSubmit(newJournalEntry as JournalEntry); 
+    
+    await onSubmit(newJournalEntryPayload); 
+    form.reset({ // Reset form after successful submission, keep date or make configurable
+        date: values.date, // Keep date or set to new Date()
+        entryNumber: '', // Generate new entry number based on logic
+        description: '',
+        debitAccountId: '',
+        creditAccountId: '',
+        amount: 0,
+    });
   };
 
   return (

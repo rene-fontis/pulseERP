@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
-// import { useGetJournalEntries, useDeleteJournalEntry, useAddJournalEntry } from '@/hooks/useJournalEntries'; 
-import type { JournalEntry, Account } from '@/types';
+import { useGetJournalEntries, useAddJournalEntry, useDeleteJournalEntry } from '@/hooks/useJournalEntries'; 
+import type { Account, NewJournalEntryPayload } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,45 +17,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import React, { useState, useEffect, useMemo } from 'react';
 import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
-
-// Placeholder hooks
-const useGetJournalEntries = (tenantId: string | null) => {
-    // Simulate fetching some initial entries. In a real app, this would be from a DB.
-    const initialEntries: JournalEntry[] = tenantId ? [
-        // { 
-        //     id: 'entry1', tenantId, entryNumber: '2024-001', date: new Date('2024-01-15').toISOString(), 
-        //     description: 'Bareinzahlung Kasse', posted: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        //     lines: [
-        //         { id: 'line1a', accountId: 'kasse', accountNumber: '1000', accountName: 'Kasse', debit: 1000, description: 'Soll Kasse' },
-        //         { id: 'line1b', accountId: 'bank', accountNumber: '1020', accountName: 'Bank', credit: 1000, description: 'Haben Bank' },
-        //     ]
-        // },
-        // { 
-        //     id: 'entry2', tenantId, entryNumber: '2024-002', date: new Date('2024-01-20').toISOString(), 
-        //     description: 'Kauf Büromaterial', posted: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        //     lines: [
-        //         { id: 'line2a', accountId: 'buero', accountNumber: '6500', accountName: 'Büroaufwand', debit: 150.75, description: 'Soll Büroaufwand' },
-        //         { id: 'line2b', accountId: 'kasse', accountNumber: '1000', accountName: 'Kasse', credit: 150.75, description: 'Haben Kasse' },
-        //     ]
-        // }
-    ] : [];
-    const [entries, setEntries] = useState<JournalEntry[]>(initialEntries);
-    const addEntry = (newEntry: JournalEntry) => {
-        const fullEntry: JournalEntry = {
-            ...newEntry,
-            id: crypto.randomUUID(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        };
-        setEntries(prev => [fullEntry, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.entryNumber.localeCompare(a.entryNumber)));
-    }
-    return { data: entries, isLoading: false, error: null, addEntry };
-}
-
-const useDeleteJournalEntry = () => {
-    // This would interact with the state from useGetJournalEntries or a global store/backend
-    return { mutateAsync: async (id: string) => { console.log("Delete", id); return Promise.resolve(); }, isPending: false };
-}
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 export default function TenantJournalPage() {
@@ -72,28 +34,35 @@ export default function TenantJournalPage() {
     setClientLoaded(true);
   }, []);
 
-  const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError, addEntry: addJournalEntry } = useGetJournalEntries(tenantId);
-  // const deleteEntryMutation = useDeleteJournalEntry();
-  // const addEntryMutation = useAddJournalEntry(); // Assuming a mutation hook for adding
+  const { data: journalEntriesData, isLoading: isLoadingEntries, error: entriesError } = useGetJournalEntries(tenantId);
+  const addEntryMutation = useAddJournalEntry(tenantId);
+  const deleteEntryMutation = useDeleteJournalEntry(tenantId);
+
 
   const allAccounts: Account[] = useMemo(() => {
     if (!chartOfAccounts) return [];
     return chartOfAccounts.groups.flatMap(group => group.accounts);
   }, [chartOfAccounts]);
 
-  const handleCreateJournalEntry = async (values: JournalEntry) => {
+  const handleCreateJournalEntry = async (values: NewJournalEntryPayload) => {
     try {
-      // await addEntryMutation.mutateAsync(values); // Use this with a real mutation
-      addJournalEntry(values); // Using placeholder state update
+      await addEntryMutation.mutateAsync(values);
       toast({ title: "Erfolg", description: "Buchungssatz erstellt." });
       setIsCreateModalOpen(false);
     } catch (e) {
-      toast({ title: "Fehler", description: "Buchungssatz konnte nicht erstellt werden.", variant: "destructive" });
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Buchungssatz konnte nicht erstellt werden: ${errorMessage}`, variant: "destructive" });
     }
   };
 
   const handleDeleteEntry = async (entryId: string) => {
-    toast({title: "Platzhalter", description: `Löschen von ${entryId} noch nicht implementiert.`})
+     try {
+      await deleteEntryMutation.mutateAsync(entryId);
+      toast({ title: "Erfolg", description: "Buchungssatz gelöscht." });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Buchungssatz konnte nicht gelöscht werden: ${errorMessage}`, variant: "destructive" });
+    }
   };
   
   const formatDate = (dateString: string) => {
@@ -112,7 +81,7 @@ export default function TenantJournalPage() {
   
   const isLoading = isLoadingTenant || (tenantId && isLoadingEntries && !clientLoaded) || (tenant?.chartOfAccountsId && isLoadingCoA);
 
-  if (isLoading) {
+  if (isLoading && !clientLoaded) { // Added !clientLoaded to prevent flash of loading screen if data is already cached by react-query
     return (
        <div className="space-y-6 p-4 md:p-8">
         <Skeleton className="h-10 w-1/3 mb-2" />
@@ -133,17 +102,18 @@ export default function TenantJournalPage() {
     );
   }
 
-  if (tenantError || entriesError || coaError) {
+  const combinedError = tenantError || entriesError || coaError;
+  if (combinedError) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden des Journals</h2>
-        <p>{(tenantError as Error)?.message || (entriesError as Error)?.message || (coaError as Error)?.message}</p>
+        <p>{(combinedError as Error)?.message}</p>
       </div>
     );
   }
   
-  if (!tenant) {
+  if (!tenant && !isLoadingTenant) { // Check isLoadingTenant to avoid showing "not found" during initial load
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
@@ -153,12 +123,26 @@ export default function TenantJournalPage() {
     );
   }
 
-   if (!tenant.chartOfAccountsId || !chartOfAccounts) {
+   if (tenant && !tenant.chartOfAccountsId && !isLoadingCoA) { // Check isLoadingCoA
     return (
       <div className="container mx-auto py-8 text-center">
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
+        <h2 className="text-2xl font-semibold mb-2">Kein Kontenplan zugewiesen</h2>
+        <p>Für diesen Mandanten wurde kein Kontenplan zugewiesen.</p>
+        <p>Bitte überprüfen Sie die Mandanteneinstellungen und weisen Sie einen Kontenplan zu.</p>
+         <Button asChild variant="link" className="mt-4">
+            <a href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</a>
+        </Button>
+      </div>
+    );
+  }
+
+  if (tenant && tenant.chartOfAccountsId && !chartOfAccounts && !isLoadingCoA) { // Check isLoadingCoA
+     return (
+      <div className="container mx-auto py-8 text-center">
+        <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
         <h2 className="text-2xl font-semibold mb-2">Kontenplan nicht gefunden</h2>
-        <p>Für diesen Mandanten wurde kein Kontenplan gefunden oder er konnte nicht geladen werden.</p>
+        <p>Der zugewiesene Kontenplan konnte nicht geladen werden.</p>
         <p>Bitte überprüfen Sie die Mandanteneinstellungen.</p>
          <Button asChild variant="link" className="mt-4">
             <a href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</a>
@@ -176,11 +160,11 @@ export default function TenantJournalPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div className="flex items-center">
             <BookOpen className="h-6 w-6 mr-3 text-primary" />
-            <CardTitle className="text-2xl font-bold">Journal: {tenant.name}</CardTitle>
+            <CardTitle className="text-2xl font-bold">Journal: {tenant?.name || 'Lädt...'}</CardTitle>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Button className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!chartOfAccounts || allAccounts.length === 0}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Neue Buchung
               </Button>
             </DialogTrigger>
@@ -188,10 +172,10 @@ export default function TenantJournalPage() {
               <DialogHeader>
                 <DialogTitle>Neue Buchung erstellen</DialogTitle>
                 <DialogDescription>
-                  Erfassen Sie einen neuen Buchungssatz für {tenant.name}.
+                  Erfassen Sie einen neuen Buchungssatz für {tenant?.name}.
                 </DialogDescription>
               </DialogHeader>
-              {isLoadingCoA ? (
+              {isLoadingCoA || !clientLoaded ? (
                 <div className="flex justify-center items-center h-32">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="ml-2">Kontenplan wird geladen...</p>
@@ -201,13 +185,13 @@ export default function TenantJournalPage() {
                   tenantId={tenantId}
                   accounts={allAccounts}
                   onSubmit={handleCreateJournalEntry}
-                  isSubmitting={false} // Replace with addEntryMutation.isPending when implemented
+                  isSubmitting={addEntryMutation.isPending}
                   defaultEntryNumber={`BU-${String(journalEntries.length + 1).padStart(3, '0')}`}
                 />
               ) : (
                  <div className="text-center py-4">
                     <p className="text-muted-foreground">Keine Konten im Kontenplan gefunden.</p>
-                    <p className="text-sm text-muted-foreground">Bitte zuerst Konten im Kontenplan anlegen.</p>
+                    <p className="text-sm text-muted-foreground">Bitte zuerst Konten im Kontenplan anlegen oder einen Kontenplan zuweisen.</p>
                  </div>
               )}
             </DialogContent>
@@ -215,12 +199,12 @@ export default function TenantJournalPage() {
         </CardHeader>
         <CardContent>
             <CardDescription className="mb-4">
-                Erfassen und verwalten Sie hier alle Buchungssätze für {tenant.name}.
+                Erfassen und verwalten Sie hier alle Buchungssätze für {tenant?.name}.
             </CardDescription>
-          {(isLoadingEntries && !clientLoaded) ? ( 
+          {(isLoadingEntries && !clientLoaded && !journalEntriesData) ? ( 
             <div className="space-y-4">
               <Skeleton className="h-10 w-full" />
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -252,9 +236,31 @@ export default function TenantJournalPage() {
                         <Button variant="outline" size="icon" disabled title="Buchung bearbeiten (Demnächst)">
                             <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="destructive" size="icon" onClick={() => handleDeleteEntry(entry.id)} disabled title="Buchung löschen (Demnächst)">
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                             <Button variant="destructive" size="icon" title="Buchung löschen" disabled={deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id}>
+                                <Trash2 className="h-4 w-4" />
+                             </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Diese Aktion kann nicht rückgängig gemacht werden. Der Buchungssatz "{entry.entryNumber}: {entry.description}" wird dauerhaft gelöscht.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteEntry(entry.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                disabled={deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id}
+                              >
+                                {(deleteEntryMutation.isPending && deleteEntryMutation.variables === entry.id) ? 'Löschen...' : 'Löschen'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   )}) : (

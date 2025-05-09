@@ -99,7 +99,7 @@ export interface TenantUser {
 
 // --- Accounting / Journal Types ---
 export interface JournalEntryLine {
-  id: string; // Unique within the entry
+  id: string; // Unique within the entry, typically client-generated for array manipulation
   accountId: string; // Reference to an Account.id in TenantChartOfAccounts
   accountNumber: string; // For display & autocomplete convenience
   accountName: string; // For display
@@ -109,14 +109,17 @@ export interface JournalEntryLine {
 }
 
 export interface JournalEntry {
-  id:string;
+  id:string; // Firestore document ID
   tenantId: string;
   entryNumber: string; // Sequential or generated
   date: string; // ISO string
   description: string;
   lines: JournalEntryLine[];
   attachments?: { name: string; url: string }[]; // Array of attachments (name and storage URL)
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string; // ISO string from Firestore serverTimestamp
+  updatedAt: string; // ISO string from Firestore serverTimestamp
   posted: boolean; // Whether the entry is posted to ledger
 }
+
+// Type for submitting new journal entries to the service/mutation
+export type NewJournalEntryPayload = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
