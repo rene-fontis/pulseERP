@@ -33,7 +33,7 @@ const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) 
     <Card className={cn("bg-background/50", cardPadding, level > 0 && "ml-0")}>
       <CardHeader className="p-0 pb-2">
         <CardTitle className={titleSize}>
-          {group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span>
+          {group.name} {/* Removed: <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span> */}
           {group.isFixed && <span className="ml-2 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">Fixe Hauptgruppe</span>}
         </CardTitle>
       </CardHeader>

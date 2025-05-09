@@ -172,9 +172,15 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
     level: number = 0
   ) => {
     const isFixedGroup = groupField.isFixed;
-    const childSubgroupFields = groupFields.filter(
-      (gf) => gf.parentId === groupField.id && gf.level === 1 && !gf.isFixed
+    
+    const childSubgroupFields = watchedGroups.filter(
+      (gf) => gf.parentId === groupField.id && !gf.isFixed
     );
+    
+    const childSubgroupOriginalIndices = childSubgroupFields.map(
+        subGField => groupFields.findIndex(originalField => originalField.fieldId === subGField.fieldId)
+    ).filter(index => index !== -1);
+
 
     return (
       <Card key={groupField.fieldId} className={cn("p-4 relative bg-background/50", level > 0 && "ml-4 mt-3")}>
@@ -191,7 +197,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
           </Button>
         )}
         <CardHeader className="p-0 mb-2">
-          <CardTitle className="text-lg">{groupField.name} {isFixedGroup ? `(${groupField.mainType})` : ''}</CardTitle>
+          <CardTitle className="text-lg">{groupField.name} {/* Removed: {isFixedGroup ? `(${groupField.mainType})` : ''} */} </CardTitle>
           {isFixedGroup && <FormDescription>Fixe Hauptgruppe. Untergruppen können hinzugefügt werden.</FormDescription>}
         </CardHeader>
         <CardContent className="p-0 space-y-3">
@@ -213,16 +219,15 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
             </>
           )}
           
-          {level === 1 && (
+          {level === 1 && ( // Only show accounts field for level 1 subgroups
             <AccountsArrayField control={form.control} groupIndex={groupIndexInForm} form={form} isFixedGroup={!!isFixedGroup}/>
           )}
           
-          {level === 0 && childSubgroupFields.length > 0 && (
-            <div className="ml-0 mt-4 space-y-0 pt-3 border-t">
-              {childSubgroupFields.map(subGField => {
-                const subGFieldIndex = groupFields.findIndex(gf => gf.fieldId === subGField.fieldId);
-                if (subGFieldIndex === -1) return null;
-                return renderGroup(subGField, subGFieldIndex, 1);
+          {level === 0 && childSubgroupOriginalIndices.length > 0 && (
+            <div className="ml-0 mt-4 space-y-3 pt-3 border-t">
+              {childSubgroupOriginalIndices.map(subGOriginalIndex => {
+                const subGField = groupFields[subGOriginalIndex];
+                return renderGroup(subGField as AccountGroupTemplate & { fieldId: string }, subGOriginalIndex, 1);
               })}
             </div>
           )}
@@ -450,4 +455,5 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
     </div>
   );
 }
+
 
