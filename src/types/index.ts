@@ -191,7 +191,7 @@ export interface Budget {
   id: string;
   tenantId: string;
   name: string;
-  description: string; // Ensure description is not optional or handle it in forms
+  description: string; 
   scenario: BudgetScenario;
   createdAt: string;
   updatedAt: string;
@@ -211,13 +211,25 @@ export interface BudgetEntry {
   description: string;
   amount: number;
   type: BudgetEntryType;
-  startDate?: string; // ISO string, optional
-  endDate?: string; // ISO string, optional
+  startDate?: string; // ISO string, optional for single entry, required for start of recurring
+  endDate?: string; // ISO string, optional, for end of recurring
   isRecurring: boolean;
   recurrence: BudgetRecurrence;
   createdAt: string;
   updatedAt: string;
 }
 
-export type BudgetEntryFormValues = Omit<BudgetEntry, 'id' | 'budgetId' | 'createdAt' | 'updatedAt' | 'accountNumber' | 'accountName' | 'counterAccountNumber' | 'counterAccountName'>;
+// For form handling - client might use Date objects for dates initially
+export type BudgetEntryFormValues = {
+  description: string;
+  accountId: string;
+  counterAccountId?: string;
+  amount: number;
+  type: BudgetEntryType;
+  startDate?: Date;
+  endDate?: Date;
+  isRecurring: boolean;
+  recurrence: BudgetRecurrence;
+};
+
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
