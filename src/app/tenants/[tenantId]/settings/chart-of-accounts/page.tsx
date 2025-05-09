@@ -34,7 +34,7 @@ const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) 
       <CardHeader className="p-0 pb-2">
         <CardTitle className={titleSize}>
           {group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span>
-          {group.isFixed && <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Fixe Hauptgruppe</span>}
+          {group.isFixed && <span className="ml-2 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">Fixe Hauptgruppe</span>}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
@@ -114,7 +114,6 @@ export default function TenantChartOfAccountsPage() {
 
   const topLevelFixedGroups = useMemo(() => {
     if (!chartOfAccounts) return [];
-    // These are the main, non-deletable categories like "Assets", "Liabilities"
     return chartOfAccounts.groups.filter(g => g.isFixed && g.level === 0)
       .sort((a, b) => { 
         const order: AccountGroup['mainType'][] = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
@@ -266,3 +265,4 @@ export default function TenantChartOfAccountsPage() {
     </div>
   );
 }
+
