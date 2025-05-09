@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -179,11 +178,10 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting`}>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Übersicht</Link>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/`) }>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                {/* Future: Add link to "Create Budget Entry" or similar if needed */}
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -369,4 +367,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
