@@ -3,7 +3,7 @@
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Renamed DialogDescription to avoid conflict
 import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import React, { useState, useEffect, useMemo } from 'react';
 import { JournalEntryForm } from '@/components/journal-entries/JournalEntryForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 export default function TenantJournalPage() {
@@ -171,9 +171,9 @@ export default function TenantJournalPage() {
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Neue Buchung erstellen</DialogTitle>
-                <DialogDescription>
+                <DialogDescriptionComponent> {/* Renamed import */}
                   Erfassen Sie einen neuen Buchungssatz für {tenant?.name}.
-                </DialogDescription>
+                </DialogDescriptionComponent>
               </DialogHeader>
               {isLoadingCoA || !clientLoaded ? (
                 <div className="flex justify-center items-center h-32">
