@@ -165,16 +165,29 @@ export function AppSidebar() {
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-                 <SidebarMenuButton
-                    asChild
-                    isActive={isBudgetingActive}
-                    tooltip="Budgeting"
-                >
-                    <Link href={`/tenants/${currentTenantId}/budgeting`}>
-                    <BarChartBig />
-                    <span>Budgeting</span>
-                    </Link>
-                </SidebarMenuButton>
+                <Accordion type="single" collapsible className="w-full" defaultValue={isBudgetingActive ? "budgeting-item" : undefined}>
+                    <AccordionItem value="budgeting-item" className="border-none">
+                        <AccordionTrigger className={cn(
+                            "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            isBudgetingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg:not(.no-override)]:text-sidebar-primary-foreground"
+                        )}>
+                           <div className="flex items-center w-full">
+                                <BarChartBig className="mr-2 h-4 w-4 shrink-0" />
+                                <span className="flex-1 text-left">Budgeting</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
+                            <SidebarMenuSub>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting`}>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Übersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                {/* Future: Add link to "Create Budget Entry" or similar if needed */}
+                            </SidebarMenuSub>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
@@ -356,3 +369,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
