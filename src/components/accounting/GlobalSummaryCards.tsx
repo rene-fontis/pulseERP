@@ -83,11 +83,12 @@ export function GlobalSummaryCards({ summary, isLoading }: GlobalSummaryCardsPro
         description="Reinvermögen (Aktiven - Passiven)"
       />
       <StatCard
-        title="Gesamtertrag"
-        value={formatCurrency(summary.totalRevenue)}
-        icon={TrendingUp}
-        description="Summe aller Erträge"
-        positive
+        title={summary.netProfitLoss >= 0 ? "Gewinn" : "Verlust"}
+        value={formatCurrency(summary.netProfitLoss)}
+        icon={summary.netProfitLoss >= 0 ? TrendingUp : TrendingDown}
+        description="Ergebnis aus Erträgen und Aufwänden"
+        positive={summary.netProfitLoss > 0}
+        negative={summary.netProfitLoss < 0}
       />
       <StatCard
         title="Gesamtaufwand"
@@ -97,12 +98,11 @@ export function GlobalSummaryCards({ summary, isLoading }: GlobalSummaryCardsPro
         negative
       />
       <StatCard
-        title={summary.netProfitLoss >= 0 ? "Gewinn" : "Verlust"}
-        value={formatCurrency(summary.netProfitLoss)}
-        icon={summary.netProfitLoss >= 0 ? TrendingUp : TrendingDown}
-        description="Ergebnis aus Erträgen und Aufwänden"
-        positive={summary.netProfitLoss > 0}
-        negative={summary.netProfitLoss < 0}
+        title="Gesamtertrag"
+        value={formatCurrency(summary.totalRevenue)}
+        icon={TrendingUp}
+        description="Summe aller Erträge"
+        positive
       />
     </div>
   );
