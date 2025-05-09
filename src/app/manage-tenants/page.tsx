@@ -25,8 +25,7 @@ import {
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { getDocs, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // oder wo auch immer deine DB-Instanz ist
-import React, { useEffect } from 'react';
+import { db } from '@/lib/firebase';
 
 export default function ManageTenantsPage() {
   const { data: tenants, isLoading, error } = useGetTenants();
@@ -55,6 +54,19 @@ export default function ManageTenantsPage() {
     }
   }, [tenants]);
 
+  // Optional: Debug-UseEffect um Firestore-Daten zu loggen
+  useEffect(() => {
+    async function testFirestore() {
+      const tenantsRef = collection(db, 'tenants');
+      const snapshot = await getDocs(tenantsRef);
+
+      snapshot.forEach(doc => {
+        console.log('Mandant:', doc.id, doc.data());
+      });
+    }
+
+    testFirestore();
+  }, []);
 
   const handleCreateTenant = async (values: { name: string }) => {
     try {
@@ -225,24 +237,3 @@ export default function ManageTenantsPage() {
     </div>
   );
 }
-useEffect(() => {
-  async function testFirestore() {
-    const tenantsRef = collection(db, 'tenants');
-    const snapshot = await getDocs(tenantsRef);
-
-    snapshot.forEach(doc => {
-      console.log('Mandant:', doc.id, doc.data());
-    });
-  }
-
-  testFirestore();
-}, []);
-
-return (
-  <div>
-    <h1>Mandanten</h1>
-    {/* Hier könntest du später die Mandanten rendern */}
-  </div>
-);
-}
-
