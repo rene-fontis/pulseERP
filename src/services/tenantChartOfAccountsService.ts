@@ -3,6 +3,15 @@ import { db } from '@/lib/firebase';
 import type { TenantChartOfAccounts, AccountGroup, Account, AccountTemplate, AccountGroupTemplate, TenantChartOfAccountsFormValues } from '@/types';
 import { getChartOfAccountsTemplateById } from './chartOfAccountsTemplateService';
 
+// Canonical IDs for fixed groups, must match those used in seeding/template creation
+const fixedGroupCanonicalIds: Record<AccountGroup['mainType'], string> = {
+  Asset: 'fixed_asset_group_global',
+  Liability: 'fixed_liability_group_global',
+  Equity: 'fixed_equity_group_global',
+  Revenue: 'fixed_revenue_group_global',
+  Expense: 'fixed_expense_group_global',
+};
+
 const tenantCoaCollectionRef = collection(db, 'tenantChartOfAccounts');
 
 const formatFirestoreTimestamp = (timestamp: any, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
@@ -29,20 +38,32 @@ const mapDocToTenantCoa = (docSnapshot: any): TenantChartOfAccounts => {
     id: docSnapshot.id,
     tenantId: data.tenantId,
     name: data.name,
-    groups: data.groups ? data.groups.map((g: any) => ({
-      ...g,
-      id: g.id || crypto.randomUUID(),
-      accounts: g.accounts ? g.accounts.map((a: any) => ({ 
-        ...a, 
+    groups: data.groups ? data.groups.map((g: any) => {
+      let groupId = g.id;
+      if (g.isFixed && (!groupId || typeof groupId !== 'string' || !Object.values(fixedGroupCanonicalIds).includes(groupId))) {
+        // If fixed group from DB is missing ID, or has a non-canonical one, assign/correct it.
+        groupId = fixedGroupCanonicalIds[g.mainType as AccountGroup['mainType']];
+      } else if (!groupId) {
+        groupId = crypto.randomUUID();
+      }
+      
+      const accounts = g.accounts ? g.accounts.map((a: any) => ({
+        ...a,
         id: a.id || crypto.randomUUID(),
-        description: a.description || '', 
-        balance: a.balance || 0, 
+        description: a.description || '',
+        balance: a.balance || 0,
         isSystemAccount: a.isSystemAccount || false,
-    })) : [],
-    isFixed: g.isFixed || false,
-    parentId: g.parentId !== undefined ? g.parentId : null,
-    level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0),
-    })) : [],
+      })) : [];
+
+      return {
+        ...g,
+        id: groupId,
+        accounts: accounts,
+        isFixed: g.isFixed || false,
+        parentId: g.parentId !== undefined ? g.parentId : null,
+        level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0),
+      };
+    }) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
   } as TenantChartOfAccounts;
@@ -58,7 +79,7 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
   const now = serverTimestamp();
   
   const newTenantCoAGroups: AccountGroup[] = template.groups.map((groupTemplate: AccountGroupTemplate) => ({
-    id: groupTemplate.id || crypto.randomUUID(), 
+    id: groupTemplate.isFixed ? fixedGroupCanonicalIds[groupTemplate.mainType] : (groupTemplate.id || crypto.randomUUID()),
     name: groupTemplate.name,
     mainType: groupTemplate.mainType,
     accounts: groupTemplate.accounts.map((accountTemplate: AccountTemplate) => ({
@@ -70,7 +91,7 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
       isSystemAccount: accountTemplate.isSystemAccount || false,
     })),
     isFixed: groupTemplate.isFixed || false,
-    parentId: groupTemplate.parentId !== undefined ? groupTemplate.parentId : null,
+    parentId: groupTemplate.parentId ? ( Object.values(fixedGroupCanonicalIds).includes(groupTemplate.parentId) ? groupTemplate.parentId : null ) : null, // Ensure parentId refers to a canonical fixed ID or is null
     level: typeof groupTemplate.level === 'number' ? groupTemplate.level : (groupTemplate.parentId ? 1 : 0),
   }));
 
@@ -102,9 +123,17 @@ export const getTenantChartOfAccountsById = async (coaId: string): Promise<Tenan
   return undefined;
 };
 
-const processTenantCoAGroupData = (group: AccountGroup): AccountGroup => ({
+const processTenantCoAGroupData = (group: AccountGroup): AccountGroup => {
+  let groupId = group.id;
+  if (group.isFixed && (!groupId || typeof groupId !== 'string' || !Object.values(fixedGroupCanonicalIds).includes(groupId))) {
+     groupId = fixedGroupCanonicalIds[group.mainType as AccountGroup['mainType']];
+  } else if (!groupId) {
+    groupId = crypto.randomUUID();
+  }
+  
+  return {
     ...group,
-    id: group.id || crypto.randomUUID(), 
+    id: groupId, 
     accounts: group.accounts.map(account => ({
         ...account,
         id: account.id || crypto.randomUUID(),
@@ -115,7 +144,8 @@ const processTenantCoAGroupData = (group: AccountGroup): AccountGroup => ({
     isFixed: group.isFixed || false,
     parentId: group.parentId !== undefined ? group.parentId : null,
     level: typeof group.level === 'number' ? group.level : (group.parentId ? 1 : 0),
-});
+  };
+};
 
 export const updateTenantChartOfAccounts = async (coaId: string, data: TenantChartOfAccountsFormValues): Promise<TenantChartOfAccounts | undefined> => {
   const docRef = doc(db, 'tenantChartOfAccounts', coaId);

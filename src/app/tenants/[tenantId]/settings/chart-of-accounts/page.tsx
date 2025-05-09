@@ -19,17 +19,18 @@ import { formatCurrency } from '@/lib/utils';
 
 interface GroupDisplayProps {
   group: AccountGroup;
-  allGroups: AccountGroup[];
+  allGroups: AccountGroup[]; // Pass all groups for subgroup lookup
   level: number;
 }
 
 const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) => {
+  // Find subgroups specifically for *this* group from the complete list
   const subgroups = allGroups.filter(g => g.parentId === group.id && !g.isFixed);
-  const cardPadding = level === 0 ? "p-4" : "p-3";
+  const cardPadding = level === 0 ? "p-4" : "p-3"; // Less padding for subgroups
   const titleSize = level === 0 ? "text-lg" : "text-md";
 
   return (
-    <Card className={cn("bg-background/50", cardPadding, level > 0 && "ml-0")}> {/* No extra margin for subgroups, parent div handles it */}
+    <Card className={cn("bg-background/50", cardPadding, level > 0 && "ml-0")}>
       <CardHeader className="p-0 pb-2">
         <CardTitle className={titleSize}>
           {group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span>
@@ -67,7 +68,7 @@ const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) 
 
         {/* Render Subgroups */}
         {subgroups.length > 0 && (
-          <div className="mt-3 space-y-3 pl-4 border-l">
+          <div className="mt-3 space-y-3 pl-4 border-l"> {/* Indentation for subgroups */}
             {subgroups.map(subG => (
               <GroupDisplay key={subG.id} group={subG} allGroups={allGroups} level={level + 1} />
             ))}
@@ -113,8 +114,9 @@ export default function TenantChartOfAccountsPage() {
 
   const topLevelFixedGroups = useMemo(() => {
     if (!chartOfAccounts) return [];
+    // These are the main, non-deletable categories like "Assets", "Liabilities"
     return chartOfAccounts.groups.filter(g => g.isFixed && g.level === 0)
-      .sort((a, b) => { // Define a sort order for fixed groups
+      .sort((a, b) => { 
         const order: AccountGroup['mainType'][] = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
         return order.indexOf(a.mainType) - order.indexOf(b.mainType);
       });
@@ -229,6 +231,7 @@ export default function TenantChartOfAccountsPage() {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Render top-level fixed groups. GroupDisplay will handle rendering their subgroups. */}
                   {topLevelFixedGroups.map((group) => (
                     <GroupDisplay key={group.id} group={group} allGroups={chartOfAccounts.groups} level={0} />
                   ))}

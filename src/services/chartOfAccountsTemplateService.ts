@@ -2,6 +2,15 @@ import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverT
 import { db } from '@/lib/firebase';
 import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/types';
 
+// Canonical IDs for fixed groups, must match those used in seeding/template creation
+const fixedGroupCanonicalIds: Record<AccountGroupTemplate['mainType'], string> = {
+  Asset: 'fixed_asset_group_global',
+  Liability: 'fixed_liability_group_global',
+  Equity: 'fixed_equity_group_global',
+  Revenue: 'fixed_revenue_group_global',
+  Expense: 'fixed_expense_group_global',
+};
+
 const templatesCollectionRef = collection(db, 'chartOfAccountsTemplates');
 
 const formatFirestoreTimestamp = (timestamp: any, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
@@ -29,19 +38,31 @@ const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
     id: docSnapshot.id,
     name: data.name,
     description: data.description || '',
-    groups: data.groups ? data.groups.map((g: any) => ({
-      ...g,
-      id: g.id || crypto.randomUUID(), 
-      accounts: g.accounts ? g.accounts.map((a: any) => ({ 
-          ...a, 
-          id: a.id || crypto.randomUUID(), 
-          description: a.description || '',
-          isSystemAccount: a.isSystemAccount || false,
-      })) : [],
-      isFixed: g.isFixed || false,
-      parentId: g.parentId !== undefined ? g.parentId : null, // Ensure parentId is null if not set
-      level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0), // Default level based on parentId
-    })) : [],
+    groups: data.groups ? data.groups.map((g: any) => {
+      let groupId = g.id;
+      if (g.isFixed && (!groupId || typeof groupId !== 'string' || !Object.values(fixedGroupCanonicalIds).includes(groupId)) ) {
+        // If fixed group from DB is missing ID, or has a non-canonical one, assign/correct it.
+        groupId = fixedGroupCanonicalIds[g.mainType as AccountGroupTemplate['mainType']];
+      } else if (!groupId) {
+        groupId = crypto.randomUUID();
+      }
+      
+      const accounts = g.accounts ? g.accounts.map((a: any) => ({
+        ...a,
+        id: a.id || crypto.randomUUID(),
+        description: a.description || '',
+        isSystemAccount: a.isSystemAccount || false,
+      })) : [];
+
+      return {
+        ...g,
+        id: groupId,
+        accounts: accounts,
+        isFixed: g.isFixed || false,
+        parentId: g.parentId !== undefined ? g.parentId : null,
+        level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0),
+      };
+    }) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
   } as ChartOfAccountsTemplate;
@@ -62,9 +83,17 @@ export const getChartOfAccountsTemplateById = async (id: string): Promise<ChartO
   return undefined;
 };
 
-const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => ({
+const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => {
+  let groupId = group.id;
+  if (group.isFixed && (!groupId || typeof groupId !== 'string' || !Object.values(fixedGroupCanonicalIds).includes(groupId))) {
+     groupId = fixedGroupCanonicalIds[group.mainType as AccountGroupTemplate['mainType']];
+  } else if (!groupId) {
+    groupId = crypto.randomUUID();
+  }
+
+  return {
   ...group,
-  id: group.id || crypto.randomUUID(),
+  id: groupId,
   accounts: group.accounts.map(account => ({
     ...account,
     id: account.id || crypto.randomUUID(),
@@ -74,7 +103,8 @@ const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => 
   isFixed: group.isFixed || false,
   parentId: group.parentId !== undefined ? group.parentId : null,
   level: typeof group.level === 'number' ? group.level : (group.parentId ? 1 : 0),
-});
+  };
+};
 
 
 export const addChartOfAccountsTemplate = async (templateData: ChartOfAccountsTemplateFormValues): Promise<ChartOfAccountsTemplate> => {
