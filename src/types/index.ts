@@ -1,3 +1,4 @@
+ts
 export interface Tenant {
   id: string;
   name: string;
@@ -60,6 +61,7 @@ export interface AccountGroup {
   isFixed?: boolean;
   parentId?: string | null;
   level?: number;
+  balance?: number; // Optional: aggregate balance for the group, calculated on the fly or stored
 }
 
 export interface TenantChartOfAccounts {
@@ -115,7 +117,7 @@ export interface JournalEntryLine {
   accountName: string; // For display
   debit?: number; // Soll
   credit?: number; // Haben
-  description?: string;
+  description?: string; // Optional line description
 }
 
 export interface JournalEntry {

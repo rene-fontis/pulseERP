@@ -1,3 +1,4 @@
+ts
 
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
@@ -28,16 +29,16 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
   return {
     id: docSnapshot.id,
     tenantId: data.tenantId,
-    fiscalYearId: data.fiscalYearId, // Will be undefined if not in Firestore
+    fiscalYearId: data.fiscalYearId, 
     entryNumber: data.entryNumber,
     date: formatFirestoreTimestamp(data.date, 'now'),
     description: data.description,
     lines: data.lines ? data.lines.map((line: any) => ({
       ...line,
       id: line.id || crypto.randomUUID(),
-      // debit/credit will be number or undefined if not in Firestore
+      description: line.description, // Will be undefined if not in Firestore, which is fine for optional field
     })) : [],
-    attachments: data.attachments || [], // Default to empty array if not in Firestore
+    attachments: data.attachments || [], 
     posted: data.posted || false,
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
@@ -45,7 +46,7 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
 };
 
 export const getJournalEntries = async (tenantId: string, fiscalYearId?: string): Promise<JournalEntry[]> => {
-  const queryConstraints: any[] = [ // Use any[] for queryConstraints to avoid TypeScript complexity with array spreading
+  const queryConstraints: any[] = [ 
     where("tenantId", "==", tenantId)
   ];
 
@@ -63,44 +64,35 @@ export const getJournalEntries = async (tenantId: string, fiscalYearId?: string)
 export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promise<JournalEntry> => {
   const now = serverTimestamp();
   
-  // Create a mutable copy to sanitize for Firestore
-  const newEntryDataForFirestore: { [key: string]: any } = { // Use an index signature for flexible property deletion
+  const newEntryDataForFirestore: { [key: string]: any } = { 
     ...entryData,
     date: Timestamp.fromDate(new Date(entryData.date)),
     createdAt: now,
     updatedAt: now,
   };
 
-  // Sanitize top-level optional fields
   if (newEntryDataForFirestore.fiscalYearId === undefined) {
     delete newEntryDataForFirestore.fiscalYearId;
   }
   if (newEntryDataForFirestore.attachments === undefined) {
     delete newEntryDataForFirestore.attachments;
-  } else if (Array.isArray(newEntryDataForFirestore.attachments) && newEntryDataForFirestore.attachments.length === 0) {
-    // Optionally remove empty attachments array, or ensure Firestore handles it.
-    // For now, we'll let empty arrays be stored if they are not undefined.
   }
 
-
-  // Sanitize fields within each line
   if (newEntryDataForFirestore.lines && Array.isArray(newEntryDataForFirestore.lines)) {
     newEntryDataForFirestore.lines = newEntryDataForFirestore.lines.map((line: Partial<JournalEntryLine>) => {
-      const sanitizedLine: { [key: string]: any } = { ...line }; // Use index signature for line as well
+      const sanitizedLine: { [key: string]: any } = { ...line }; 
       
-      if (!sanitizedLine.id) { // Ensure line id is present, form should provide this
+      if (!sanitizedLine.id) { 
           sanitizedLine.id = crypto.randomUUID();
       }
-      // If debit is undefined (or 0, depending on how you want to treat it), remove the key
       if (sanitizedLine.debit === undefined) {
         delete sanitizedLine.debit;
       }
-      // If credit is undefined (or 0), remove the key
       if (sanitizedLine.credit === undefined) {
         delete sanitizedLine.credit;
       }
-      if (sanitizedLine.description === undefined) {
-          sanitizedLine.description = ''; // Default to empty string if undefined
+      if (sanitizedLine.description === undefined) { // If not provided, don't store it
+        delete sanitizedLine.description;
       }
       return sanitizedLine;
     });
@@ -124,7 +116,6 @@ export const updateJournalEntry = async (entryId: string, entryData: Partial<New
     updateData.date = Timestamp.fromDate(new Date(entryData.date));
   }
 
-  // Sanitize fields for update as well
   if (updateData.fiscalYearId === undefined) {
     delete updateData.fiscalYearId;
   }
@@ -137,7 +128,7 @@ export const updateJournalEntry = async (entryId: string, entryData: Partial<New
       const sanitizedLine: { [key: string]: any } = { ...line };
       if (sanitizedLine.debit === undefined) delete sanitizedLine.debit;
       if (sanitizedLine.credit === undefined) delete sanitizedLine.credit;
-      if (sanitizedLine.description === undefined) sanitizedLine.description = '';
+      if (sanitizedLine.description === undefined) delete sanitizedLine.description;
       return sanitizedLine;
     });
   }

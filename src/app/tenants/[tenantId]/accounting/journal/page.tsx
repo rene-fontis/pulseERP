@@ -1,3 +1,4 @@
+tsx
 "use client";
 
 import { useParams } from 'next/navigation';
@@ -279,7 +280,6 @@ export default function TenantJournalPage() {
                     <TableHead>Konto-Name</TableHead>
                     <TableHead className="text-right">Soll</TableHead>
                     <TableHead className="text-right">Haben</TableHead>
-                    <TableHead>Beschreibung (Zeile)</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -300,9 +300,6 @@ export default function TenantJournalPage() {
                         <TableCell>{line.accountName}</TableCell>
                         <TableCell className="text-right">{formatCurrency(line.debit)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(line.credit)}</TableCell>
-                        <TableCell className="max-w-xs truncate" title={line.description}>
-                          {line.description || '-'}
-                        </TableCell>
                         {lineIndex === 0 && (
                           <TableCell rowSpan={entry.lines.length || 1} className="text-right space-x-1 align-top">
                             <Button 
@@ -350,7 +347,7 @@ export default function TenantJournalPage() {
                     ))
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                         Keine Buchungssätze für das aktive Geschäftsjahr gefunden.
                       </TableCell>
                     </TableRow>

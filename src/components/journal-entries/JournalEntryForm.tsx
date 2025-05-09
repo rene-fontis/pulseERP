@@ -1,3 +1,4 @@
+tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -29,7 +30,7 @@ const journalEntryLineSchema = z.object({
     (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
     z.number().optional()
   ),
-  lineDescription: z.string().optional(),
+  // lineDescription removed
 }).refine(data => {
   const hasDebit = typeof data.debit === 'number' && data.debit > 0;
   const hasCredit = typeof data.credit === 'number' && data.credit > 0;
@@ -93,18 +94,16 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(formSchema),
-    // Default values are set based on whether initialData is present (edit mode) or not (create mode)
     defaultValues: initialData && activeFiscalYear
       ? {
           date: parseISO(initialData.date),
           entryNumber: initialData.entryNumber,
           description: initialData.description,
           lines: initialData.lines.map(line => ({
-            // id: line.id, // useFieldArray handles internal 'id' for keys, we map data
             accountId: line.accountId,
             debit: line.debit,
             credit: line.credit,
-            lineDescription: line.description,
+            // lineDescription removed
           })),
         }
       : {
@@ -112,8 +111,8 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
           entryNumber: defaultEntryNumber || '',
           description: '',
           lines: [
-            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-            { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+            { accountId: '', debit: undefined, credit: undefined },
+            { accountId: '', debit: undefined, credit: undefined },
             ],
         },
   });
@@ -124,8 +123,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   });
   
   useEffect(() => {
-    // This effect ensures the form resets if initialData or activeFiscalYear changes after initial render.
-    // It's particularly useful if the form component remains mounted while these props change.
     if (initialData && activeFiscalYear) {
       form.reset({
         date: parseISO(initialData.date),
@@ -135,7 +132,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
           accountId: line.accountId,
           debit: line.debit,
           credit: line.credit,
-          lineDescription: line.description,
+           // lineDescription removed
         })),
       });
     } else if (!initialData && activeFiscalYear) {
@@ -149,12 +146,9 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
         if(!isWithinInterval(form.getValues("date"), {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
            form.setValue("date", defaultDate, { shouldValidate: true });
         }
-        // Reset other fields for create mode if necessary, or rely on defaultValues from useForm
-        // For example, if defaultEntryNumber is dynamic and could change:
         if(form.getValues("entryNumber") !== (defaultEntryNumber || '') && !initialData) {
              form.setValue("entryNumber", defaultEntryNumber || '');
         }
-
     }
   }, [initialData, form, activeFiscalYear, defaultEntryNumber]);
 
@@ -170,21 +164,19 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
       const account = accounts.find(acc => acc.id === line.accountId);
       if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
       return {
-        // For updates, if line IDs need to be preserved, this logic might need adjustment
-        // Currently, new IDs are generated, effectively replacing old lines.
         id: crypto.randomUUID(), 
         accountId: account.id,
         accountNumber: account.number,
         accountName: account.name,
         debit: line.debit || undefined,
         credit: line.credit || undefined,
-        description: line.lineDescription || '',
+        // description removed
       };
     });
     
     const newJournalEntryPayload: NewJournalEntryPayload = {
       tenantId,
-      fiscalYearId: activeFiscalYear?.id, // This will be undefined if activeFiscalYear is null
+      fiscalYearId: activeFiscalYear?.id, 
       entryNumber: values.entryNumber,
       date: values.date.toISOString(),
       description: values.description,
@@ -193,14 +185,14 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
     };
     
     await onSubmit(newJournalEntryPayload); 
-    if (!initialData) { // Only reset fully for create mode
+    if (!initialData) { 
         form.reset({ 
-            date: values.date, // Keep the date as it's often reused for multiple entries
-            entryNumber: '', // Clear entry number for next creation
+            date: values.date, 
+            entryNumber: '', 
             description: '',
             lines: [
-                { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
-                { accountId: '', debit: undefined, credit: undefined, lineDescription: '' },
+                { accountId: '', debit: undefined, credit: undefined },
+                { accountId: '', debit: undefined, credit: undefined },
             ],
         });
     }
@@ -299,7 +291,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
             {fields.map((item, index) => (
                 <Card key={item.id} className="p-4 relative bg-background/50">
                     <CardContent className="p-0 space-y-3">
-                        {index > 1 && ( // Allow removing lines beyond the initial two
+                        {index > 1 && ( 
                              <Button
                                 type="button"
                                 variant="ghost"
@@ -369,20 +361,6 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                                 )}
                             />
                         </div>
-                         <FormField
-                            control={form.control}
-                            name={`lines.${index}.lineDescription`}
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel className="text-xs">Beschreibung Zeile (optional)</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Details zu dieser Zeile" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         {/* Display line-specific error for debit/credit validation */}
                         {form.formState.errors.lines?.[index]?.debit?.message && (
                             <FormMessage className="text-xs">{form.formState.errors.lines?.[index]?.debit?.message}</FormMessage>
                         )}
@@ -396,7 +374,7 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ accountId: '', debit: undefined, credit: undefined, lineDescription: '' })}
+                onClick={() => append({ accountId: '', debit: undefined, credit: undefined })}
                 className="w-full"
             >
                 <PlusCircle className="mr-2 h-4 w-4" /> Zeile hinzufügen
