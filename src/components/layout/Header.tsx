@@ -53,7 +53,7 @@ export function Header() {
       return "Mandantenübersicht";
     }
     if (pathname.startsWith('/manage-templates')) {
-        return "Vorlagenübersicht";
+        return "Mandant wählen ...";
     }
     return "Mandant wählen...";
   };
