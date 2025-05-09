@@ -6,34 +6,55 @@ const tenantsCollectionRef = collection(db, 'tenants');
 
 // Helper function to safely convert Firestore createdAt to ISO string
 const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
+  // console.log(`[tenantService.ts] Formatting timestamp for doc ${docId}:`, timestamp, typeof timestamp);
   if (timestamp instanceof Timestamp) {
+    // console.log(`[tenantService.ts]   Doc ${docId}: Is Firestore Timestamp. Value: ${timestamp.toDate().toISOString()}`);
     return timestamp.toDate().toISOString();
   }
-  // Check if it's a string and if it's a valid date representation
+  
+  // Check for seconds and nanoseconds properties (common for Firestore Timestamps when not correctly identified as Timestamp instance)
+  if (timestamp && typeof timestamp.seconds === 'number' && typeof timestamp.nanoseconds === 'number') {
+    // console.log(`[tenantService.ts]   Doc ${docId}: Looks like a Firestore Timestamp object (seconds/nanoseconds). Converting.`);
+    try {
+      const dateFromObject = new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate();
+      return dateFromObject.toISOString();
+    } catch (e) {
+      // console.warn(`[tenantService.ts]   Doc ${docId}: Error converting seconds/nanoseconds to Date:`, e);
+      // Fall through to default handling if conversion fails
+    }
+  }
+
   if (typeof timestamp === 'string') {
     const date = new Date(timestamp);
     if (!isNaN(date.getTime())) {
-      return date.toISOString(); // Normalize to ISO string if it's a parsable string
+      // console.log(`[tenantService.ts]   Doc ${docId}: Is valid date string. Value: ${date.toISOString()}`);
+      return date.toISOString();
+    } else {
+      // console.warn(`[tenantService.ts]   Doc ${docId}: Is string, but invalid date string: ${timestamp}`);
     }
   }
   
-  // Fallback for undefined, null, or invalid string/number
   const defaultDate = defaultDateOption === 'epoch' ? new Date(0) : new Date();
   const idPart = docId ? `for tenant ID ${docId} ` : '';
-  console.warn(`Invalid or missing createdAt value ${idPart}encountered: ${JSON.stringify(timestamp)}. Falling back to ${defaultDateOption} date: ${defaultDate.toISOString()}.`);
+  // console.warn(`[tenantService.ts] Invalid or missing createdAt value ${idPart} encountered: ${JSON.stringify(timestamp)}. Falling back to ${defaultDateOption} date: ${defaultDate.toISOString()}.`);
   return defaultDate.toISOString();
 };
 
 
 export const getTenants = async (): Promise<Tenant[]> => {
+  // console.log("[tenantService.ts] Fetching tenants from Firestore...");
   const q = query(tenantsCollectionRef, orderBy("createdAt", "desc"));
   const querySnapshot = await getDocs(q);
+  // console.log(`[tenantService.ts] Fetched ${querySnapshot.docs.length} tenants.`);
   return querySnapshot.docs.map(doc => {
     const data = doc.data();
+    // console.log(`[tenantService.ts] Processing tenant doc ${doc.id}:`, data);
+    const createdAtValue = formatFirestoreTimestamp(data.createdAt, doc.id);
+    // console.log(`[tenantService.ts]   Formatted createdAt for ${doc.id}: ${createdAtValue}`);
     return { 
       id: doc.id, 
       name: data.name,
-      createdAt: formatFirestoreTimestamp(data.createdAt, doc.id) 
+      createdAt: createdAtValue
     } as Tenant;
   });
 };
@@ -58,15 +79,19 @@ export const addTenant = async (name: string): Promise<Tenant> => {
     createdAt: serverTimestamp(),
   };
   const docRef = await addDoc(tenantsCollectionRef, newTenantData);
-  const newDocSnapshot = await getDoc(docRef);
+  // console.log("[tenantService.ts] Tenant added with ID:", docRef.id);
+  const newDocSnapshot = await getDoc(docRef); // Fetch the document to get the server-generated timestamp
   if (newDocSnapshot.exists()) {
       const data = newDocSnapshot.data();
+      // console.log("[tenantService.ts] New tenant data after fetch:", data);
       return {
           id: newDocSnapshot.id,
           name: data.name,
-          createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'),
+          // 'now' is a better default here as we expect a fresh timestamp
+          createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'), 
       } as Tenant;
   }
+  // console.error("[tenantService.ts] Could not retrieve tenant after creation for ID:", docRef.id);
   throw new Error("Could not retrieve tenant after creation.");
 };
 

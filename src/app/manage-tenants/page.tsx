@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { getDocs, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+// Removed: import { getDocs, collection } from 'firebase/firestore';
+// Removed: import { db } from '@/lib/firebase';
 
 export default function ManageTenantsPage() {
   const { data: tenants, isLoading, error } = useGetTenants();
@@ -39,34 +39,29 @@ export default function ManageTenantsPage() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
 
+  // console.log("[ManageTenantsPage] useGetTenants state:", { tenants, isLoading, error });
+
   useEffect(() => {
     if (tenants) {
+      // console.log("[ManageTenantsPage] tenants received:", tenants);
       const newFormattedDates: Record<string, string> = {};
       tenants.forEach(tenant => {
         try {
-          newFormattedDates[tenant.id] = format(new Date(tenant.createdAt), "PPP p", { locale: de });
+          // console.log(`[ManageTenantsPage] Formatting date for tenant ${tenant.id}, createdAt: ${tenant.createdAt}`);
+          const dateToFormat = new Date(tenant.createdAt);
+          if (isNaN(dateToFormat.getTime())) {
+            // This error means tenant.createdAt was not a valid date string/number for new Date()
+            throw new Error(`Invalid date value for tenant.createdAt: ${tenant.createdAt}`);
+          }
+          newFormattedDates[tenant.id] = format(dateToFormat, "PPP p", { locale: de });
         } catch (e) {
-          console.error("Error formatting date for tenant:", tenant.id, e);
+          // console.error("[ManageTenantsPage] Error formatting date for tenant in useEffect:", tenant.id, tenant.createdAt, e);
           newFormattedDates[tenant.id] = "Ungültiges Datum";
         }
       });
       setFormattedDates(newFormattedDates);
     }
   }, [tenants]);
-
-  // Optional: Debug-UseEffect um Firestore-Daten zu loggen
-  useEffect(() => {
-    async function testFirestore() {
-      const tenantsRef = collection(db, 'tenants');
-      const snapshot = await getDocs(tenantsRef);
-
-      snapshot.forEach(doc => {
-        console.log('Mandant:', doc.id, doc.data());
-      });
-    }
-
-    testFirestore();
-  }, []);
 
   const handleCreateTenant = async (values: { name: string }) => {
     try {
@@ -105,6 +100,7 @@ export default function ManageTenantsPage() {
   };
 
   if (error) {
+    // console.error("[ManageTenantsPage] Error from useGetTenants:", error);
     return (
       <div className="flex flex-col items-center justify-center h-full text-destructive">
         <AlertCircle className="w-16 h-16 mb-4" />
@@ -193,9 +189,9 @@ export default function ManageTenantsPage() {
                               <AlertDialogAction
                                 onClick={() => handleDeleteTenant(tenant.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                disabled={deleteTenantMutation.isPending}
+                                disabled={deleteTenantMutation.isPending && deleteTenantMutation.variables === tenant.id}
                               >
-                                {deleteTenantMutation.isPending && deleteTenantMutation.variables === tenant.id ? 'Löschen...' : 'Löschen'}
+                                {(deleteTenantMutation.isPending && deleteTenantMutation.variables === tenant.id) ? 'Löschen...' : 'Löschen'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
