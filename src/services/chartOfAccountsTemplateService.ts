@@ -1,6 +1,6 @@
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues } from '@/types';
+import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/types';
 
 const templatesCollectionRef = collection(db, 'chartOfAccountsTemplates');
 
@@ -36,8 +36,11 @@ const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
           ...a, 
           id: a.id || crypto.randomUUID(), 
           description: a.description || '',
-          isSystemAccount: a.isSystemAccount || false, // Ensure isSystemAccount is mapped
-        })) : [],
+          isSystemAccount: a.isSystemAccount || false,
+      })) : [],
+      isFixed: g.isFixed || false,
+      parentId: g.parentId !== undefined ? g.parentId : null, // Ensure parentId is null if not set
+      level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0), // Default level based on parentId
     })) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
@@ -59,21 +62,27 @@ export const getChartOfAccountsTemplateById = async (id: string): Promise<ChartO
   return undefined;
 };
 
+const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => ({
+  ...group,
+  id: group.id || crypto.randomUUID(),
+  accounts: group.accounts.map(account => ({
+    ...account,
+    id: account.id || crypto.randomUUID(),
+    description: account.description || '',
+    isSystemAccount: account.isSystemAccount || false,
+  })),
+  isFixed: group.isFixed || false,
+  parentId: group.parentId !== undefined ? group.parentId : null,
+  level: typeof group.level === 'number' ? group.level : (group.parentId ? 1 : 0),
+});
+
+
 export const addChartOfAccountsTemplate = async (templateData: ChartOfAccountsTemplateFormValues): Promise<ChartOfAccountsTemplate> => {
   const now = serverTimestamp();
   const newTemplate = {
     ...templateData,
     description: templateData.description || '',
-    groups: templateData.groups.map(group => ({
-      ...group,
-      id: group.id || crypto.randomUUID(),
-      accounts: group.accounts.map(account => ({
-        ...account,
-        id: account.id || crypto.randomUUID(),
-        description: account.description || '',
-        isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount is included
-      })),
-    })),
+    groups: templateData.groups.map(processGroupData),
     createdAt: now,
     updatedAt: now,
   };
@@ -89,19 +98,13 @@ export const updateChartOfAccountsTemplate = async (id: string, templateData: Pa
   const docRef = doc(db, 'chartOfAccountsTemplates', id);
    const updateData: any = { ...templateData, updatedAt: serverTimestamp() };
    
-   if (templateData.description === undefined) updateData.description = '';
+   if (templateData.description === undefined && !updateData.hasOwnProperty('description')) {
+     updateData.description = '';
+   }
+
 
    if (templateData.groups) {
-    updateData.groups = templateData.groups.map(group => ({
-        ...group,
-        id: group.id || crypto.randomUUID(),
-        accounts: group.accounts.map(account => ({
-            ...account,
-            id: account.id || crypto.randomUUID(),
-            description: account.description || '',
-            isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount is included on update
-        })),
-    }));
+    updateData.groups = templateData.groups.map(processGroupData);
    }
 
   await updateDoc(docRef, updateData);

@@ -10,10 +10,74 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TenantChartOfAccountsForm, type TenantChartOfAccountsFormValues } from '@/components/tenants/TenantChartOfAccountsForm';
 import { useToast } from '@/hooks/use-toast';
-import type { TenantChartOfAccounts } from '@/types';
+import type { TenantChartOfAccounts, AccountGroup } from '@/types';
+import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+
+interface GroupDisplayProps {
+  group: AccountGroup;
+  allGroups: AccountGroup[];
+  level: number;
+}
+
+const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) => {
+  const subgroups = allGroups.filter(g => g.parentId === group.id && !g.isFixed);
+  const cardPadding = level === 0 ? "p-4" : "p-3";
+  const titleSize = level === 0 ? "text-lg" : "text-md";
+
+  return (
+    <Card className={cn("bg-background/50", cardPadding, level > 0 && "ml-0")}> {/* No extra margin for subgroups, parent div handles it */}
+      <CardHeader className="p-0 pb-2">
+        <CardTitle className={titleSize}>
+          {group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span>
+          {group.isFixed && <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Fixe Hauptgruppe</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {group.accounts.length > 0 && (
+          <div className="overflow-x-auto mt-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px] h-8">Nummer</TableHead>
+                  <TableHead className="h-8">Name</TableHead>
+                  <TableHead className="h-8">Beschreibung</TableHead>
+                  <TableHead className="text-right h-8">Anfangsbestand</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.accounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium py-2">{account.number}</TableCell>
+                    <TableCell className="py-2">{account.name}</TableCell>
+                    <TableCell className="py-2">{account.description || '-'}</TableCell>
+                    <TableCell className="text-right py-2">{formatCurrency(account.balance)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {group.accounts.length === 0 && !subgroups.length && (
+           <p className="text-sm text-muted-foreground py-2">Keine Konten oder Untergruppen in dieser Gruppe.</p>
+        )}
+
+        {/* Render Subgroups */}
+        {subgroups.length > 0 && (
+          <div className="mt-3 space-y-3 pl-4 border-l">
+            {subgroups.map(subG => (
+              <GroupDisplay key={subG.id} group={subG} allGroups={allGroups} level={level + 1} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 
 export default function TenantChartOfAccountsPage() {
   const params = useParams();
@@ -31,7 +95,6 @@ export default function TenantChartOfAccountsPage() {
     setClientLoaded(true);
   }, []);
 
-
   const handleUpdateCoA = async (values: TenantChartOfAccountsFormValues) => {
     if (!chartOfAccounts) {
       toast({ title: "Fehler", description: "Kein Kontenplan zum Aktualisieren vorhanden.", variant: "destructive" });
@@ -47,6 +110,15 @@ export default function TenantChartOfAccountsPage() {
       toast({ title: "Fehler", description: `Kontenplan konnte nicht aktualisiert werden: ${errorMessage}`, variant: "destructive" });
     }
   };
+
+  const topLevelFixedGroups = useMemo(() => {
+    if (!chartOfAccounts) return [];
+    return chartOfAccounts.groups.filter(g => g.isFixed && g.level === 0)
+      .sort((a, b) => { // Define a sort order for fixed groups
+        const order: AccountGroup['mainType'][] = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
+        return order.indexOf(a.mainType) - order.indexOf(b.mainType);
+      });
+  }, [chartOfAccounts]);
 
 
   if (isLoadingTenant || (clientLoaded && tenant?.chartOfAccountsId && isLoadingCoA)) {
@@ -78,7 +150,7 @@ export default function TenantChartOfAccountsPage() {
     );
   }
     
-  if (!tenant) {
+  if (!tenant && !isLoadingTenant) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 md:p-8">
         <AlertCircle className="w-16 h-16 mb-4" />
@@ -118,7 +190,7 @@ export default function TenantChartOfAccountsPage() {
         <CardHeader>
           <CardTitle className="text-xl">Aktiver Kontenplan</CardTitle>
            <CardDescription>
-            Hier können Sie die Kontengruppen und deren Konten einsehen und bearbeiten.
+            Hier können Sie die Hauptgruppen, Untergruppen und deren Konten einsehen und bearbeiten.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -156,38 +228,10 @@ export default function TenantChartOfAccountsPage() {
                     <h2 className="text-lg font-semibold">Name: {chartOfAccounts.name}</h2>
                 </div>
 
-                <div className="space-y-6">
-                    {chartOfAccounts.groups.map((group) => (
-                    <Card key={group.id} className="bg-background/50">
-                        <CardHeader className="pb-2 pt-4 px-4">
-                        <CardTitle className="text-md">{group.name} <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span></CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-4 pb-4">
-                        {group.accounts.length > 0 ? (
-                            <Table>
-                            <TableHeader>
-                                <TableRow>
-                                <TableHead className="w-[100px] h-8">Nummer</TableHead>
-                                <TableHead className="h-8">Name</TableHead>
-                                <TableHead className="h-8">Beschreibung</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {group.accounts.map((account) => (
-                                <TableRow key={account.id}>
-                                    <TableCell className="font-medium py-2">{account.number}</TableCell>
-                                    <TableCell className="py-2">{account.name}</TableCell>
-                                    <TableCell className="py-2">{account.description || '-'}</TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                            </Table>
-                        ) : (
-                            <p className="text-sm text-muted-foreground py-2">Keine Konten in dieser Gruppe.</p>
-                        )}
-                        </CardContent>
-                    </Card>
-                    ))}
+                <div className="space-y-4">
+                  {topLevelFixedGroups.map((group) => (
+                    <GroupDisplay key={group.id} group={group} allGroups={chartOfAccounts.groups} level={0} />
+                  ))}
                 </div>
                 <div className="mt-6 border-t pt-6 flex justify-end">
                   <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
@@ -201,7 +245,7 @@ export default function TenantChartOfAccountsPage() {
                       <DialogHeader>
                         <DialogTitle>Kontenplan bearbeiten: {chartOfAccounts.name}</DialogTitle>
                         <DialogDescriptionComponent>
-                          Aktualisieren Sie die Details des Kontenplans.
+                          Aktualisieren Sie die Details des Kontenplans. Hauptgruppen sind fix.
                         </DialogDescriptionComponent>
                       </DialogHeader>
                       <TenantChartOfAccountsForm

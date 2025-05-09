@@ -1,6 +1,6 @@
-import { collection, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from "firebase/firestore"; // query, orderBy removed as not used
+import { collection, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { TenantChartOfAccounts, AccountGroup, Account, AccountTemplate, AccountGroupTemplate } from '@/types';
+import type { TenantChartOfAccounts, AccountGroup, Account, AccountTemplate, AccountGroupTemplate, TenantChartOfAccountsFormValues } from '@/types';
 import { getChartOfAccountsTemplateById } from './chartOfAccountsTemplateService';
 
 const tenantCoaCollectionRef = collection(db, 'tenantChartOfAccounts');
@@ -37,8 +37,11 @@ const mapDocToTenantCoa = (docSnapshot: any): TenantChartOfAccounts => {
         id: a.id || crypto.randomUUID(),
         description: a.description || '', 
         balance: a.balance || 0, 
-        isSystemAccount: a.isSystemAccount || false, // Ensure isSystemAccount
+        isSystemAccount: a.isSystemAccount || false,
     })) : [],
+    isFixed: g.isFixed || false,
+    parentId: g.parentId !== undefined ? g.parentId : null,
+    level: typeof g.level === 'number' ? g.level : (g.parentId ? 1 : 0),
     })) : [],
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
@@ -55,17 +58,20 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
   const now = serverTimestamp();
   
   const newTenantCoAGroups: AccountGroup[] = template.groups.map((groupTemplate: AccountGroupTemplate) => ({
-    id: crypto.randomUUID(), 
+    id: groupTemplate.id || crypto.randomUUID(), 
     name: groupTemplate.name,
     mainType: groupTemplate.mainType,
     accounts: groupTemplate.accounts.map((accountTemplate: AccountTemplate) => ({
-      id: crypto.randomUUID(), 
+      id: accountTemplate.id || crypto.randomUUID(), 
       number: accountTemplate.number,
       name: accountTemplate.name,
       description: accountTemplate.description || '',
       balance: 0, 
-      isSystemAccount: accountTemplate.isSystemAccount || false, // Carry over isSystemAccount
+      isSystemAccount: accountTemplate.isSystemAccount || false,
     })),
+    isFixed: groupTemplate.isFixed || false,
+    parentId: groupTemplate.parentId !== undefined ? groupTemplate.parentId : null,
+    level: typeof groupTemplate.level === 'number' ? groupTemplate.level : (groupTemplate.parentId ? 1 : 0),
   }));
 
   const newTenantCoADocData = {
@@ -96,27 +102,33 @@ export const getTenantChartOfAccountsById = async (coaId: string): Promise<Tenan
   return undefined;
 };
 
-export const updateTenantChartOfAccounts = async (coaId: string, data: Partial<Omit<TenantChartOfAccounts, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>>): Promise<TenantChartOfAccounts | undefined> => {
+const processTenantCoAGroupData = (group: AccountGroup): AccountGroup => ({
+    ...group,
+    id: group.id || crypto.randomUUID(), 
+    accounts: group.accounts.map(account => ({
+        ...account,
+        id: account.id || crypto.randomUUID(),
+        description: account.description || '',
+        balance: account.balance || 0,
+        isSystemAccount: account.isSystemAccount || false,
+    })),
+    isFixed: group.isFixed || false,
+    parentId: group.parentId !== undefined ? group.parentId : null,
+    level: typeof group.level === 'number' ? group.level : (group.parentId ? 1 : 0),
+});
+
+export const updateTenantChartOfAccounts = async (coaId: string, data: TenantChartOfAccountsFormValues): Promise<TenantChartOfAccounts | undefined> => {
   const docRef = doc(db, 'tenantChartOfAccounts', coaId);
   
   const updatePayload: any = { ...data, updatedAt: serverTimestamp() };
   
   if (data.groups) {
-    updatePayload.groups = data.groups.map(group => ({
-        ...group,
-        id: group.id || crypto.randomUUID(), 
-        accounts: group.accounts.map(account => ({
-            ...account,
-            id: account.id || crypto.randomUUID(),
-            description: account.description || '',
-            balance: account.balance || 0,
-            isSystemAccount: account.isSystemAccount || false, // Ensure isSystemAccount on update
-        })),
-    }));
+    updatePayload.groups = data.groups.map(processTenantCoAGroupData);
    }
 
   await updateDoc(docRef, updatePayload);
-  return getTenantChartOfAccountsById(coaId);
+  const updatedSnapshot = await getTenantChartOfAccountsById(coaId); // Use existing getter to ensure consistent mapping
+  return updatedSnapshot;
 };
 
 export const deleteTenantChartOfAccounts = async (coaId: string): Promise<boolean> => {

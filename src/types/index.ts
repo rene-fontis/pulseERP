@@ -16,21 +16,24 @@ export interface AccountTemplate {
   number: string; // Account number, e.g., "1000"
   name: string; // Account name, e.g., "Kasse"
   description?: string;
-  isSystemAccount?: boolean; // For special accounts like profit/loss, non-deletable/modifiable by user
+  isSystemAccount: boolean; // For special accounts like profit/loss, non-deletable/modifiable by user
 }
 
 export interface AccountGroupTemplate {
-  id?: string; // Unique within the template
+  id: string; // Unique within the template
   name: string; // e.g., "Umlaufvermögen", "Bank"
-  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity'; // Main COA categories, Added Equity
+  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity'; // Main COA categories
   accounts: AccountTemplate[];
+  isFixed?: boolean; // True for the 5 main unmodifiable groups (Asset, Liability, etc.)
+  parentId?: string | null; // ID of the parent group, null for top-level (fixed) groups
+  level?: number; // Hierarchy level, 0 for fixed groups, 1 for their subgroups, etc.
 }
 
 export interface ChartOfAccountsTemplate {
   id: string;
   name: string; // e.g., "KMU Schweiz", "Verein", "Privat"
   description?: string;
-  groups: AccountGroupTemplate[];
+  groups: AccountGroupTemplate[]; // Now a flat list, hierarchy managed by parentId and level
   createdAt: string;
   updatedAt: string;
 }
@@ -45,22 +48,25 @@ export interface Account {
   number: string;
   name: string;
   description?: string;
-  balance?: number; // Opening balance for the fiscal period
-  isSystemAccount?: boolean; // For special accounts like profit/loss
+  balance: number; // Opening balance for the fiscal period, changed from optional
+  isSystemAccount: boolean; 
 }
 
 export interface AccountGroup {
   id: string;
   name: string;
-  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity'; // Added Equity
+  mainType: 'Asset' | 'Liability' | 'Expense' | 'Revenue' | 'Equity';
   accounts: Account[];
+  isFixed?: boolean;
+  parentId?: string | null;
+  level?: number;
 }
 
 export interface TenantChartOfAccounts {
   id: string;
   tenantId: string;
   name: string; // Can be derived from template name initially
-  groups: AccountGroup[];
+  groups: AccountGroup[]; // Flat list
   createdAt: string;
   updatedAt: string;
 }
