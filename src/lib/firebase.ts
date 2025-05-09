@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDfGS8FxR8v2orZd3kNMC0U2yY3xk7tFaQ",
   authDomain: "pulseerp.firebaseapp.com",
   projectId: "pulseerp",
-  storageBucket: "pulseerp.firebasestorage.app",
+  storageBucket: "pulseerp.appspot.com",
   messagingSenderId: "917957062375",
   appId: "1:917957062375:web:96d4e292e4340c3b5ffc42"
 };
