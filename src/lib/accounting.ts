@@ -1,4 +1,3 @@
-src/lib/accounting.ts
 import type { TenantChartOfAccounts, JournalEntry, Account } from '@/types';
 
 export interface AccountBalances {

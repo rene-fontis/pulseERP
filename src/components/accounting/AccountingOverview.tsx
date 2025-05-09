@@ -1,4 +1,3 @@
-src/components/accounting/AccountingOverview.tsx
 "use client";
 
 import React from 'react';
