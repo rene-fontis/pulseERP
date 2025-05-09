@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, {useEffect, useMemo} from 'react';
@@ -28,9 +29,16 @@ const fixedGroupIdsSeed = {
 const getDefaultFixedGroups = (): AccountGroupTemplate[] => [
   { id: fixedGroupIdsSeed.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
   { id: fixedGroupIdsSeed.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-  { id: fixedGroupIdsSeed.equity, name: "Eigenkapital", mainType: "Equity", accounts: [
+  { 
+    id: fixedGroupIdsSeed.equity, 
+    name: "Eigenkapital", 
+    mainType: "Equity", 
+    accounts: [
+      { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
       { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true },
-    ], isFixed: true, parentId: null, level: 0 },
+    ], 
+    isFixed: true, parentId: null, level: 0 
+  },
   { id: fixedGroupIdsSeed.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
   { id: fixedGroupIdsSeed.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
 ];
@@ -41,6 +49,7 @@ const accountTemplateSchema = z.object({
   name: z.string().min(1, "Kontoname ist erforderlich."),
   description: z.string().optional().default(''),
   isSystemAccount: z.boolean().optional().default(false),
+  isRetainedEarningsAccount: z.boolean().optional().default(false),
 });
 
 const accountGroupTemplateSchema = z.object({
@@ -93,10 +102,23 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
         existing.parentId = null;
         existing.name = dfg.name; 
         existing.mainType = dfg.mainType; 
-        if (dfg.mainType === 'Equity' && !existing.accounts.some(acc => acc.isSystemAccount)) {
-          const profitLossAccount = dfg.accounts.find(acc => acc.isSystemAccount);
-          if (profitLossAccount) existing.accounts.push({...profitLossAccount, id: crypto.randomUUID() });
-        }
+
+        // Ensure system and retained earnings accounts from default are present
+        dfg.accounts.forEach(defaultAcc => {
+            if (!existing.accounts.some(ea => ea.number === defaultAcc.number && (ea.isSystemAccount === defaultAcc.isSystemAccount) && (ea.isRetainedEarningsAccount === defaultAcc.isRetainedEarningsAccount))) {
+                existing.accounts.push({...defaultAcc, id: crypto.randomUUID()});
+            } else {
+                // Update existing system/retained earnings account properties if needed
+                const accToUpdate = existing.accounts.find(ea => ea.number === defaultAcc.number);
+                if (accToUpdate) {
+                    accToUpdate.isSystemAccount = defaultAcc.isSystemAccount;
+                    accToUpdate.isRetainedEarningsAccount = defaultAcc.isRetainedEarningsAccount;
+                    accToUpdate.name = defaultAcc.name; // Keep name consistent
+                    accToUpdate.description = defaultAcc.description; // Keep description consistent
+                }
+            }
+        });
+
 
       } else {
         processedGroups.push({ ...dfg, id: dfg.id || crypto.randomUUID() });
@@ -152,13 +174,15 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
 
   const handleSubmit = async (values: ChartOfAccountsTemplateFormValues) => {
     const equityGroup = values.groups.find(g => g.mainType === 'Equity' && g.isFixed);
-    if (equityGroup && !equityGroup.accounts.some(acc => acc.isSystemAccount)) {
-        equityGroup.accounts.push({
-            id: crypto.randomUUID(),
-            number: "2979",
-            name: "Laufender Gewinn/Verlust",
-            description: "Ergebnis des Geschäftsjahres. Systemkonto.",
-            isSystemAccount: true
+    if (equityGroup) {
+        const defaultEquityAccounts = getDefaultFixedGroups().find(dfg => dfg.mainType === 'Equity')?.accounts || [];
+        defaultEquityAccounts.forEach(defaultAcc => {
+            if(!equityGroup.accounts.some(acc => acc.number === defaultAcc.number && (acc.isSystemAccount || acc.isRetainedEarningsAccount))) {
+                 equityGroup.accounts.push({
+                    ...defaultAcc,
+                    id: crypto.randomUUID(),
+                });
+            }
         });
     }
     await onSubmit(values);
@@ -197,7 +221,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
           </Button>
         )}
         <CardHeader className="p-0 mb-2">
-          <CardTitle className="text-lg">{groupField.name} {/* Removed: {isFixedGroup ? `(${groupField.mainType})` : ''} */} </CardTitle>
+          <CardTitle className="text-lg">{groupField.name} </CardTitle>
           {isFixedGroup && <FormDescription>Fixe Hauptgruppe. Untergruppen können hinzugefügt werden.</FormDescription>}
         </CardHeader>
         <CardContent className="p-0 space-y-3">
@@ -219,9 +243,7 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
             </>
           )}
           
-          {level === 1 && ( // Only show accounts field for level 1 subgroups
-            <AccountsArrayField control={form.control} groupIndex={groupIndexInForm} form={form} isFixedGroup={!!isFixedGroup}/>
-          )}
+          <AccountsArrayField control={form.control} groupIndex={groupIndexInForm} form={form} isFixedGroup={!!isFixedGroup}/>
           
           {level === 0 && childSubgroupOriginalIndices.length > 0 && (
             <div className="ml-0 mt-4 space-y-3 pt-3 border-t">
@@ -301,6 +323,10 @@ export function ChartOfAccountsTemplateForm({ onSubmit, initialData, isSubmittin
               <div className="space-y-4 mt-2">
                 {groupFields
                   .filter((groupFieldItem) => groupFieldItem.level === 0 && groupFieldItem.isFixed)
+                  .sort((a,b) => { // Ensure fixed groups render in a consistent order
+                     const order: AccountGroupTemplate['mainType'][] = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
+                     return order.indexOf(a.mainType) - order.indexOf(b.mainType);
+                  })
                   .map((groupFieldItem) => {
                     const originalIndex = groupFields.findIndex(item => item.fieldId === groupFieldItem.fieldId);
                     if (originalIndex === -1) return null;
@@ -336,54 +362,19 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
     keyName: "accountFieldId"
   });
 
-  if (isFixedGroup) { 
-    const groupData = form.getValues(`groups.${groupIndex}`);
-    if (groupData.mainType === 'Equity' && groupData.isFixed) {
-        const systemAccountField = fields.find(f => {
-            const accountData = form.getValues(`groups.${groupIndex}.accounts.${fields.indexOf(f)}`);
-            return accountData && accountData.isSystemAccount;
-        });
-        if (systemAccountField) {
-            const systemAccountIndex = fields.indexOf(systemAccountField);
-             return (
-                 <div className="space-y-3 pl-4 border-l border-border">
-                     <FormLabel className="text-base">Systemkonten</FormLabel>
-                     <Card key={systemAccountField.accountFieldId} className="p-3 bg-muted/30 relative">
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                             <FormField
-                                 control={control}
-                                 name={`groups.${groupIndex}.accounts.${systemAccountIndex}.number`}
-                                 render={({ field }) => (
-                                     <FormItem><FormLabel className="text-xs">Nr.</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>
-                                 )} />
-                             <FormField
-                                 control={control}
-                                 name={`groups.${groupIndex}.accounts.${systemAccountIndex}.name`}
-                                 render={({ field }) => (
-                                     <FormItem><FormLabel className="text-xs">Name</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>
-                                 )} />
-                         </div>
-                         <FormField
-                             control={control}
-                             name={`groups.${groupIndex}.accounts.${systemAccountIndex}.description`}
-                             render={({ field }) => (
-                                 <FormItem className="mt-2"><FormLabel className="text-xs">Beschreibung</FormLabel><FormControl><Input {...field} className="h-8 text-sm" disabled /></FormControl></FormItem>
-                             )} />
-                         <p className="text-xs text-muted-foreground mt-1">Systemkonto, nicht bearbeitbar.</p>
-                     </Card>
-                 </div>
-             );
-        }
-    }
-    return null;
-  }
-
+  const groupData = form.getValues(`groups.${groupIndex}`);
 
   return (
-    <div className="space-y-3 pl-4 border-l border-border">
-      <FormLabel className="text-base">Konten in dieser Untergruppe</FormLabel>
+    <div className={cn("space-y-3", !isFixedGroup && "pl-4 border-l border-border")}>
+      <FormLabel className="text-base">
+        {isFixedGroup ? 'Systemkonten in dieser Hauptgruppe' : 'Konten in dieser Untergruppe'}
+      </FormLabel>
+      {fields.length === 0 && !isFixedGroup && <p className="text-xs text-muted-foreground">Keine Konten definiert.</p>}
       {fields.map((accountItem, accountIndex) => {
          const isSystemAcc = form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isSystemAccount`);
+         const isRetainedEarningsAcc = form.getValues(`groups.${groupIndex}.accounts.${accountIndex}.isRetainedEarningsAccount`);
+         const isDisabled = isSystemAcc || (isFixedGroup && isRetainedEarningsAcc);
+
         return (
         <Card key={accountItem.accountFieldId} className="p-3 bg-muted/30 relative">
            <Button
@@ -392,7 +383,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
               size="icon"
               className="absolute top-1 right-1 text-muted-foreground hover:text-destructive h-6 w-6 z-10"
               onClick={() => remove(accountIndex)}
-              disabled={isSystemAcc}
+              disabled={isDisabled}
             >
               <Trash2 className="h-3 w-3" />
               <span className="sr-only">Konto entfernen</span>
@@ -405,7 +396,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
                 <FormItem>
                   <FormLabel className="text-xs">Nr.</FormLabel>
                   <FormControl>
-                    <Input placeholder="1000" {...field} className="h-8 text-sm" disabled={isSystemAcc} />
+                    <Input placeholder="1000" {...field} className="h-8 text-sm" disabled={isDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -418,7 +409,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
                 <FormItem>
                   <FormLabel className="text-xs">Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Kasse" {...field} className="h-8 text-sm" disabled={isSystemAcc} />
+                    <Input placeholder="Kasse" {...field} className="h-8 text-sm" disabled={isDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -432,28 +423,31 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
               <FormItem className="mt-2">
                 <FormLabel className="text-xs">Beschreibung (opt.)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Details zum Konto" {...field} className="h-8 text-sm" disabled={isSystemAcc} />
+                  <Input placeholder="Details zum Konto" {...field} className="h-8 text-sm" disabled={isDisabled} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-           {isSystemAcc && (
-             <p className="text-xs text-muted-foreground mt-1">Systemkonto, nicht vollständig bearbeitbar.</p>
+           {(isSystemAcc || isRetainedEarningsAcc) && (
+             <p className="text-xs text-muted-foreground mt-1">
+                {isSystemAcc && "Systemkonto, nicht bearbeitbar. "}
+                {isRetainedEarningsAcc && "Konto für Gewinn-/Verlustvortrag, nicht bearbeitbar."}
+            </p>
            )}
         </Card>
       )})}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', isSystemAccount: false })}
-        className="w-full mt-2"
-      >
-        <PlusCircle className="mr-2 h-4 w-4" /> Konto zu dieser Untergruppe hinzufügen
-      </Button>
+      {!isFixedGroup && ( // Only allow adding accounts to non-fixed (sub)groups
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', isSystemAccount: false, isRetainedEarningsAccount: false })}
+            className="w-full mt-2"
+        >
+            <PlusCircle className="mr-2 h-4 w-4" /> Konto zu dieser Untergruppe hinzufügen
+        </Button>
+      )}
     </div>
   );
 }
-
-

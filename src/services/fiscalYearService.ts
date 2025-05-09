@@ -1,3 +1,4 @@
+
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { FiscalYear, FiscalYearFormValues } from '@/types';
@@ -30,6 +31,7 @@ const mapDocToFiscalYear = (docSnapshot: any): FiscalYear => {
     startDate: formatFirestoreTimestamp(data.startDate),
     endDate: formatFirestoreTimestamp(data.endDate),
     isClosed: data.isClosed || false,
+    carryForwardSourceFiscalYearId: data.carryForwardSourceFiscalYearId || null,
     createdAt: formatFirestoreTimestamp(data.createdAt, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, 'now'),
   } as FiscalYear;
@@ -59,6 +61,7 @@ export const addFiscalYear = async (tenantId: string, fiscalYearData: FiscalYear
     startDate: Timestamp.fromDate(new Date(fiscalYearData.startDate)), // Store as Timestamp
     endDate: Timestamp.fromDate(new Date(fiscalYearData.endDate)),   // Store as Timestamp
     isClosed: false, // Default to not closed
+    carryForwardSourceFiscalYearId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -70,7 +73,7 @@ export const addFiscalYear = async (tenantId: string, fiscalYearData: FiscalYear
   throw new Error("Could not retrieve fiscal year after creation.");
 };
 
-export const updateFiscalYear = async (tenantId: string, fiscalYearId: string, fiscalYearData: Partial<FiscalYearFormValues & { isClosed: boolean }>): Promise<FiscalYear | undefined> => {
+export const updateFiscalYear = async (tenantId: string, fiscalYearId: string, fiscalYearData: Partial<FiscalYearFormValues & { isClosed: boolean; carryForwardSourceFiscalYearId: string | null }>): Promise<FiscalYear | undefined> => {
   const fiscalYearDocRef = doc(db, 'tenants', tenantId, 'fiscalYears', fiscalYearId);
   
   const updateData: any = { ...fiscalYearData, updatedAt: serverTimestamp() };
@@ -80,6 +83,10 @@ export const updateFiscalYear = async (tenantId: string, fiscalYearId: string, f
   if (fiscalYearData.endDate) {
     updateData.endDate = Timestamp.fromDate(new Date(fiscalYearData.endDate));
   }
+   if (fiscalYearData.hasOwnProperty('carryForwardSourceFiscalYearId')) {
+    updateData.carryForwardSourceFiscalYearId = fiscalYearData.carryForwardSourceFiscalYearId;
+  }
+
 
   await updateDoc(fiscalYearDocRef, updateData);
   const updatedDocSnapshot = await getDoc(fiscalYearDocRef);

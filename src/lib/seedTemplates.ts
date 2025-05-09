@@ -21,9 +21,16 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
     // Fixed Groups (Level 0) - These MUST use IDs from fixedGroupIds
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { id: fixedGroupIds.equity, name: "Eigenkapital", mainType: "Equity", accounts: [
+    { 
+      id: fixedGroupIds.equity, 
+      name: "Eigenkapital", 
+      mainType: "Equity", 
+      accounts: [
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
         { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
-      ], isFixed: true, parentId: null, level: 0 },
+      ], 
+      isFixed: true, parentId: null, level: 0 
+    },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
     
@@ -134,9 +141,16 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
   groups: [
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { id: fixedGroupIds.equity, name: "Eigenkapital", mainType: "Equity", accounts: [
+    { 
+      id: fixedGroupIds.equity, 
+      name: "Eigenkapital", 
+      mainType: "Equity", 
+      accounts: [
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
         { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Vereinsjahres. Systemkonto.", isSystemAccount: true },
-      ], isFixed: true, parentId: null, level: 0 },
+      ], 
+      isFixed: true, parentId: null, level: 0 
+    },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
 
@@ -190,9 +204,16 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
   groups: [
     { id: fixedGroupIds.asset, name: "Vermögen (Aktiven)", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Schulden (Passiven)", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { id: fixedGroupIds.equity, name: "Nettovermögen (Eigenkapital)", mainType: "Equity", accounts: [
+    { 
+      id: fixedGroupIds.equity, 
+      name: "Nettovermögen (Eigenkapital)", 
+      mainType: "Equity", 
+      accounts: [
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
         { id: crypto.randomUUID(), number: "2979", name: "Laufender Überschuss/Fehlbetrag", description: "Ergebnis der laufenden Periode. Systemkonto.", isSystemAccount: true },
-      ], isFixed: true, parentId: null, level: 0 },
+      ], 
+      isFixed: true, parentId: null, level: 0 
+    },
     { id: fixedGroupIds.revenue, name: "Einnahmen (Ertrag)", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Ausgaben (Aufwand)", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
 
@@ -257,9 +278,16 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
   const fixedGroupDefinitions: AccountGroupTemplate[] = [
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { id: fixedGroupIds.equity, name: "Eigenkapital", mainType: "Equity", accounts: [
+    { 
+      id: fixedGroupIds.equity, 
+      name: "Eigenkapital", 
+      mainType: "Equity", 
+      accounts: [
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
         { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true },
-    ], isFixed: true, parentId: null, level: 0 },
+      ], 
+      isFixed: true, parentId: null, level: 0 
+    },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
   ];
@@ -285,14 +313,18 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
         existingFixedGroup.parentId = null;
         existingFixedGroup.level = 0;
       } else {
-        existingFixedGroup = { ...fixedDef, accounts: fixedDef.mainType === 'Equity' ? [...fixedDef.accounts.map(acc => ({...acc, id: crypto.randomUUID()}))] : [] };
+         existingFixedGroup = { ...fixedDef, accounts: fixedDef.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID() })) };
       }
     }
 
     if (existingFixedGroup.mainType === 'Equity') {
-      const profitLossAccountTemplate = fixedDef.accounts.find(acc => acc.isSystemAccount);
+      const profitLossAccountTemplate = fixedDef.accounts.find(acc => acc.isSystemAccount && acc.number === "2979");
       if (profitLossAccountTemplate && !existingFixedGroup.accounts.some(acc => acc.number === profitLossAccountTemplate.number && acc.isSystemAccount)) {
         existingFixedGroup.accounts.push({ ...profitLossAccountTemplate, id: crypto.randomUUID() }); 
+      }
+      const retainedEarningsAccountTemplate = fixedDef.accounts.find(acc => acc.isRetainedEarningsAccount && acc.number === "2970");
+      if (retainedEarningsAccountTemplate && !existingFixedGroup.accounts.some(acc => acc.number === retainedEarningsAccountTemplate.number && acc.isRetainedEarningsAccount)) {
+        existingFixedGroup.accounts.push({ ...retainedEarningsAccountTemplate, id: crypto.randomUUID() });
       }
     }
     resultGroups.push(existingFixedGroup);
@@ -311,6 +343,9 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
         const groupToAdd = {...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))};
         resultGroups.push(groupToAdd);
       } else if (!group.parentId) {
+        // This case handles groups that might have been defined without a parentId and are not fixed.
+        // This could happen if the input `groups` array contains groups that are not part of the standard structure.
+        // We add them if they are not already processed (e.g. as a fixed group that was missing its canonical ID).
         if (!resultGroups.some(rg => rg.id === group.id)) {
              const groupToAdd = {...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))};
             resultGroups.push(groupToAdd);
@@ -319,6 +354,7 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
     }
   });
   
+  // Deduplicate groups by ID, prioritizing fixed groups or earlier occurrences.
   const finalGroups = resultGroups.reduce((acc, current) => {
     if (!acc.find(item => item.id === current.id)) {
       acc.push(current);
@@ -347,6 +383,7 @@ export async function seedDefaultChartOfAccountsTemplates() {
             id: a.id || crypto.randomUUID(), 
             description: a.description || '',
             isSystemAccount: a.isSystemAccount || false,
+            isRetainedEarningsAccount: a.isRetainedEarningsAccount || false,
           })),
         }));
         

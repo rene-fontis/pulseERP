@@ -1,3 +1,4 @@
+
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/types';
@@ -52,6 +53,7 @@ const mapDocToTemplate = (docSnapshot: any): ChartOfAccountsTemplate => {
         id: a.id || crypto.randomUUID(),
         description: a.description || '',
         isSystemAccount: a.isSystemAccount || false,
+        isRetainedEarningsAccount: a.isRetainedEarningsAccount || false,
       })) : [];
 
       return {
@@ -99,6 +101,7 @@ const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => 
     id: account.id || crypto.randomUUID(),
     description: account.description || '',
     isSystemAccount: account.isSystemAccount || false,
+    isRetainedEarningsAccount: account.isRetainedEarningsAccount || false,
   })),
   isFixed: group.isFixed || false,
   parentId: group.parentId !== undefined ? group.parentId : null,
@@ -150,3 +153,4 @@ export const deleteChartOfAccountsTemplate = async (id: string): Promise<boolean
   await deleteDoc(docRef);
   return true;
 };
+

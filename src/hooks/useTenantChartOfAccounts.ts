@@ -1,11 +1,13 @@
+
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
     getTenantChartOfAccountsById as fetchTenantChartOfAccountsById,
-    updateTenantChartOfAccounts as updateTenantChartOfAccountsService 
+    updateTenantChartOfAccounts as updateTenantChartOfAccountsService,
+    carryForwardBalances as carryForwardBalancesService
 } from '@/services/tenantChartOfAccountsService';
-import type { TenantChartOfAccounts, TenantChartOfAccountsFormValues } from '@/types';
+import type { TenantChartOfAccounts, TenantChartOfAccountsFormValues, CarryForwardBalancesPayload } from '@/types';
 
 const tenantCoaQueryKeys = {
   all: (tenantId?: string) => ['tenantChartOfAccounts', tenantId || 'all'] as const,
@@ -30,6 +32,23 @@ export function useUpdateTenantChartOfAccounts() {
         queryClient.invalidateQueries({ queryKey: tenantCoaQueryKeys.all(data.tenantId) });
       } else {
         queryClient.invalidateQueries({ queryKey: tenantCoaQueryKeys.all() }); // Fallback to invalidate all if tenantId not directly available
+      }
+    },
+  });
+}
+
+export function useCarryForwardBalances() {
+  const queryClient = useQueryClient();
+  return useMutation<TenantChartOfAccounts | undefined, Error, CarryForwardBalancesPayload>({
+    mutationFn: carryForwardBalancesService,
+    onSuccess: (updatedCoa, variables) => {
+      if (updatedCoa) {
+        queryClient.invalidateQueries({ queryKey: tenantCoaQueryKeys.detail(updatedCoa.id) });
+        queryClient.invalidateQueries({ queryKey: tenantCoaQueryKeys.all(updatedCoa.tenantId) });
+         // Invalidate fiscal years list for the tenant to reflect carryForwardSourceFiscalYearId update
+        queryClient.invalidateQueries({ queryKey: ['fiscalYears', variables.tenantId, 'list'] });
+        queryClient.invalidateQueries({ queryKey: ['fiscalYears', variables.tenantId, 'detail', variables.targetFiscalYearId] });
+
       }
     },
   });

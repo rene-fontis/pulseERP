@@ -1,7 +1,13 @@
+
 import { collection, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { TenantChartOfAccounts, AccountGroup, Account, AccountTemplate, AccountGroupTemplate, TenantChartOfAccountsFormValues } from '@/types';
+import type { TenantChartOfAccounts, AccountGroup, Account, AccountTemplate, AccountGroupTemplate, TenantChartOfAccountsFormValues, CarryForwardBalancesPayload, JournalEntry, FiscalYear } from '@/types';
 import { getChartOfAccountsTemplateById } from './chartOfAccountsTemplateService';
+import { getTenantById } from "./tenantService";
+import { getFiscalYearById } from "./fiscalYearService";
+import { getJournalEntries } from "./journalEntryService";
+import { calculateFinancialSummary } from "@/lib/accounting";
+
 
 // Canonical IDs for fixed groups, must match those used in seeding/template creation
 const fixedGroupCanonicalIds: Record<AccountGroup['mainType'], string> = {
@@ -41,7 +47,6 @@ const mapDocToTenantCoa = (docSnapshot: any): TenantChartOfAccounts => {
     groups: data.groups ? data.groups.map((g: any) => {
       let groupId = g.id;
       if (g.isFixed && (!groupId || typeof groupId !== 'string' || !Object.values(fixedGroupCanonicalIds).includes(groupId))) {
-        // If fixed group from DB is missing ID, or has a non-canonical one, assign/correct it.
         groupId = fixedGroupCanonicalIds[g.mainType as AccountGroup['mainType']];
       } else if (!groupId) {
         groupId = crypto.randomUUID();
@@ -53,6 +58,7 @@ const mapDocToTenantCoa = (docSnapshot: any): TenantChartOfAccounts => {
         description: a.description || '',
         balance: a.balance || 0,
         isSystemAccount: a.isSystemAccount || false,
+        isRetainedEarningsAccount: a.isRetainedEarningsAccount || false,
       })) : [];
 
       return {
@@ -89,6 +95,7 @@ export const createTenantChartOfAccountsFromTemplate = async (templateId: string
       description: accountTemplate.description || '',
       balance: 0, 
       isSystemAccount: accountTemplate.isSystemAccount || false,
+      isRetainedEarningsAccount: accountTemplate.isRetainedEarningsAccount || false,
     })),
     isFixed: groupTemplate.isFixed || false,
     parentId: groupTemplate.parentId ? ( Object.values(fixedGroupCanonicalIds).includes(groupTemplate.parentId) ? groupTemplate.parentId : null ) : null, // Ensure parentId refers to a canonical fixed ID or is null
@@ -140,6 +147,7 @@ const processTenantCoAGroupData = (group: AccountGroup): AccountGroup => {
         description: account.description || '',
         balance: account.balance || 0,
         isSystemAccount: account.isSystemAccount || false,
+        isRetainedEarningsAccount: account.isRetainedEarningsAccount || false,
     })),
     isFixed: group.isFixed || false,
     parentId: group.parentId !== undefined ? group.parentId : null,
@@ -165,4 +173,86 @@ export const deleteTenantChartOfAccounts = async (coaId: string): Promise<boolea
   const docRef = doc(db, 'tenantChartOfAccounts', coaId);
   await deleteDoc(docRef);
   return true;
+};
+
+export const carryForwardBalances = async (payload: CarryForwardBalancesPayload): Promise<TenantChartOfAccounts | undefined> => {
+  const { tenantId, sourceFiscalYearId } = payload;
+
+  const tenant = await getTenantById(tenantId);
+  if (!tenant || !tenant.chartOfAccountsId) {
+    throw new Error("Tenant oder zugehöriger Kontenplan nicht gefunden.");
+  }
+
+  const chartOfAccounts = await getTenantChartOfAccountsById(tenant.chartOfAccountsId);
+  if (!chartOfAccounts) {
+    throw new Error("Kontenplan des Mandanten nicht gefunden.");
+  }
+
+  const sourceFiscalYear = await getFiscalYearById(tenantId, sourceFiscalYearId);
+  if (!sourceFiscalYear) {
+    throw new Error("Quell-Geschäftsjahr nicht gefunden.");
+  }
+  
+  // Fetch all journal entries for the tenant. Filtering by fiscal year will happen in calculateFinancialSummary.
+  const allJournalEntries = await getJournalEntries(tenantId, undefined); 
+  
+  const summary = calculateFinancialSummary(chartOfAccounts, allJournalEntries, sourceFiscalYear);
+
+  const updatedGroups: AccountGroup[] = JSON.parse(JSON.stringify(chartOfAccounts.groups)); // Deep copy
+
+  let retainedEarningsAccount: Account | undefined;
+  let currentYearPLEAccount: Account | undefined;
+
+  updatedGroups.forEach(group => {
+    group.accounts.forEach(account => {
+      if (account.isRetainedEarningsAccount) {
+        retainedEarningsAccount = account;
+      }
+      if (account.isSystemAccount && account.number === "2979") { // Assuming "2979" is current P/L
+        currentYearPLEAccount = account;
+      }
+
+      if (group.mainType === 'Asset' || group.mainType === 'Liability') {
+        account.balance = summary.accountBalances[account.id] || 0;
+      } else if (group.mainType === 'Equity') {
+        // Specific handling for equity accounts
+        if (account.isRetainedEarningsAccount) {
+          // New opening balance for Retained Earnings is its *original* opening balance + P/L from source year.
+          // The `account.balance` here is the opening balance from the CoA *before* this carry-forward operation for this account.
+          account.balance = (chartOfAccounts.groups.flatMap(g => g.accounts).find(acc => acc.id === account.id)?.balance || 0) + summary.netProfitLoss;
+        } else if (account.isSystemAccount && account.number === "2979") { // Current Year P/L
+          account.balance = 0; // Reset for the new year
+        } else {
+          // Other equity accounts (e.g., capital contributions) carry forward their closing balance.
+          account.balance = summary.accountBalances[account.id] || 0;
+        }
+      } else { 
+        // Revenue and Expense accounts start with a zero balance for the new period.
+        // Their `account.balance` in CoA represents the opening balance, which should be 0 for P/L accounts.
+        account.balance = 0;
+      }
+    });
+  });
+  
+  const updatePayload: TenantChartOfAccountsFormValues = {
+    name: chartOfAccounts.name, // Name doesn't change
+    groups: updatedGroups,
+  };
+
+  await updateDoc(doc(db, 'tenantChartOfAccounts', chartOfAccounts.id), {
+    ...updatePayload,
+    updatedAt: serverTimestamp(),
+  });
+  
+  // Mark target fiscal year with source (for UI/info purposes)
+  // Note: targetFiscalYearId was part of payload for this, but not directly used in calculation here.
+  // We'll update the targetFiscalYear to store which source was used for carry forward.
+  const targetFiscalYearDocRef = doc(db, 'tenants', tenantId, 'fiscalYears', payload.targetFiscalYearId);
+  await updateDoc(targetFiscalYearDocRef, {
+    carryForwardSourceFiscalYearId: sourceFiscalYearId,
+    updatedAt: serverTimestamp()
+  });
+
+
+  return getTenantChartOfAccountsById(chartOfAccounts.id);
 };

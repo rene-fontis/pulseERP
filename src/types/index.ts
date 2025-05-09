@@ -18,6 +18,7 @@ export interface AccountTemplate {
   name: string; // Account name, e.g., "Kasse"
   description?: string;
   isSystemAccount: boolean; // For special accounts like profit/loss, non-deletable/modifiable by user
+  isRetainedEarningsAccount?: boolean; // Specifically for "Gewinnvortrag / Verlustvortrag"
 }
 
 export interface AccountGroupTemplate {
@@ -51,6 +52,7 @@ export interface Account {
   description?: string;
   balance: number; // Opening balance for the fiscal period, changed from optional
   isSystemAccount: boolean; 
+  isRetainedEarningsAccount?: boolean;
 }
 
 export interface AccountGroup {
@@ -143,12 +145,12 @@ export interface FiscalYear {
   startDate: string; // ISO string
   endDate: string; // ISO string
   isClosed?: boolean; // To mark a fiscal year as closed, preventing new entries
-  // tenantId is implicit as this will be a subcollection
+  carryForwardSourceFiscalYearId?: string | null; // For UI to track which FY was used to carry forward balances into this one
   createdAt: string;
   updatedAt: string;
 }
 
-export type FiscalYearFormValues = Omit<FiscalYear, 'id' | 'isClosed' | 'createdAt' | 'updatedAt'>;
+export type FiscalYearFormValues = Omit<FiscalYear, 'id' | 'isClosed' | 'carryForwardSourceFiscalYearId' | 'createdAt' | 'updatedAt'>;
 
 // --- Financial Summary Types ---
 export interface AccountBalances {
@@ -172,4 +174,10 @@ export interface FinancialSummary {
   equity: number;
   accountBalances: AccountBalances;
   monthlyBreakdown: MonthlyBreakdownItem[];
+}
+
+export interface CarryForwardBalancesPayload {
+  tenantId: string;
+  sourceFiscalYearId: string;
+  targetFiscalYearId: string; // Target is implicitly the one whose CoA is being updated
 }

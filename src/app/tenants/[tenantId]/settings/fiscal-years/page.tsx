@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { PlusCircle, Edit, Trash2, CalendarDays, AlertCircle, CheckCircle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, CalendarDays, AlertCircle, CheckCircle, Upload } from 'lucide-react'; // Upload icon added
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,6 +15,7 @@ import type { FiscalYear } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { CarryForwardBalancesDialog } from '@/components/settings/CarryForwardBalancesDialog'; // Import the new dialog
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -22,7 +24,7 @@ export default function TenantFiscalYearsPage() {
   const tenantId = params.tenantId as string;
   
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
-  const { data: fiscalYears, isLoading: isLoadingFiscalYears, error: fiscalYearsError } = useGetFiscalYears(tenantId);
+  const { data: fiscalYears, isLoading: isLoadingFiscalYears, error: fiscalYearsError, refetch: refetchFiscalYears } = useGetFiscalYears(tenantId);
   
   const addFiscalYearMutation = useAddFiscalYear(tenantId);
   const updateFiscalYearMutation = useUpdateFiscalYear(tenantId);
@@ -33,6 +35,7 @@ export default function TenantFiscalYearsPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCarryForwardModalOpen, setIsCarryForwardModalOpen] = useState(false); // State for new dialog
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<FiscalYear | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -162,27 +165,38 @@ export default function TenantFiscalYearsPage() {
       </div>
 
       <Card className="shadow-xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-2">
           <CardTitle className="text-2xl font-bold">Definierte Geschäftsjahre</CardTitle>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <PlusCircle className="mr-2 h-4 w-4" /> Geschäftsjahr erstellen
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Neues Geschäftsjahr erstellen</DialogTitle>
-                <DialogDescriptionComponent>
-                  Definieren Sie ein neues Geschäftsjahr.
-                </DialogDescriptionComponent>
-              </DialogHeader>
-              <FiscalYearForm 
-                onSubmit={handleCreateFiscalYear} 
-                isSubmitting={addFiscalYearMutation.isPending} 
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {fiscalYears && fiscalYears.length > 0 && tenant?.chartOfAccountsId && (
+                <Button 
+                    variant="outline" 
+                    onClick={() => setIsCarryForwardModalOpen(true)}
+                    className="w-full sm:w-auto"
+                >
+                    <Upload className="mr-2 h-4 w-4" /> Salden vortragen
+                </Button>
+            )}
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+                <DialogTrigger asChild>
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/90 w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Geschäftsjahr erstellen
+                </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Neues Geschäftsjahr erstellen</DialogTitle>
+                    <DialogDescriptionComponent>
+                    Definieren Sie ein neues Geschäftsjahr.
+                    </DialogDescriptionComponent>
+                </DialogHeader>
+                <FiscalYearForm 
+                    onSubmit={handleCreateFiscalYear} 
+                    isSubmitting={addFiscalYearMutation.isPending} 
+                />
+                </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingFiscalYears && clientLoaded ? (
@@ -198,6 +212,7 @@ export default function TenantFiscalYearsPage() {
                     <TableHead>Startdatum</TableHead>
                     <TableHead>Enddatum</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Vortrag von</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -223,6 +238,11 @@ export default function TenantFiscalYearsPage() {
                              Offen
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {fy.carryForwardSourceFiscalYearId 
+                            ? fiscalYears.find(f => f.id === fy.carryForwardSourceFiscalYearId)?.name || 'Unbekannt' 
+                            : '-'}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
                         {tenant?.activeFiscalYearId !== fy.id && !fy.isClosed && (
@@ -250,7 +270,7 @@ export default function TenantFiscalYearsPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Diese Aktion kann nicht rückgängig gemacht werden. Das Geschäftsjahr "{fy.name}" wird dauerhaft gelöscht.
+                                Diese Aktion kann nicht rückgängig gemacht werden. Das Geschäftsjahr "{fy.name}" wird dauerhaft gelöscht. Buchungsdaten werden NICHT gelöscht, sind aber ggf. nicht mehr zugänglich.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -269,7 +289,7 @@ export default function TenantFiscalYearsPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                         Keine Geschäftsjahre gefunden. Erstellen Sie eines, um loszulegen!
                       </TableCell>
                     </TableRow>
@@ -304,6 +324,15 @@ export default function TenantFiscalYearsPage() {
             />
           </DialogContent>
         </Dialog>
+      )}
+      {tenant && fiscalYears && (
+         <CarryForwardBalancesDialog
+            tenantId={tenant.id}
+            open={isCarryForwardModalOpen}
+            onOpenChange={setIsCarryForwardModalOpen}
+            fiscalYears={fiscalYears}
+            currentChartOfAccountsId={tenant.chartOfAccountsId}
+        />
       )}
     </div>
   );
