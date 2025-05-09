@@ -62,6 +62,9 @@ export interface TenantChartOfAccounts {
   updatedAt: string;
 }
 
+// For form handling, excluding DB-generated fields and tenantId
+export type TenantChartOfAccountsFormValues = Omit<TenantChartOfAccounts, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>;
+
 
 // --- User Management Types ---
 export enum Module {

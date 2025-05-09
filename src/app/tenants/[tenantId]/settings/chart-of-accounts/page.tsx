@@ -1,23 +1,46 @@
-
 "use client";
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileText as FileTextIcon, AlertCircle, Edit, Loader2 } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
-import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts'; 
+import { useGetTenantChartOfAccountsById, useUpdateTenantChartOfAccounts } from '@/hooks/useTenantChartOfAccounts'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import React from 'react';
+import React, { useState } from 'react';
+import { TenantChartOfAccountsForm, type TenantChartOfAccountsFormValues } from '@/components/tenants/TenantChartOfAccountsForm';
+import { useToast } from '@/hooks/use-toast';
+import type { TenantChartOfAccounts } from '@/types';
 
 export default function TenantChartOfAccountsPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   
-  const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
+  const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError, refetch: refetchCoA } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
+  const updateCoAMutation = useUpdateTenantChartOfAccounts();
+  const { toast } = useToast();
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const handleUpdateCoA = async (values: TenantChartOfAccountsFormValues) => {
+    if (!chartOfAccounts) {
+      toast({ title: "Fehler", description: "Kein Kontenplan zum Aktualisieren vorhanden.", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateCoAMutation.mutateAsync({ coaId: chartOfAccounts.id, data: values });
+      toast({ title: "Erfolg", description: "Kontenplan erfolgreich aktualisiert." });
+      setIsEditModalOpen(false);
+      refetchCoA();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
+      toast({ title: "Fehler", description: `Kontenplan konnte nicht aktualisiert werden: ${errorMessage}`, variant: "destructive" });
+    }
+  };
 
 
   if (isLoadingTenant || (tenant?.chartOfAccountsId && isLoadingCoA)) {
@@ -89,7 +112,7 @@ export default function TenantChartOfAccountsPage() {
         <CardHeader>
           <CardTitle className="text-xl">Aktiver Kontenplan</CardTitle>
            <CardDescription>
-            Hier können Sie die Kontengruppen und deren Konten einsehen. Die Bearbeitungsfunktion wird in Kürze verfügbar sein.
+            Hier können Sie die Kontengruppen und deren Konten einsehen und bearbeiten.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -141,6 +164,7 @@ export default function TenantChartOfAccountsPage() {
                                 <TableHead className="w-[100px] h-8">Nummer</TableHead>
                                 <TableHead className="h-8">Name</TableHead>
                                 <TableHead className="h-8">Beschreibung</TableHead>
+                                <TableHead className="text-right h-8">Saldo</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -149,6 +173,7 @@ export default function TenantChartOfAccountsPage() {
                                     <TableCell className="font-medium py-2">{account.number}</TableCell>
                                     <TableCell className="py-2">{account.name}</TableCell>
                                     <TableCell className="py-2">{account.description || '-'}</TableCell>
+                                    <TableCell className="text-right py-2">{new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(account.balance || 0)}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
@@ -161,10 +186,27 @@ export default function TenantChartOfAccountsPage() {
                     ))}
                 </div>
                 <div className="mt-6 border-t pt-6 flex justify-end">
-                    <Button disabled className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
                         <Edit className="mr-2 h-4 w-4" />
-                        Kontenplan bearbeiten (Demnächst)
-                    </Button>
+                        Kontenplan bearbeiten
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh]">
+                      <DialogHeader>
+                        <DialogTitle>Kontenplan bearbeiten: {chartOfAccounts.name}</DialogTitle>
+                        <DialogDescription>
+                          Aktualisieren Sie die Details des Kontenplans.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <TenantChartOfAccountsForm
+                        onSubmit={handleUpdateCoA}
+                        initialData={chartOfAccounts}
+                        isSubmitting={updateCoAMutation.isPending}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </div>
              </div>
           )}
@@ -173,4 +215,3 @@ export default function TenantChartOfAccountsPage() {
     </div>
   );
 }
-
