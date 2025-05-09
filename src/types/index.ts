@@ -191,7 +191,7 @@ export interface Budget {
   id: string;
   tenantId: string;
   name: string;
-  description?: string;
+  description: string; // Ensure description is not optional or handle it in forms
   scenario: BudgetScenario;
   createdAt: string;
   updatedAt: string;
