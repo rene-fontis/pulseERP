@@ -132,6 +132,7 @@ export interface JournalEntry {
   createdAt: string; // ISO string from Firestore serverTimestamp
   updatedAt: string; // ISO string from Firestore serverTimestamp
   posted: boolean; // Whether the entry is posted to ledger
+  // entryType?: 'single' | 'batch'; // Optional: To distinguish how the entry was created/is best represented
 }
 
 // Type for submitting new journal entries to the service/mutation
@@ -242,3 +243,4 @@ export type BudgetEntryFormValues = {
 
 // Payload for adding/updating entries, dates as ISO strings
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
+

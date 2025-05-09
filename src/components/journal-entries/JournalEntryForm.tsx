@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -18,60 +17,94 @@ import { de } from 'date-fns/locale';
 import type { Account, NewJournalEntryPayload, FiscalYear, JournalEntryLine, JournalEntry } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const dateValidation = (fiscalYear?: FiscalYear | null) => z.date({ required_error: "Datum ist erforderlich." })
+  .refine(date => {
+    if (!fiscalYear) return true;
+    const startDate = startOfDay(parseISO(fiscalYear.startDate));
+    const endDate = endOfDay(parseISO(fiscalYear.endDate));
+    return isWithinInterval(date, { start: startDate, end: endDate });
+  }, {
+    message: fiscalYear ? `Datum muss zwischen ${format(parseISO(fiscalYear.startDate), "dd.MM.yyyy", { locale: de })} und ${format(parseISO(fiscalYear.endDate), "dd.MM.yyyy", { locale: de })} liegen.` : "Ungültiger Datumsbereich."
+  });
 
 const journalEntryLineSchema = z.object({
-  id: z.string().optional(), // For useFieldArray key
+  id: z.string().optional(),
   accountId: z.string().min(1, "Konto ist erforderlich."),
   debit: z.preprocess(
-    (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
+    (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number().optional()
   ),
   credit: z.preprocess(
-    (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
+    (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
     z.number().optional()
   ),
-  // lineDescription removed
 }).refine(data => {
-  const hasDebit = typeof data.debit === 'number' && data.debit > 0;
-  const hasCredit = typeof data.credit === 'number' && data.credit > 0;
-  return (hasDebit && !hasCredit) || (hasCredit && !hasDebit);
+  const hasDebit = typeof data.debit === 'number' && data.debit !== 0;
+  const hasCredit = typeof data.credit === 'number' && data.credit !== 0;
+  // Valid if: (debit and no credit) OR (credit and no debit) OR (no debit, no credit, and no accountId - allows for an truly empty line that might be removed)
+  return (hasDebit && !hasCredit) || (!hasDebit && hasCredit) || (!hasDebit && !hasCredit && (data.accountId === '' || data.accountId === undefined));
 }, {
-  message: "Pro Zeile entweder Soll oder Haben > 0 angeben.",
+  message: "Pro Zeile entweder Soll oder Haben > 0 angeben (nicht beides).",
   path: ["debit"], 
 });
 
 
-const createJournalEntryFormSchema = (fiscalYear?: FiscalYear | null) => z.object({
-  date: z.date({ required_error: "Datum ist erforderlich." })
-    .refine(date => {
-      if (!fiscalYear) return true; 
-      const startDate = startOfDay(parseISO(fiscalYear.startDate));
-      const endDate = endOfDay(parseISO(fiscalYear.endDate));
-      return isWithinInterval(date, { start: startDate, end: endDate });
-    }, {
-      message: fiscalYear ? `Datum muss zwischen ${format(parseISO(fiscalYear.startDate), "dd.MM.yyyy", { locale: de })} und ${format(parseISO(fiscalYear.endDate), "dd.MM.yyyy", { locale: de })} liegen.` : "Ungültiger Datumsbereich."
-    }),
-  entryNumber: z.string().min(1, "Buchungsnummer ist erforderlich."),
+const baseEntrySchema = z.object({
+  date: dateValidation(null), 
+  entryNumber: z.string().min(1, "Belegnummer ist erforderlich."),
   description: z.string().min(1, "Beschreibung ist erforderlich."),
-  lines: z.array(journalEntryLineSchema).min(2, "Mindestens zwei Buchungszeilen erforderlich.").refine(lines => {
-    const totalDebits = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-    const totalCredits = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-    return totalDebits > 0 && totalCredits > 0;
-  }, {
-    message: "Es muss mindestens eine Soll- und eine Haben-Buchung vorhanden sein.",
-  }),
-}).refine(data => {
-  const totalDebits = data.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-  const totalCredits = data.lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-  // Using a small tolerance for floating point comparison
-  return Math.abs(totalDebits - totalCredits) < 0.001;
-}, {
-  message: "Summe Soll muss Summe Haben entsprechen.",
-  path: ["lines"], 
 });
 
+const singleEntryPartSchema = z.object({
+  entryType: z.literal('single'),
+  debitAccountId: z.string().min(1, "Soll-Konto ist erforderlich."),
+  creditAccountId: z.string().min(1, "Haben-Konto ist erforderlich."),
+  amount: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (typeof val === 'number' ? val : undefined)),
+    z.number({invalid_type_error: "Betrag muss eine Zahl sein."}).positive("Betrag muss positiv sein.")
+  ),
+  lines: z.array(journalEntryLineSchema).optional(), // Not directly used for single validation but part of overall form
+});
 
-export type JournalEntryFormValues = z.infer<ReturnType<typeof createJournalEntryFormSchema>>;
+const batchEntryPartSchema = z.object({
+  entryType: z.literal('batch'),
+  lines: z.array(journalEntryLineSchema).min(2, "Mindestens zwei Buchungszeilen erforderlich.")
+    .refine(lines => lines.some(line => line.accountId && (line.debit || line.credit)), "Mindestens eine gültige Buchungszeile erforderlich.")
+    .refine(lines => {
+      const totalDebits = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+      const totalCredits = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+      return Math.abs(totalDebits - totalCredits) < 0.001;
+    }, {
+      message: "Summe Soll muss Summe Haben entsprechen.",
+    }).refine(lines => {
+        const totalDebits = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+        return totalDebits > 0;
+    }, {
+        message: "Mindestens eine Soll-Buchung mit Betrag > 0 erforderlich.",
+    }).refine(lines => {
+        const totalCredits = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+        return totalCredits > 0;
+    }, {
+        message: "Mindestens eine Haben-Buchung mit Betrag > 0 erforderlich.",
+    }),
+  debitAccountId: z.string().optional(),
+  creditAccountId: z.string().optional(),
+  amount: z.number().optional(),
+});
+
+const getJournalEntryFormSchema = (fiscalYear?: FiscalYear | null) => {
+  return baseEntrySchema.extend({
+    date: dateValidation(fiscalYear) 
+  }).and(z.discriminatedUnion("entryType", [
+    singleEntryPartSchema,
+    batchEntryPartSchema
+  ]));
+};
+
+
+export type JournalEntryFormValues = z.infer<ReturnType<typeof getJournalEntryFormSchema>>;
 
 interface JournalEntryFormProps {
   tenantId: string;
@@ -90,65 +123,98 @@ interface AccountOption {
 }
 
 export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmit, isSubmitting, defaultEntryNumber, initialData }: JournalEntryFormProps) {
-  const formSchema = createJournalEntryFormSchema(activeFiscalYear);
+  const formSchema = useMemo(() => getJournalEntryFormSchema(activeFiscalYear), [activeFiscalYear]);
   
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData && activeFiscalYear
-      ? {
+    defaultValues: useMemo(() => {
+      const today = new Date();
+      let defaultDate = today;
+      if (activeFiscalYear) {
+          const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
+          const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
+          if (today < fiscalYearStartDate) defaultDate = fiscalYearStartDate;
+          if (today > fiscalYearEndDate) defaultDate = fiscalYearEndDate;
+      }
+
+      if (initialData && activeFiscalYear) {
+        // When editing, always default to 'batch' tab to show all lines.
+        // User can switch to 'single' if it's a simple 2-liner.
+        return {
+          entryType: 'batch',
           date: parseISO(initialData.date),
           entryNumber: initialData.entryNumber,
           description: initialData.description,
           lines: initialData.lines.map(line => ({
+            id: line.id || crypto.randomUUID(),
             accountId: line.accountId,
             debit: line.debit,
             credit: line.credit,
-            // lineDescription removed
           })),
-        }
-      : {
-          date: activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date(),
+          debitAccountId: undefined,
+          creditAccountId: undefined,
+          amount: undefined,
+        };
+      } else {
+        return {
+          entryType: 'single',
+          date: defaultDate,
           entryNumber: defaultEntryNumber || '',
           description: '',
+          debitAccountId: '',
+          creditAccountId: '',
+          amount: undefined,
           lines: [
-            { accountId: '', debit: undefined, credit: undefined },
-            { accountId: '', debit: undefined, credit: undefined },
+            { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+            { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
             ],
-        },
+        };
+      }
+    }, [initialData, activeFiscalYear, defaultEntryNumber])
   });
+  
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "lines"
   });
   
+  const currentEntryType = form.watch("entryType");
+
   useEffect(() => {
+    // If initialData changes, reset the form.
+    // This ensures that if the dialog is re-opened with different initialData, the form updates.
+    const defaultDate = activeFiscalYear ? new Date(Math.max(new Date().getTime(), parseISO(activeFiscalYear.startDate).getTime())) : new Date();
     if (initialData && activeFiscalYear) {
-      form.reset({
-        date: parseISO(initialData.date),
-        entryNumber: initialData.entryNumber,
-        description: initialData.description,
-        lines: initialData.lines.map(line => ({
-          accountId: line.accountId,
-          debit: line.debit,
-          credit: line.credit,
-           // lineDescription removed
-        })),
-      });
-    } else if (!initialData && activeFiscalYear) {
-        const today = new Date();
-        const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
-        let defaultDate = today;
-        if (today < fiscalYearStartDate) defaultDate = fiscalYearStartDate;
-        const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
-        if (today > fiscalYearEndDate) defaultDate = fiscalYearEndDate;
-        
-        if(!isWithinInterval(form.getValues("date"), {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
-           form.setValue("date", defaultDate, { shouldValidate: true });
-        }
-        if(form.getValues("entryNumber") !== (defaultEntryNumber || '') && !initialData) {
-             form.setValue("entryNumber", defaultEntryNumber || '');
-        }
+        form.reset({
+            entryType: 'batch',
+            date: parseISO(initialData.date),
+            entryNumber: initialData.entryNumber,
+            description: initialData.description,
+            lines: initialData.lines.map(line => ({
+                id: line.id || crypto.randomUUID(),
+                accountId: line.accountId,
+                debit: line.debit,
+                credit: line.credit,
+            })),
+            debitAccountId: undefined,
+            creditAccountId: undefined,
+            amount: undefined,
+        });
+    } else if (!initialData) {
+        form.reset({
+            entryType: 'single',
+            date: defaultDate,
+            entryNumber: defaultEntryNumber || '',
+            description: '',
+            debitAccountId: '',
+            creditAccountId: '',
+            amount: undefined,
+            lines: [
+                { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+                { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+            ],
+        });
     }
   }, [initialData, form, activeFiscalYear, defaultEntryNumber]);
 
@@ -160,19 +226,33 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   }));
 
   const handleSubmitInternal = async (values: JournalEntryFormValues) => {
-    const mappedLines: JournalEntryLine[] = values.lines.map(line => {
-      const account = accounts.find(acc => acc.id === line.accountId);
-      if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
-      return {
-        id: crypto.randomUUID(), 
-        accountId: account.id,
-        accountNumber: account.number,
-        accountName: account.name,
-        debit: line.debit || undefined,
-        credit: line.credit || undefined,
-        // description removed
-      };
-    });
+    let finalLines: JournalEntryLine[] = [];
+
+    if (values.entryType === 'single') {
+      const debitAccount = accounts.find(acc => acc.id === values.debitAccountId);
+      const creditAccount = accounts.find(acc => acc.id === values.creditAccountId);
+      if (!debitAccount || !creditAccount || !values.amount) {
+        console.error("Missing data for single entry. This should be caught by validation.");
+        return;
+      }
+      finalLines = [
+        { id: crypto.randomUUID(), accountId: debitAccount.id, accountNumber: debitAccount.number, accountName: debitAccount.name, debit: values.amount, credit: undefined },
+        { id: crypto.randomUUID(), accountId: creditAccount.id, accountNumber: creditAccount.number, accountName: creditAccount.name, debit: undefined, credit: values.amount },
+      ];
+    } else { // entryType === 'batch'
+      finalLines = values.lines!.filter(line => line.accountId && (line.debit || line.credit)).map(line => {
+        const account = accounts.find(acc => acc.id === line.accountId);
+        if (!account) throw new Error(`Konto nicht gefunden: ${line.accountId}`);
+        return {
+          id: line.id || crypto.randomUUID(), 
+          accountId: account.id,
+          accountNumber: account.number,
+          accountName: account.name,
+          debit: line.debit || undefined,
+          credit: line.credit || undefined,
+        };
+      });
+    }
     
     const newJournalEntryPayload: NewJournalEntryPayload = {
       tenantId,
@@ -181,18 +261,37 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
       date: values.date.toISOString(),
       description: values.description,
       posted: false, 
-      lines: mappedLines,
+      lines: finalLines,
     };
     
     await onSubmit(newJournalEntryPayload); 
     if (!initialData) { 
+        const today = new Date();
+        let nextDefaultDate = today;
+        if (activeFiscalYear) {
+            const fiscalYearStartDate = parseISO(activeFiscalYear.startDate);
+            const fiscalYearEndDate = parseISO(activeFiscalYear.endDate);
+            if (today < fiscalYearStartDate) nextDefaultDate = fiscalYearStartDate;
+            if (today > fiscalYearEndDate) nextDefaultDate = fiscalYearEndDate;
+             if (!isWithinInterval(values.date, {start: fiscalYearStartDate, end: fiscalYearEndDate})) {
+                nextDefaultDate = values.date; // keep user selected date if valid, otherwise reset based on FY
+             } else {
+                nextDefaultDate = values.date;
+             }
+        }
+
+
         form.reset({ 
-            date: values.date, 
-            entryNumber: '', 
+            entryType: 'single', // Reset to single entry for next new one
+            date: nextDefaultDate, // Keep the date from the previous entry
+            entryNumber: '', // Clear for new entry number (or implement auto-increment)
             description: '',
+            debitAccountId: '',
+            creditAccountId: '',
+            amount: undefined,
             lines: [
-                { accountId: '', debit: undefined, credit: undefined },
-                { accountId: '', debit: undefined, credit: undefined },
+                { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+                { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
             ],
         });
     }
@@ -201,16 +300,67 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
   const fiscalYearStart = activeFiscalYear ? parseISO(activeFiscalYear.startDate) : undefined;
   const fiscalYearEnd = activeFiscalYear ? parseISO(activeFiscalYear.endDate) : undefined;
 
-  const watchedLines = form.watch("lines");
-  const totalDebits = watchedLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
-  const totalCredits = watchedLines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
+  const watchedBatchLines = form.watch("lines");
+  const totalDebits = currentEntryType === 'batch' ? (watchedBatchLines || []).reduce((sum, line) => sum + (Number(line.debit) || 0), 0) : (form.getValues("amount") || 0);
+  const totalCredits = currentEntryType === 'batch' ? (watchedBatchLines || []).reduce((sum, line) => sum + (Number(line.credit) || 0), 0) : (form.getValues("amount") || 0);
+
 
   const buttonText = initialData ? 'Änderungen speichern' : 'Buchung erstellen';
+
+  const handleTabChange = (newTabValue: string) => {
+    const currentValues = form.getValues();
+    form.setValue("entryType", newTabValue as 'single' | 'batch', { shouldValidate: true, shouldDirty: true });
+
+    if (newTabValue === 'batch') {
+      // Switching from single to batch
+      if (currentValues.entryType === 'single' && currentValues.debitAccountId && currentValues.creditAccountId && currentValues.amount) {
+        replace([
+          { id: crypto.randomUUID(), accountId: currentValues.debitAccountId, debit: currentValues.amount, credit: undefined },
+          { id: crypto.randomUUID(), accountId: currentValues.creditAccountId, debit: undefined, credit: currentValues.amount },
+        ]);
+      } else if (fields.length < 2) {
+         replace([
+            { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+            { id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined },
+         ]);
+      }
+      form.setValue("debitAccountId", undefined);
+      form.setValue("creditAccountId", undefined);
+      form.setValue("amount", undefined);
+
+    } else if (newTabValue === 'single') {
+      // Switching from batch to single
+      if (currentValues.entryType === 'batch' && currentValues.lines && currentValues.lines.length === 2) {
+        const firstLine = currentValues.lines[0];
+        const secondLine = currentValues.lines[1];
+        if (firstLine.debit && secondLine.credit && firstLine.debit === secondLine.credit) {
+          form.setValue("debitAccountId", firstLine.accountId);
+          form.setValue("creditAccountId", secondLine.accountId);
+          form.setValue("amount", firstLine.debit);
+        } else if (firstLine.credit && secondLine.debit && firstLine.credit === secondLine.debit) {
+           form.setValue("debitAccountId", secondLine.accountId);
+           form.setValue("creditAccountId", firstLine.accountId);
+           form.setValue("amount", firstLine.credit);
+        } else {
+          // Not a simple 2-liner, clear single fields
+          form.setValue("debitAccountId", '');
+          form.setValue("creditAccountId", '');
+          form.setValue("amount", undefined);
+        }
+      } else {
+        // Default for new single entry or complex batch
+        form.setValue("debitAccountId", '');
+        form.setValue("creditAccountId", '');
+        form.setValue("amount", undefined);
+      }
+    }
+  };
 
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitInternal)} className="space-y-6">
+        {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
@@ -256,13 +406,12 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 </FormItem>
             )}
             />
-
             <FormField
             control={form.control}
             name="entryNumber"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Buchungsnummer</FormLabel>
+                <FormLabel>Belegnummer</FormLabel>
                 <FormControl>
                     <Input placeholder="z.B. 2024-001" {...field} />
                 </FormControl>
@@ -271,38 +420,85 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
             )}
             />
         </div>
-        
         <FormField
           control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Beschreibung (Hauptbuchung)</FormLabel>
+              <FormLabel>Beschreibung</FormLabel>
               <FormControl>
-                <Textarea placeholder="Beschreibung der gesamten Buchung" {...field} />
+                <Textarea placeholder="Beschreibung der Buchung" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <div className="space-y-4">
+        <Tabs defaultValue={form.getValues("entryType")} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="single">Einzelbuchung</TabsTrigger>
+            <TabsTrigger value="batch">Sammelbuchung</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="single" className="pt-4 space-y-4">
+            <FormField
+              control={form.control}
+              name="debitAccountId"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Soll-Konto</FormLabel>
+                   <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Soll-Konto wählen..." />
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="creditAccountId"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Haben-Konto</FormLabel>
+                   <AccountAutocomplete options={accountOptions} value={field.value || ''} onChange={field.onChange} placeholder="Haben-Konto wählen..." />
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Betrag (CHF)</FormLabel>
+                  <FormControl>
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} 
+                       onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                       value={field.value ?? ''}
+                      />
+                  </FormControl>
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
+             {form.formState.errors.amount && <FormMessage>{form.formState.errors.amount.message}</FormMessage>}
+          </TabsContent>
+
+          <TabsContent value="batch" className="pt-4 space-y-4">
             <FormLabel>Buchungszeilen</FormLabel>
             {fields.map((item, index) => (
                 <Card key={item.id} className="p-4 relative bg-background/50">
                     <CardContent className="p-0 space-y-3">
-                        {index > 1 && ( 
-                             <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
-                                onClick={() => remove(index)}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Zeile entfernen</span>
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-muted-foreground hover:text-destructive z-10 h-7 w-7"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 2 && (index === 0 || index === 1) } // Prevent removing first two lines if only two exist
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Zeile entfernen</span>
+                        </Button>
+                        
                         <FormField
                             control={form.control}
                             name={`lines.${index}.accountId`}
@@ -374,16 +570,17 @@ export function JournalEntryForm({ tenantId, accounts, activeFiscalYear, onSubmi
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ accountId: '', debit: undefined, credit: undefined })}
+                onClick={() => append({ id: crypto.randomUUID(), accountId: '', debit: undefined, credit: undefined })}
                 className="w-full"
             >
                 <PlusCircle className="mr-2 h-4 w-4" /> Zeile hinzufügen
             </Button>
-        </div>
-
-        {form.formState.errors.lines?.message && <FormMessage>{form.formState.errors.lines.message}</FormMessage>}
-        {form.formState.errors.lines?.root?.message && <FormMessage>{form.formState.errors.lines.root.message}</FormMessage>}
-
+            {form.formState.errors.lines && typeof form.formState.errors.lines === 'object' && 'message' in form.formState.errors.lines && (
+                <FormMessage>{form.formState.errors.lines.message}</FormMessage>
+            )}
+            {form.formState.errors.lines?.root?.message && <FormMessage>{form.formState.errors.lines.root.message}</FormMessage>}
+          </TabsContent>
+        </Tabs>
 
         <div className="mt-4 p-3 border rounded-md bg-muted/50">
             <div className="flex justify-between font-medium">
@@ -427,7 +624,7 @@ function AccountAutocomplete({ options, value, onChange, placeholder }: AccountA
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between font-normal h-9 text-xs" // Adjusted size
+          className="w-full justify-between font-normal h-9 text-xs" 
         >
           {selectedOption ? selectedOption.label : placeholder || "Konto wählen..."}
           <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />

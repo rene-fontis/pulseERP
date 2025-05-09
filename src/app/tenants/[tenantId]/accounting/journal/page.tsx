@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useParams } from 'next/navigation';
@@ -207,6 +206,7 @@ export default function TenantJournalPage() {
   }
 
   const journalEntries = journalEntriesData || [];
+  const currentDefaultEntryNumber = `${(journalEntries.length + 1)}`;
 
   return (
     <div className="container mx-auto py-8">
@@ -247,7 +247,7 @@ export default function TenantJournalPage() {
                   activeFiscalYear={activeFiscalYear}
                   onSubmit={handleCreateJournalEntry}
                   isSubmitting={addEntryMutation.isPending}
-                  defaultEntryNumber={`BU-${String(journalEntries.length + 1).padStart(3, '0')}`}
+                  defaultEntryNumber={currentDefaultEntryNumber}
                 />
               ) : (
                  <div className="text-center py-4">
@@ -274,7 +274,7 @@ export default function TenantJournalPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Datum</TableHead>
-                    <TableHead>Nr.</TableHead>
+                    <TableHead>Beleg</TableHead>
                     <TableHead>Beschreibung (Buchung)</TableHead>
                     <TableHead>Konto-Nr.</TableHead>
                     <TableHead>Konto-Name</TableHead>
@@ -298,8 +298,12 @@ export default function TenantJournalPage() {
                         )}
                         <TableCell>{line.accountNumber}</TableCell>
                         <TableCell>{line.accountName}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(line.debit)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(line.credit)}</TableCell>
+                        <TableCell className="text-right">
+                          {line.debit && line.debit !== 0 ? formatCurrency(line.debit) : ''}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {line.credit && line.credit !== 0 ? formatCurrency(line.credit) : ''}
+                        </TableCell>
                         {lineIndex === 0 && (
                           <TableCell rowSpan={entry.lines.length || 1} className="text-right space-x-1 align-top">
                             <Button 
@@ -392,6 +396,5 @@ export default function TenantJournalPage() {
     </div>
   );
 }
-
 
     
