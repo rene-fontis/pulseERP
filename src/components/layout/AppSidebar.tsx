@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -70,7 +71,7 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled // Re-enabled, but generally should be disabled after first import
+            disabled 
         >
             <Link href="/admin/import">
                 <Users /> 
