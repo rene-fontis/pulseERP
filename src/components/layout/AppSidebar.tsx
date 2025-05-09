@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import {
   useSidebar,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarMenuSubItem, // Added missing import
 } from '@/components/ui/sidebar';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { cn } from '@/lib/utils';
