@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon } from 'lucide-react';
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, ChevronDown } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -15,14 +14,14 @@ import {
   useSidebar,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem, // Added missing import
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as React from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button'; // Import Button for AccordionTrigger
+import { Button } from '@/components/ui/button';
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -113,9 +112,12 @@ export function AppSidebar() {
                 <Accordion type="single" collapsible className="w-full" defaultValue={isAccountingActive ? "accounting-item" : undefined}>
                     <AccordionItem value="accounting-item" className="border-none">
                         <AccordionTrigger asChild>
-                             <Button variant="ghost" className={cn("w-full justify-start p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
-                                <BookOpen className="mr-2 h-4 w-4 shrink-0" />
-                                <span>Buchhaltung</span>
+                             <Button variant="ghost" className={cn("w-full justify-between p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isAccountingActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
+                                <div className="flex items-center">
+                                    <BookOpen className="mr-2 h-4 w-4 shrink-0" />
+                                    <span>Buchhaltung</span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                              </Button>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
@@ -135,9 +137,12 @@ export function AppSidebar() {
                  <Accordion type="single" collapsible className="w-full" defaultValue={isSettingsActive ? "settings-item" : undefined}>
                     <AccordionItem value="settings-item" className="border-none">
                         <AccordionTrigger asChild>
-                             <Button variant="ghost" className={cn("w-full justify-start p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
-                                <Settings className="mr-2 h-4 w-4 shrink-0" />
-                                <span>Einstellungen</span>
+                             <Button variant="ghost" className={cn("w-full justify-between p-2 h-auto font-normal text-sm rounded-md hover:bg-sidebar-accent [&_svg]:text-sidebar-foreground [&_svg]:hover:text-sidebar-accent-foreground", isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&_svg]:text-sidebar-primary-foreground")}>
+                                <div className="flex items-center">
+                                 <Settings className="mr-2 h-4 w-4 shrink-0" />
+                                 <span>Einstellungen</span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                              </Button>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
