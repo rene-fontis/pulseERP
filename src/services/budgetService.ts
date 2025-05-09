@@ -71,4 +71,3 @@ export const deleteBudget = async (budgetId: string): Promise<boolean> => {
   await deleteDoc(budgetDocRef);
   return true;
 };
-```

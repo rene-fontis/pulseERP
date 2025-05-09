@@ -108,4 +108,3 @@ export function BudgetForm({ onSubmit, initialData, isSubmitting }: BudgetFormPr
     </Form>
   );
 }
-```
