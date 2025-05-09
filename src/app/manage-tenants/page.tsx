@@ -37,6 +37,21 @@ export default function ManageTenantsPage() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
 
+
+  import { getDocs, collection } from 'firebase/firestore';
+
+  async function testFirestore() {
+    const tenantsRef = collection(db, 'tenants');
+    const snapshot = await getDocs(tenantsRef);
+    
+    snapshot.forEach(doc => {
+      console.log('Mandant:', doc.id, doc.data());
+    });
+  }
+  
+  testFirestore();
+
+
   useEffect(() => {
     if (tenants) {
       const newFormattedDates: Record<string, string> = {};
