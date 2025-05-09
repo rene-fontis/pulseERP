@@ -1,4 +1,3 @@
-ts
 
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
@@ -36,7 +35,7 @@ const mapDocToJournalEntry = (docSnapshot: any): JournalEntry => {
     lines: data.lines ? data.lines.map((line: any) => ({
       ...line,
       id: line.id || crypto.randomUUID(),
-      description: line.description, // Will be undefined if not in Firestore, which is fine for optional field
+      // description: line.description, // Removed as per user request
     })) : [],
     attachments: data.attachments || [], 
     posted: data.posted || false,
@@ -91,9 +90,7 @@ export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promis
       if (sanitizedLine.credit === undefined) {
         delete sanitizedLine.credit;
       }
-      if (sanitizedLine.description === undefined) { // If not provided, don't store it
-        delete sanitizedLine.description;
-      }
+      // Removed line.description as per user request
       return sanitizedLine;
     });
   } else {
@@ -128,7 +125,7 @@ export const updateJournalEntry = async (entryId: string, entryData: Partial<New
       const sanitizedLine: { [key: string]: any } = { ...line };
       if (sanitizedLine.debit === undefined) delete sanitizedLine.debit;
       if (sanitizedLine.credit === undefined) delete sanitizedLine.credit;
-      if (sanitizedLine.description === undefined) delete sanitizedLine.description;
+      // Removed line.description as per user request
       return sanitizedLine;
     });
   }
