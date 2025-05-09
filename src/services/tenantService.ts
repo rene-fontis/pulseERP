@@ -2,7 +2,7 @@ import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, 
 import { db } from '@/lib/firebase'; // Import the initialized db from firebase.ts
 import type { Tenant } from '@/types';
 
-const tenantsCollectionRef = collection(db, 'pulse-erp');
+const tenantsCollectionRef = collection(db, 'tenants');
 
 // Helper function to safely convert Firestore createdAt to ISO string
 const formatFirestoreTimestamp = (timestamp: any, docId?: string, defaultDateOption: 'epoch' | 'now' = 'epoch'): string => {
