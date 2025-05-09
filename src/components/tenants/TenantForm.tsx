@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -11,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Tenant } from '@/types';
 import { useGetChartOfAccountsTemplates } from '@/hooks/useChartOfAccountsTemplates';
 import { Skeleton } from '../ui/skeleton';
+
+const NO_TEMPLATE_VALUE = "NO_TEMPLATE_SELECTED_INTERNAL_VALUE";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Mandantenname muss mindestens 2 Zeichen lang sein." }),
@@ -76,14 +79,17 @@ export function TenantForm({ onSubmit, initialData, isSubmitting }: TenantFormPr
                 {isLoadingTemplates ? (
                     <Skeleton className="h-10 w-full" />
                 ) : (
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <Select 
+                        onValueChange={(value) => field.onChange(value === NO_TEMPLATE_VALUE ? '' : value)} 
+                        defaultValue={field.value || undefined}
+                    >
                     <FormControl>
                         <SelectTrigger>
                         <SelectValue placeholder="Standardvorlage wählen..." />
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        <SelectItem value="">Keine Vorlage (leerer Kontenplan)</SelectItem>
+                        <SelectItem value={NO_TEMPLATE_VALUE}>Keine Vorlage (leerer Kontenplan)</SelectItem>
                         {templates?.map(template => (
                         <SelectItem key={template.id} value={template.id}>
                             {template.name}
@@ -105,3 +111,4 @@ export function TenantForm({ onSubmit, initialData, isSubmitting }: TenantFormPr
     </Form>
   );
 }
+

@@ -52,10 +52,24 @@ export default function ManageTenantsPage() {
         try {
           const dateToFormat = new Date(tenant.createdAt);
           if (isNaN(dateToFormat.getTime())) {
-            throw new Error(`Invalid date value for tenant.createdAt: ${tenant.createdAt}`);
+            // Try parsing as Firestore Timestamp-like object if direct Date parsing fails
+            // This scenario might occur if `formatFirestoreTimestamp` didn't fully convert it.
+            let parsedDate;
+            if (typeof tenant.createdAt === 'object' && tenant.createdAt && 'seconds' in tenant.createdAt && 'nanoseconds' in tenant.createdAt) {
+                parsedDate = new Date((tenant.createdAt as any).seconds * 1000 + (tenant.createdAt as any).nanoseconds / 1000000);
+            } else {
+                 throw new Error(`Invalid date value for tenant.createdAt: ${tenant.createdAt}`);
+            }
+             if (isNaN(parsedDate.getTime())) {
+                throw new Error(`Invalid date value for tenant.createdAt after attempting to parse Timestamp object: ${tenant.createdAt}`);
+            }
+            newFormattedDates[tenant.id] = format(parsedDate, "PPP p", { locale: de });
+
+          } else {
+            newFormattedDates[tenant.id] = format(dateToFormat, "PPP p", { locale: de });
           }
-          newFormattedDates[tenant.id] = format(dateToFormat, "PPP p", { locale: de });
         } catch (e) {
+          console.error("Error formatting date for tenant:", tenant.id, tenant.createdAt, e);
           newFormattedDates[tenant.id] = "Ungültiges Datum";
         }
       });
@@ -67,7 +81,7 @@ export default function ManageTenantsPage() {
     try {
       await addTenantMutation.mutateAsync({ 
         name: values.name, 
-        chartOfAccountsTemplateId: values.chartOfAccountsTemplateId || undefined // Pass undefined if empty string
+        chartOfAccountsTemplateId: values.chartOfAccountsTemplateId || undefined 
       });
       toast({ title: "Erfolg", description: "Mandant erfolgreich erstellt.", variant: "default" });
       setIsCreateModalOpen(false);
@@ -255,3 +269,4 @@ export default function ManageTenantsPage() {
     </div>
   );
 }
+
