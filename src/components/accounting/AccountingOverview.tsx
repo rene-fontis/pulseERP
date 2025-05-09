@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -169,12 +170,12 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="min-h-[250px] w-full aspect-auto">
+                  <ChartContainer config={chartConfig} className="h-[300px] w-full"> {/* Changed: Explicit height */}
                     <BarChart 
                         accessibilityLayer 
                         data={chartData} 
                         layout="vertical"
-                        margin={{ top: 5, right: 50, left: 5, bottom: 20 }} // Adjusted margins
+                        margin={{ top: 5, right: 50, left: 5, bottom: 20 }} 
                     >
                       <XAxis type="number" hide />
                       <YAxis
@@ -249,3 +250,4 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts }: Acco
     </div>
   );
 }
+
