@@ -35,7 +35,6 @@ const getDefaultFixedGroups = (): AccountGroupTemplate[] => [
     mainType: "Equity", 
     accounts: [
       { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
     ], 
     isFixed: true, parentId: null, level: 0 
   },
@@ -369,7 +368,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
   return (
     <div className={cn("space-y-3", !isFixedGroup && "pl-4 border-l border-border")}>
       <FormLabel className="text-base">
-        {isFixedGroup ? 'Systemkonten in dieser Hauptgruppe' : 'Konten in dieser Untergruppe'}
+        {isFixedGroup ? 'Konten in dieser Hauptgruppe' : 'Konten in dieser Untergruppe'}
       </FormLabel>
       {fields.length === 0 && !isFixedGroup && <p className="text-xs text-muted-foreground">Keine Konten definiert.</p>}
       {fields.map((accountItem, accountIndex) => {
@@ -444,7 +443,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', isSystemAccount: false, isRetainedEarningsAccount: false })}
+            onClick={() => append({ id: crypto.randomUUID(), number: '', name: '', description: '', isSystemAccount: false, isRetainedEarningsAccount: false } as AccountTemplate)}
             className="w-full mt-2"
         >
             <PlusCircle className="mr-2 h-4 w-4" /> Konto zu dieser Untergruppe hinzufügen

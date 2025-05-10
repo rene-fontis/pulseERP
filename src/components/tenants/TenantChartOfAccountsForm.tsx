@@ -31,7 +31,6 @@ const getDefaultFixedGroupsForTenant = (): AccountGroup[] => [
     mainType: "Equity", 
     accounts: [
       { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, balance: 0, isRetainedEarningsAccount: true },
-      // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true, balance: 0 },
     ], 
     isFixed: true, parentId: null, level: 0, balance:0 
   },
@@ -338,7 +337,7 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
   return (
     <div className={cn("space-y-3", !isFixedGroup && "pl-4 border-l border-border")}>
        <FormLabel className="text-base">
-        {isFixedGroup ? 'Systemkonten in dieser Hauptgruppe' : 'Konten in dieser Untergruppe'}
+        {isFixedGroup ? 'Konten in dieser Hauptgruppe' : 'Konten in dieser Untergruppe'}
       </FormLabel>
       {fields.length === 0 && !isFixedGroup && <p className="text-xs text-muted-foreground">Keine Konten definiert.</p>}
       {fields.map((accountItem, accountIndex) => {
