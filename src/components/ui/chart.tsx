@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -293,7 +294,8 @@ const ChartLegendContent = React.forwardRef<
             <div
               key={item.value}
               className={cn(
-                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
+                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground cursor-pointer",
+                item.inactive && "opacity-50" // Style for inactive items
               )}
             >
               {itemConfig?.icon && !hideIcon ? (
@@ -302,11 +304,11 @@ const ChartLegendContent = React.forwardRef<
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.color,
+                    backgroundColor: item.inactive ? "hsl(var(--muted-foreground))" : item.color, // Grey out color if inactive
                   }}
                 />
               )}
-              {itemConfig?.label}
+              <span className={cn(item.inactive && "line-through")}>{itemConfig?.label || item.value}</span>
             </div>
           )
         })}

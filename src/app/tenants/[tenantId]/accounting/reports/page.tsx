@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, AlertCircle, Loader2, CalendarDays, BookOpen } from 'lucide-react';
+import { BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, AlertCircle, Loader2, CalendarDays } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
@@ -24,6 +24,7 @@ import {
   ResponsiveContainer,
   LabelList,
   ReferenceLine,
+  LegendProps,
 } from 'recharts';
 import {
   ChartContainer,
@@ -65,6 +66,12 @@ export default function TenantReportsPage() {
 
   const [selectedFiscalYearId, setSelectedFiscalYearId] = useState<string | undefined>(undefined);
   const [clientLoaded, setClientLoaded] = useState(false);
+
+  const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({
+    Ertrag: true,
+    Aufwand: true,
+    GewinnVerlust: true,
+  });
 
   useEffect(() => {
     setClientLoaded(true);
@@ -110,6 +117,16 @@ export default function TenantReportsPage() {
     Aufwand: -item.expenses, // Expenses are made negative to render downwards
     GewinnVerlust: item.revenue - item.expenses,
   })) || [];
+
+  const handleLegendClick = (data: any) => {
+    const { dataKey } = data;
+    if (dataKey) {
+        setSeriesVisibility(prev => ({
+            ...prev,
+            [dataKey]: !prev[dataKey]
+        }));
+    }
+  };
 
   if (isLoadingData && !clientLoaded) {
     return (
@@ -212,7 +229,7 @@ export default function TenantReportsPage() {
           <CardDescription className="flex items-center">
             <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
             {selectedFiscalYearDetails ? 
-                `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - ${formatDate(selectedFiscalYearDetails.endDate)})` 
+                `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - {formatDate(selectedFiscalYearDetails.endDate)})` 
                 : (isLoadingSelectedFiscalYear ? "Lade Geschäftsjahres Info..." : "Bitte Geschäftsjahr wählen")}
           </CardDescription>
         </CardHeader>
@@ -244,15 +261,20 @@ export default function TenantReportsPage() {
                     return [formatCurrency(displayValue), String(name)];
                   }} />}
                 />
-                <ChartLegend content={<ChartLegendContent />} verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }} />
+                <ChartLegend 
+                    content={<ChartLegendContent />} 
+                    verticalAlign="top" 
+                    wrapperStyle={{ paddingBottom: '20px' }}
+                    onClick={handleLegendClick} 
+                />
                 <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={2} strokeOpacity={0.9} />
-                <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={25}>
+                <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={25} hide={!seriesVisibility.Ertrag}>
                   <LabelList dataKey="Ertrag" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
                 </Bar>
-                <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[0, 0, 4, 4]} barSize={25}>
+                <Bar dataKey="Aufwand" fill="var(--color-Aufwand)" radius={[0, 0, 4, 4]} barSize={25} hide={!seriesVisibility.Aufwand}>
                   <LabelList dataKey="Aufwand" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5} />
                 </Bar>
-                <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2.5} dot={{ r: 5, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 7 }} name="Gewinn/Verlust" />
+                <Line type="monotone" dataKey="GewinnVerlust" stroke="var(--color-GewinnVerlust)" strokeWidth={2.5} dot={{ r: 5, fill: "var(--color-GewinnVerlust)" }} activeDot={{ r: 7 }} name="Gewinn/Verlust" hide={!seriesVisibility.GewinnVerlust} />
               </ComposedChart>
             </ChartContainer>
           ) : (
