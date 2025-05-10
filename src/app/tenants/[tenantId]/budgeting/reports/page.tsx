@@ -50,9 +50,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const chartConfig = {
   actualJournalProfitLoss: { label: "Ist G/V", color: "hsl(var(--chart-0))" }, 
-  actualProfitLoss: { label: "Budget G/V Standard", color: "hsl(var(--chart-1))" },
+  actualProfitLoss: { label: "Budget G/V Standard", color: "hsl(var(--chart-3))" }, // Swapped with worstCaseProfitLoss
   bestCaseProfitLoss: { label: "Budget G/V Best-Case", color: "hsl(var(--chart-2))" },
-  worstCaseProfitLoss: { label: "Budget G/V Worst-Case", color: "hsl(var(--chart-3))" },
+  worstCaseProfitLoss: { label: "Budget G/V Worst-Case", color: "hsl(var(--chart-1))" }, // Swapped with actualProfitLoss
   actualRevenue: { label: "Eff. Ertrag", color: "hsl(var(--chart-4))" }, 
   actualExpense: { label: "Eff. Aufwand", color: "hsl(var(--chart-5))" }, 
 } satisfies ChartConfig;
