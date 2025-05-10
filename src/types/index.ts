@@ -157,10 +157,11 @@ export interface AccountBalances {
   [accountId: string]: number;
 }
 
-export interface MonthlyBreakdownItem {
-  month: string; // e.g., "Jan", "Feb"
-  year: number;  // e.g., 2024
-  monthYear: string; // e.g., "Jan 2024" for display
+export type AggregationPeriod = 'monthly' | 'weekly' | 'daily';
+
+export interface PeriodicalBreakdownItem {
+  periodLabel: string; // e.g., "Jan '24", "KW23 '24", "01.06.24"
+  year: number;
   revenue: number;
   expenses: number;
 }
@@ -176,7 +177,7 @@ export interface FinancialSummary {
   netProfitLoss: number;
   closingEquity: number;
   accountBalances: AccountBalances; // Closing balances for all accounts
-  monthlyBreakdown: MonthlyBreakdownItem[];
+  periodicalBreakdown: PeriodicalBreakdownItem[];
 }
 
 export interface CarryForwardBalancesPayload {

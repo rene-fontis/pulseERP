@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -12,6 +11,7 @@ import { useGetJournalEntries } from '@/hooks/useJournalEntries';
 import { calculateFinancialSummary, type FinancialSummary } from '@/lib/accounting';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/chart";
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import type { AggregationPeriod } from '@/types';
 
 const chartConfig = {
     Ertrag: {
@@ -64,6 +65,7 @@ export default function TenantReportsPage() {
   const { data: fiscalYears, isLoading: isLoadingFiscalYears, error: fiscalYearsError } = useGetFiscalYears(tenantId);
 
   const [selectedFiscalYearId, setSelectedFiscalYearId] = useState<string | undefined>(undefined);
+  const [aggregationPeriod, setAggregationPeriod] = useState<AggregationPeriod>('monthly');
   const [clientLoaded, setClientLoaded] = useState(false);
 
   const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({
@@ -89,8 +91,8 @@ export default function TenantReportsPage() {
   
   const financialSummary: FinancialSummary | null = useMemo(() => {
     if (!chartOfAccounts || !journalEntries || !clientLoaded || !selectedFiscalYearDetails) return null;
-    return calculateFinancialSummary(chartOfAccounts, journalEntries, selectedFiscalYearDetails);
-  }, [chartOfAccounts, journalEntries, clientLoaded, selectedFiscalYearDetails]);
+    return calculateFinancialSummary(chartOfAccounts, journalEntries, selectedFiscalYearDetails, aggregationPeriod);
+  }, [chartOfAccounts, journalEntries, clientLoaded, selectedFiscalYearDetails, aggregationPeriod]);
 
   const isLoadingData = isLoadingTenant || 
                         (clientLoaded && isLoadingCoA) || 
@@ -110,10 +112,10 @@ export default function TenantReportsPage() {
     }
   };
   
-  const monthlyChartData = financialSummary?.monthlyBreakdown?.map(item => ({
-    name: item.monthYear,
+  const periodicalChartData = financialSummary?.periodicalBreakdown?.map(item => ({
+    name: item.periodLabel,
     Ertrag: item.revenue,
-    Aufwand: -item.expenses, // Expenses are made negative to render downwards
+    Aufwand: -item.expenses, 
     GewinnVerlust: item.revenue - item.expenses,
   })) || [];
 
@@ -224,22 +226,39 @@ export default function TenantReportsPage() {
 
       <Card className="shadow-xl mx-4 md:mx-0">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Monatliche Erfolgsübersicht</CardTitle>
-          <CardDescription className="flex items-center">
-            <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
-            {selectedFiscalYearDetails ? 
-                `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - ${formatDate(selectedFiscalYearDetails.endDate)})` 
-                : (isLoadingSelectedFiscalYear ? "Lade Geschäftsjahres Info..." : "Bitte Geschäftsjahr wählen")}
-          </CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <CardTitle className="text-2xl font-bold">Erfolgsübersicht</CardTitle>
+                    <CardDescription className="flex items-center">
+                        <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
+                        {selectedFiscalYearDetails ? 
+                            `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - ${formatDate(selectedFiscalYearDetails.endDate)})` 
+                            : (isLoadingSelectedFiscalYear ? "Lade Geschäftsjahres Info..." : "Bitte Geschäftsjahr wählen")}
+                    </CardDescription>
+                </div>
+                <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                    <Label htmlFor="aggregation-period" className="shrink-0 text-sm">Ansicht:</Label>
+                    <Select value={aggregationPeriod} onValueChange={(value) => setAggregationPeriod(value as AggregationPeriod)}>
+                        <SelectTrigger id="aggregation-period" className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Zeitraum wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="monthly">Monatlich</SelectItem>
+                            <SelectItem value="weekly">Wöchentlich</SelectItem>
+                            <SelectItem value="daily">Täglich</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
         </CardHeader>
         <CardContent>
           {isLoadingData && clientLoaded ? (
             <Loader2 className="mx-auto my-8 h-12 w-12 animate-spin text-primary" />
           ) : !selectedFiscalYearDetails ? (
             <p className="text-muted-foreground text-center py-8">Bitte wählen Sie ein Geschäftsjahr, um das Diagramm anzuzeigen.</p>
-          ) : monthlyChartData.length > 0 ? (
+          ) : periodicalChartData.length > 0 ? (
             <ChartContainer config={chartConfig} className="h-[450px] w-full">
-              <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <ComposedChart data={periodicalChartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} horizontalStroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="name"
@@ -276,7 +295,7 @@ export default function TenantReportsPage() {
               </ComposedChart>
             </ChartContainer>
           ) : (
-            <p className="text-muted-foreground text-center py-8">Keine monatlichen Erfolgsdaten für das Diagramm im gewählten Geschäftsjahr verfügbar.</p>
+            <p className="text-muted-foreground text-center py-8">Keine Daten für die Erfolgsübersicht im gewählten Zeitraum verfügbar.</p>
           )}
         </CardContent>
       </Card>
