@@ -233,7 +233,7 @@ export default function BudgetReportsPage() {
       return {
         periodLabel: label,
         actualJournalRevenue: actualItem?.revenue || 0, 
-        actualJournalExpense: actualItem?.expenses || 0, 
+        actualJournalExpense: -(actualItem?.expenses || 0), // Store as negative for downward bar
         
         cumulativeActualJournalProfitLoss: cumulativeActualJournalPnl,
         cumulativeActualBudgetProfitLoss: cumulativeBudgetActualPnl,
@@ -425,7 +425,7 @@ export default function BudgetReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="periodLabel" tickLine={false} axisLine={{ stroke: 'hsl(var(--foreground))', strokeWidth: 1, strokeDasharray: "3 3" }} tickMargin={8} />
                     <YAxis tickFormatter={(value) => `${(value / 1000)}k`} tickLine={false} axisLine={false} tickMargin={8}/>
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => [formatCurrency(name === 'actualExpense' ? Math.abs(value as number) : value as number), String(name)]}/>} />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => [formatCurrency(name === 'Eff. Aufwand' ? Math.abs(value as number) : value as number), String(name)]}/>} />
                     <ChartLegend content={<ChartLegendContent onClick={handleLegendClick} />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} />
                     <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={2} />
                     
@@ -433,7 +433,7 @@ export default function BudgetReportsPage() {
                         <LabelList dataKey="actualJournalRevenue" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
                     </Bar>
                     <Bar dataKey="actualJournalExpense" fill="var(--color-actualExpense)" radius={[0, 0, 4, 4]} barSize={15} hide={!seriesVisibility.actualExpense} name="Eff. Aufwand">
-                        <LabelList dataKey="actualJournalExpense" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                        <LabelList dataKey="actualJournalExpense" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5} />
                     </Bar>
 
                     <Line type="monotone" dataKey="cumulativeActualJournalProfitLoss" stroke="var(--color-actualJournalProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Ist G/V" hide={!seriesVisibility.actualJournalProfitLoss}/>
