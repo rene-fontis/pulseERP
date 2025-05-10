@@ -495,44 +495,23 @@ export default function BudgetReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {pnlAccounts.length > 0 ? (
-                        <>
+                        <React.Fragment>
                         <TableRow className="bg-muted/50 font-semibold">
-                            <TableCell colSpan={2}>Erträge</TableCell>
-                            <TableCell className="text-right">{formatCurrency(revenueTotals.actual)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(revenueTotals.bestCase)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(revenueTotals.worstCase)}</TableCell>
+                            <TableCell colSpan={2}>Erträge</TableCell><TableCell className="text-right">{formatCurrency(revenueTotals.actual)}</TableCell><TableCell className="text-right">{formatCurrency(revenueTotals.bestCase)}</TableCell><TableCell className="text-right">{formatCurrency(revenueTotals.worstCase)}</TableCell>
                         </TableRow>
                         {pnlAccounts.filter(acc => acc.mainType === 'Revenue').map(item => (
-                            <TableRow key={item.accountId}>
-                                <TableCell>{item.accountNumber}</TableCell>
-                                <TableCell>{item.accountName}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.actualAmount)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.bestCaseAmount)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.worstCaseAmount)}</TableCell>
-                            </TableRow>
+                            <TableRow key={item.accountId}><TableCell>{item.accountNumber}</TableCell><TableCell>{item.accountName}</TableCell><TableCell className="text-right">{formatCurrency(item.actualAmount)}</TableCell><TableCell className="text-right">{formatCurrency(item.bestCaseAmount)}</TableCell><TableCell className="text-right">{formatCurrency(item.worstCaseAmount)}</TableCell></TableRow>
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
-                            <TableCell colSpan={2}>Aufwände</TableCell>
-                            <TableCell className="text-right">{formatCurrency(expenseTotals.actual)}</TableCell> {/* Already negative or zero */}
-                            <TableCell className="text-right">{formatCurrency(expenseTotals.bestCase)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(expenseTotals.worstCase)}</TableCell>
+                            <TableCell colSpan={2}>Aufwände</TableCell><TableCell className="text-right">{formatCurrency(expenseTotals.actual)}</TableCell><TableCell className="text-right">{formatCurrency(expenseTotals.bestCase)}</TableCell><TableCell className="text-right">{formatCurrency(expenseTotals.worstCase)}</TableCell>
                         </TableRow>
                         {pnlAccounts.filter(acc => acc.mainType === 'Expense').map(item => (
-                            <TableRow key={item.accountId}>
-                                <TableCell>{item.accountNumber}</TableCell>
-                                <TableCell>{item.accountName}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.actualAmount)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.bestCaseAmount)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.worstCaseAmount)}</TableCell>
-                            </TableRow>
+                            <TableRow key={item.accountId}><TableCell>{item.accountNumber}</TableCell><TableCell>{item.accountName}</TableCell><TableCell className="text-right">{formatCurrency(item.actualAmount)}</TableCell><TableCell className="text-right">{formatCurrency(item.bestCaseAmount)}</TableCell><TableCell className="text-right">{formatCurrency(item.worstCaseAmount)}</TableCell></TableRow>
                         ))}
                         <TableRow className="bg-primary/10 font-bold border-t-2 border-primary">
-                            <TableCell colSpan={2}>Gewinn / Verlust</TableCell>
-                            <TableCell className="text-right">{formatCurrency(profitLossTotals.actual)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(profitLossTotals.bestCase)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(profitLossTotals.worstCase)}</TableCell>
+                            <TableCell colSpan={2}>Gewinn / Verlust</TableCell><TableCell className="text-right">{formatCurrency(profitLossTotals.actual)}</TableCell><TableCell className="text-right">{formatCurrency(profitLossTotals.bestCase)}</TableCell><TableCell className="text-right">{formatCurrency(profitLossTotals.worstCase)}</TableCell>
                         </TableRow>
-                        </>
+                        </React.Fragment>
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
