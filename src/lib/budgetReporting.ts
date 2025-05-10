@@ -251,5 +251,3 @@ export function calculateBudgetReportData(
 
   return reportData;
 }
-
-    
