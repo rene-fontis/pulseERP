@@ -183,35 +183,23 @@ export const carryForwardBalances = async (payload: CarryForwardBalancesPayload)
 
   const updatedGroups: AccountGroup[] = JSON.parse(JSON.stringify(chartOfAccounts.groups)); // Deep copy
 
-  let retainedEarningsAccount: Account | undefined;
-  let currentYearPLEAccount: Account | undefined;
-
   updatedGroups.forEach(group => {
     group.accounts.forEach(account => {
-      if (account.isRetainedEarningsAccount) {
-        retainedEarningsAccount = account;
-      }
-      if (account.isSystemAccount && account.number === "2979") { // Assuming "2979" is current P/L
-        currentYearPLEAccount = account;
-      }
-
       if (group.mainType === 'Asset' || group.mainType === 'Liability') {
         account.balance = summary.accountBalances[account.id] || 0;
       } else if (group.mainType === 'Equity') {
-        // Specific handling for equity accounts
         if (account.isRetainedEarningsAccount) {
-          // New opening balance for Retained Earnings is its *original* opening balance + P/L from source year.
-          // The `account.balance` here is the opening balance from the CoA *before* this carry-forward operation for this account.
+          // New opening balance for Retained Earnings is its *original* opening balance from CoA + P/L from source year.
           account.balance = (chartOfAccounts.groups.flatMap(g => g.accounts).find(acc => acc.id === account.id)?.balance || 0) + summary.netProfitLoss;
-        } else if (account.isSystemAccount && account.number === "2979") { // Current Year P/L
-          account.balance = 0; // Reset for the new year
-        } else {
+        } else if (account.isSystemAccount) { // General system accounts (if any others existed)
+           account.balance = 0; // Typically reset system accounts not meant for carry-over
+        }
+         else {
           // Other equity accounts (e.g., capital contributions) carry forward their closing balance.
           account.balance = summary.accountBalances[account.id] || 0;
         }
       } else { 
         // Revenue and Expense accounts start with a zero balance for the new period.
-        // Their `account.balance` in CoA represents the opening balance, which should be 0 for P/L accounts.
         account.balance = 0;
       }
     });
@@ -228,8 +216,6 @@ export const carryForwardBalances = async (payload: CarryForwardBalancesPayload)
   });
   
   // Mark target fiscal year with source (for UI/info purposes)
-  // Note: targetFiscalYearId was part of payload for this, but not directly used in calculation here.
-  // We'll update the targetFiscalYear to store which source was used for carry forward.
   const targetFiscalYearDocRef = doc(db, 'tenants', tenantId, 'fiscalYears', payload.targetFiscalYearId);
   await updateDoc(targetFiscalYearDocRef, {
     carryForwardSourceFiscalYearId: sourceFiscalYearId,
@@ -239,3 +225,4 @@ export const carryForwardBalances = async (payload: CarryForwardBalancesPayload)
 
   return getTenantChartOfAccountsById(chartOfAccounts.id);
 };
+

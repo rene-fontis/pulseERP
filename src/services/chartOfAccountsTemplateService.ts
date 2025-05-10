@@ -135,3 +135,4 @@ export const deleteChartOfAccountsTemplate = async (id: string): Promise<boolean
   await deleteDoc(docRef);
   return true;
 };
+

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, {useEffect, useMemo} from 'react';
@@ -34,7 +35,7 @@ const getDefaultFixedGroups = (): AccountGroupTemplate[] => [
     mainType: "Equity", 
     accounts: [
       { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
+      // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
     ], 
     isFixed: true, parentId: null, level: 0 
   },

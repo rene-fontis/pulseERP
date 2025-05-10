@@ -31,7 +31,7 @@ const getDefaultFixedGroupsForTenant = (): AccountGroup[] => [
     mainType: "Equity", 
     accounts: [
       { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, balance: 0, isRetainedEarningsAccount: true },
-      { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true, balance: 0 },
+      // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true, balance: 0 },
     ], 
     isFixed: true, parentId: null, level: 0, balance:0 
   },

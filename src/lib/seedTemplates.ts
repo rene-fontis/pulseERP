@@ -27,7 +27,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       mainType: "Equity", 
       accounts: [
         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-        { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
+        // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Geschäftsjahres. Dient dem Bilanzausgleich. Systemkonto.", isSystemAccount: true },
       ], 
       isFixed: true, parentId: null, level: 0 
     },
@@ -147,7 +147,7 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
       mainType: "Equity", 
       accounts: [
         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-        { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Vereinsjahres. Systemkonto.", isSystemAccount: true },
+        // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des laufenden Vereinsjahres. Systemkonto.", isSystemAccount: true },
       ], 
       isFixed: true, parentId: null, level: 0 
     },
@@ -210,7 +210,7 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
       mainType: "Equity", 
       accounts: [
         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-        { id: crypto.randomUUID(), number: "2979", name: "Laufender Überschuss/Fehlbetrag", description: "Ergebnis der laufenden Periode. Systemkonto.", isSystemAccount: true },
+        // { id: crypto.randomUUID(), number: "2979", name: "Laufender Überschuss/Fehlbetrag", description: "Ergebnis der laufenden Periode. Systemkonto.", isSystemAccount: true },
       ], 
       isFixed: true, parentId: null, level: 0 
     },
@@ -284,7 +284,7 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
       mainType: "Equity", 
       accounts: [
         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-        { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true },
+        // { id: crypto.randomUUID(), number: "2979", name: "Laufender Gewinn/Verlust", description: "Ergebnis des Geschäftsjahres. Systemkonto.", isSystemAccount: true },
       ], 
       isFixed: true, parentId: null, level: 0 
     },
@@ -318,10 +318,10 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
     }
 
     if (existingFixedGroup.mainType === 'Equity') {
-      const profitLossAccountTemplate = fixedDef.accounts.find(acc => acc.isSystemAccount && acc.number === "2979");
-      if (profitLossAccountTemplate && !existingFixedGroup.accounts.some(acc => acc.number === profitLossAccountTemplate.number && acc.isSystemAccount)) {
-        existingFixedGroup.accounts.push({ ...profitLossAccountTemplate, id: crypto.randomUUID() }); 
-      }
+      // const profitLossAccountTemplate = fixedDef.accounts.find(acc => acc.isSystemAccount && acc.number === "2979");
+      // if (profitLossAccountTemplate && !existingFixedGroup.accounts.some(acc => acc.number === profitLossAccountTemplate.number && acc.isSystemAccount)) {
+      //   existingFixedGroup.accounts.push({ ...profitLossAccountTemplate, id: crypto.randomUUID() }); 
+      // }
       const retainedEarningsAccountTemplate = fixedDef.accounts.find(acc => acc.isRetainedEarningsAccount && acc.number === "2970");
       if (retainedEarningsAccountTemplate && !existingFixedGroup.accounts.some(acc => acc.number === retainedEarningsAccountTemplate.number && acc.isRetainedEarningsAccount)) {
         existingFixedGroup.accounts.push({ ...retainedEarningsAccountTemplate, id: crypto.randomUUID() });
@@ -407,3 +407,4 @@ export async function seedDefaultChartOfAccountsTemplates() {
     throw error; 
   }
 }
+
