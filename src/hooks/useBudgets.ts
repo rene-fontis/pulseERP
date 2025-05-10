@@ -15,7 +15,7 @@ const budgetQueryKeys = {
   all: (tenantId: string) => ['budgets', tenantId] as const,
   lists: (tenantId: string) => [...budgetQueryKeys.all(tenantId), 'list'] as const,
   details: (tenantId: string) => [...budgetQueryKeys.all(tenantId), 'detail'] as const,
-  detail: (budgetId: string) => [...budgetQueryKeys.details(''), budgetId] as const, // TenantId not part of detail key for simplicity if budgetId is global
+  detail: (budgetId: string) => [...budgetQueryKeys.details(''), budgetId] as const, 
 };
 
 export function useGetBudgets(tenantId: string | null) {
@@ -36,7 +36,8 @@ export function useGetBudgetById(budgetId: string | null) {
 
 export function useAddBudget(tenantId: string) {
   const queryClient = useQueryClient();
-  return useMutation<Budget, Error, BudgetFormValues>({
+  // BudgetFormValues no longer contains 'scenario'
+  return useMutation<Budget, Error, BudgetFormValues>({ 
     mutationFn: (budgetData) => addBudget(tenantId, budgetData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: budgetQueryKeys.lists(tenantId) });
@@ -46,7 +47,8 @@ export function useAddBudget(tenantId: string) {
 
 export function useUpdateBudget() {
   const queryClient = useQueryClient();
-  return useMutation<Budget | undefined, Error, { budgetId: string; data: Partial<BudgetFormValues> }>({
+  // BudgetFormValues no longer contains 'scenario'
+  return useMutation<Budget | undefined, Error, { budgetId: string; data: Partial<BudgetFormValues> }>({ 
     mutationFn: ({ budgetId, data }) => updateBudget(budgetId, data),
     onSuccess: (data, variables) => {
       if (data) {
@@ -60,15 +62,14 @@ export function useUpdateBudget() {
 export function useDeleteBudget() {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, string, { previousBudgets?: Budget[] }>({
-    mutationFn: deleteBudget, // Pass the function reference directly
+    mutationFn: deleteBudget,
     onSuccess: (success, budgetId, context) => {
       if (success) {
-        // A bit aggressive, but ensures lists are updated.
-        // If tenantId was available from the deleted budget (e.g. from context or by fetching before delete),
-        // we could be more specific.
-        queryClient.invalidateQueries({ queryKey: ['budgets'] }); // Consider a more specific invalidation if tenantId is known
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }); 
         queryClient.removeQueries({queryKey: budgetQueryKeys.detail(budgetId)});
       }
     },
   });
 }
+
+    

@@ -188,7 +188,6 @@ export interface CarryForwardBalancesPayload {
 }
 
 // --- Budgeting Types ---
-export type BudgetScenario = "Actual" | "Best Case" | "Worst Case";
 export type BudgetEntryType = "Income" | "Expense";
 export type BudgetRecurrence = 
   | "None" 
@@ -204,7 +203,7 @@ export interface Budget {
   tenantId: string;
   name: string;
   description: string; 
-  scenario: BudgetScenario;
+  // scenario: BudgetScenario; // Removed: Scenario is now per entry
   createdAt: string;
   updatedAt: string;
 }
@@ -221,7 +220,9 @@ export interface BudgetEntry {
   counterAccountNumber?: string; 
   counterAccountName?: string;   
   description: string;
-  amount: number;
+  amountActual: number; // Renamed from 'amount'
+  amountBestCase?: number | null; // Optional
+  amountWorstCase?: number | null; // Optional
   type: BudgetEntryType; 
   startDate?: string; 
   endDate?: string; 
@@ -231,11 +232,14 @@ export interface BudgetEntry {
   updatedAt: string;
 }
 
+// For form handling of BudgetEntry
 export type BudgetEntryFormValues = {
   description: string;
   accountId: string; 
   counterAccountId?: string; 
-  amount: number;
+  amountActual: number;
+  amountBestCase?: number | null;
+  amountWorstCase?: number | null;
   type: BudgetEntryType;
   startDate?: Date; 
   endDate?: Date;   
@@ -251,14 +255,13 @@ export interface BudgetReportAccountEntry {
   accountNumber: string;
   accountName: string;
   mainType: AccountGroup['mainType']; // From CoA
-  actualAmount: number;
-  bestCaseAmount: number;
-  worstCaseAmount: number;
+  actualAmount: number; // Derived from entry.amountActual
+  bestCaseAmount: number; // Derived from entry.amountBestCase or entry.amountActual
+  worstCaseAmount: number; // Derived from entry.amountWorstCase or entry.amountActual
 }
 
 export interface BudgetReportChartDataItem {
   periodLabel: string;
-  // Periodical P/L for each budget scenario for THIS period
   periodActualBudgetProfitLoss: number;
   periodBestCaseBudgetProfitLoss: number;
   periodWorstCaseBudgetProfitLoss: number;
@@ -277,9 +280,9 @@ export interface CombinedBudgetReportChartItem {
   
   // Lines for CUMULATIVE P/L
   cumulativeActualJournalProfitLoss: number; // From Journal
-  cumulativeActualBudgetProfitLoss: number;  // From Budget Scenario 'Actual'
-  cumulativeBestCaseBudgetProfitLoss: number;// From Budget Scenario 'Best Case'
-  cumulativeWorstCaseBudgetProfitLoss: number;// From Budget Scenario 'Worst Case'
+  cumulativeActualBudgetProfitLoss: number;  // From Budget Entry amountActual
+  cumulativeBestCaseBudgetProfitLoss: number;// From Budget Entry amountBestCase (or amountActual)
+  cumulativeWorstCaseBudgetProfitLoss: number;// From Budget Entry amountWorstCase (or amountActual)
 }
 
-
+    

@@ -9,7 +9,6 @@ import type {
   Account,
   AccountGroup,
   AggregationPeriod,
-  BudgetScenario,
 } from '@/types';
 import {
   parseISO,
@@ -45,7 +44,6 @@ function countOccurrencesInPeriod(
   const entryStartDate = startOfDay(parseISO(entry.startDate));
   const entryOwnEndDate = entry.endDate ? endOfDay(parseISO(entry.endDate)) : null;
 
-  // If the entry itself is outside the query period entirely, return 0.
   if (entryOwnEndDate && isBefore(entryOwnEndDate, periodStart)) return 0;
   if (isAfter(entryStartDate, periodEnd)) return 0;
 
@@ -56,7 +54,6 @@ function countOccurrencesInPeriod(
   let occurrences = 0;
   let currentDate = entryStartDate;
 
-  // Adjust currentDate to be the first occurrence >= periodStart
   while (isBefore(currentDate, periodStart)) {
     switch (entry.recurrence) {
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
@@ -65,7 +62,7 @@ function countOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return 0; // Should not happen with 'None' handled
+      default: return 0;
     }
   }
   
@@ -84,7 +81,7 @@ function countOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return occurrences; // Should not happen
+      default: return occurrences;
     }
   }
   return occurrences;
@@ -92,7 +89,7 @@ function countOccurrencesInPeriod(
 
 export function calculateBudgetReportData(
   chartOfAccounts: TenantChartOfAccounts,
-  allTenantBudgets: Budget[],
+  _allTenantBudgets: Budget[], // No longer needed for scenario filtering, but kept for potential future use
   allTenantBudgetEntries: BudgetEntry[],
   reportStartDate: Date,
   reportEndDate: Date,
@@ -111,15 +108,11 @@ export function calculateBudgetReportData(
     });
   });
 
-  // --- Prepare Table Data ---
   const accountAggregates = new Map<string, BudgetReportAccountEntry>();
 
   allTenantBudgetEntries.forEach(entry => {
     const occurrences = countOccurrencesInPeriod(entry, reportStartDate, reportEndDate);
     if (occurrences === 0) return;
-
-    const budget = allTenantBudgets.find(b => b.id === entry.budgetId);
-    if (!budget) return;
 
     const account = accountMap.get(entry.accountId);
     if (!account) return;
@@ -137,49 +130,27 @@ export function calculateBudgetReportData(
       };
     }
 
-    const totalAmountForPeriod = entry.amount * occurrences;
-    // For P&L accounts: Income increases P/L, Expense decreases P/L.
-    // If mainType is Revenue, positive amount is income. If Expense, positive amount is expense.
-    // We store income as positive, expense as positive for P/L calculation: P/L = Income - Expense
-    // Budget entry type 'Income' means it's an income, 'Expense' means it's an expense.
-    const pnlImpact = entry.type === 'Income' ? totalAmountForPeriod : -totalAmountForPeriod;
+    const pnlImpactActual = (entry.type === 'Income' ? entry.amountActual : -entry.amountActual) * occurrences;
+    // Use actual amount if best/worst case is not specified (null or undefined)
+    const amountForBestCase = entry.amountBestCase ?? entry.amountActual;
+    const amountForWorstCase = entry.amountWorstCase ?? entry.amountActual;
 
+    const pnlImpactBestCase = (entry.type === 'Income' ? amountForBestCase : -amountForBestCase) * occurrences;
+    const pnlImpactWorstCase = (entry.type === 'Income' ? amountForWorstCase : -amountForWorstCase) * occurrences;
 
-    switch (budget.scenario) {
-      case 'Actual':
-        aggregate.actualAmount += pnlImpact;
-        // If an account has an 'Actual' entry, it contributes to best/worst too unless overridden for that specific scenario
-        if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case')) {
-             aggregate.bestCaseAmount += pnlImpact;
-        }
-        if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case')) {
-             aggregate.worstCaseAmount += pnlImpact;
-        }
-        break;
-      case 'Best Case':
-        aggregate.bestCaseAmount += pnlImpact;
-        break;
-      case 'Worst Case':
-        aggregate.worstCaseAmount += pnlImpact;
-        break;
-    }
+    aggregate.actualAmount += pnlImpactActual;
+    aggregate.bestCaseAmount += pnlImpactBestCase;
+    aggregate.worstCaseAmount += pnlImpactWorstCase;
+    
     accountAggregates.set(entry.accountId, aggregate);
   });
   reportData.tableData = Array.from(accountAggregates.values());
 
-
-  // --- Prepare Chart Data (Periodical P/L for budget scenarios) ---
   let periods: Date[] = [];
   switch (aggregationPeriod) {
-    case 'monthly':
-      periods = eachMonthOfInterval({ start: reportStartDate, end: reportEndDate });
-      break;
-    case 'weekly':
-      periods = eachWeekOfInterval({ start: reportStartDate, end: reportEndDate }, { weekStartsOn: 1 });
-      break;
-    case 'daily':
-      periods = eachDayOfInterval({ start: reportStartDate, end: reportEndDate });
-      break;
+    case 'monthly': periods = eachMonthOfInterval({ start: reportStartDate, end: reportEndDate }); break;
+    case 'weekly': periods = eachWeekOfInterval({ start: reportStartDate, end: reportEndDate }, { weekStartsOn: 1 }); break;
+    case 'daily': periods = eachDayOfInterval({ start: reportStartDate, end: reportEndDate }); break;
   }
 
   periods.forEach(periodDate => {
@@ -187,20 +158,14 @@ export function calculateBudgetReportData(
 
     switch (aggregationPeriod) {
       case 'monthly':
-        periodStart = startOfMonth(periodDate);
-        periodEnd = endOfMonth(periodDate);
-        periodLabel = format(periodDate, "MMM yy", { locale: de });
-        break;
+        periodStart = startOfMonth(periodDate); periodEnd = endOfMonth(periodDate);
+        periodLabel = format(periodDate, "MMM yy", { locale: de }); break;
       case 'weekly':
-        periodStart = startOfWeek(periodDate, { weekStartsOn: 1 });
-        periodEnd = endOfWeek(periodDate, { weekStartsOn: 1 });
-        periodLabel = `KW${format(periodDate, "ww", { locale: de })} '${format(periodDate, "yy", { locale: de })}`;
-        break;
+        periodStart = startOfWeek(periodDate, { weekStartsOn: 1 }); periodEnd = endOfWeek(periodDate, { weekStartsOn: 1 });
+        periodLabel = `KW${format(periodDate, "ww", { locale: de })} '${format(periodDate, "yy", { locale: de })}`; break;
       case 'daily':
-        periodStart = startOfDay(periodDate);
-        periodEnd = endOfDay(periodDate);
-        periodLabel = format(periodDate, "dd.MM.yy", { locale: de });
-        break;
+        periodStart = startOfDay(periodDate); periodEnd = endOfDay(periodDate);
+        periodLabel = format(periodDate, "dd.MM.yy", { locale: de }); break;
     }
     
     if (isAfter(periodEnd, reportEndDate)) periodEnd = reportEndDate;
@@ -217,35 +182,23 @@ export function calculateBudgetReportData(
       const occurrences = countOccurrencesInPeriod(entry, periodStart, periodEnd);
       if (occurrences === 0) return;
 
-      const budget = allTenantBudgets.find(b => b.id === entry.budgetId);
-      if (!budget) return;
-
       const account = accountMap.get(entry.accountId);
       if (!account || (account.mainType !== 'Revenue' && account.mainType !== 'Expense')) return;
 
-      const totalAmountForSubPeriod = entry.amount * occurrences;
-      const pnlImpactForSubPeriod = entry.type === 'Income' ? totalAmountForSubPeriod : -totalAmountForSubPeriod;
+      const pnlImpactActual = (entry.type === 'Income' ? entry.amountActual : -entry.amountActual) * occurrences;
+      const amountForBestCase = entry.amountBestCase ?? entry.amountActual;
+      const amountForWorstCase = entry.amountWorstCase ?? entry.amountActual;
+      const pnlImpactBestCase = (entry.type === 'Income' ? amountForBestCase : -amountForBestCase) * occurrences;
+      const pnlImpactWorstCase = (entry.type === 'Income' ? amountForWorstCase : -amountForWorstCase) * occurrences;
 
-      switch (budget.scenario) {
-        case 'Actual':
-          chartItem.periodActualBudgetProfitLoss += pnlImpactForSubPeriod;
-           if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
-             chartItem.periodBestCaseBudgetProfitLoss += pnlImpactForSubPeriod;
-           }
-           if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
-            chartItem.periodWorstCaseBudgetProfitLoss += pnlImpactForSubPeriod;
-           }
-          break;
-        case 'Best Case':
-          chartItem.periodBestCaseBudgetProfitLoss += pnlImpactForSubPeriod;
-          break;
-        case 'Worst Case':
-          chartItem.periodWorstCaseBudgetProfitLoss += pnlImpactForSubPeriod;
-          break;
-      }
+      chartItem.periodActualBudgetProfitLoss += pnlImpactActual;
+      chartItem.periodBestCaseBudgetProfitLoss += pnlImpactBestCase;
+      chartItem.periodWorstCaseBudgetProfitLoss += pnlImpactWorstCase;
     });
     reportData.chartData.push(chartItem);
   });
 
   return reportData;
 }
+
+    

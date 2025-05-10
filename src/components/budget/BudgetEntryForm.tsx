@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -39,12 +40,20 @@ const createBudgetEntryFormSchema = () => z.object({
   description: z.string().min(1, "Beschreibung ist erforderlich."),
   accountId: z.string().min(1, "Budgetkonto ist erforderlich."),
   counterAccountId: z.string().optional(),
-  amount: z.preprocess(
+  amountActual: z.preprocess(
     (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
-    z.number().positive("Betrag muss positiv sein.")
+    z.number().positive("Standardbetrag muss positiv sein.")
+  ),
+  amountBestCase: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (val === null || val === undefined ? null : val)),
+    z.number().positive("Best-Case Betrag muss positiv sein.").nullable().optional()
+  ),
+  amountWorstCase: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() !== '' ? parseFloat(val.replace(',', '.')) : (val === null || val === undefined ? null : val)),
+    z.number().positive("Worst-Case Betrag muss positiv sein.").nullable().optional()
   ),
   type: z.enum(budgetEntryTypes, { required_error: "Typ ist erforderlich." }),
-  startDate: z.date().optional(), // Required if isRecurring or for single specific date
+  startDate: z.date().optional(),
   endDate: z.date().optional(),
   isRecurring: z.boolean().default(false),
   recurrence: z.enum(budgetRecurrences).default('None'),
@@ -103,7 +112,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
           description: initialData.description,
           accountId: initialData.accountId,
           counterAccountId: initialData.counterAccountId || '',
-          amount: initialData.amount,
+          amountActual: initialData.amountActual,
+          amountBestCase: initialData.amountBestCase,
+          amountWorstCase: initialData.amountWorstCase,
           type: initialData.type,
           startDate: initialData.startDate ? parseISO(initialData.startDate) : undefined,
           endDate: initialData.endDate ? parseISO(initialData.endDate) : undefined,
@@ -114,9 +125,11 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
           description: '',
           accountId: '',
           counterAccountId: '',
-          amount: 0,
+          amountActual: 0,
+          amountBestCase: undefined,
+          amountWorstCase: undefined,
           type: 'Expense',
-          startDate: new Date(), // Default to today for new entries
+          startDate: new Date(), 
           endDate: undefined,
           isRecurring: false,
           recurrence: 'None',
@@ -129,7 +142,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
         description: initialData.description,
         accountId: initialData.accountId,
         counterAccountId: initialData.counterAccountId || '',
-        amount: initialData.amount,
+        amountActual: initialData.amountActual,
+        amountBestCase: initialData.amountBestCase,
+        amountWorstCase: initialData.amountWorstCase,
         type: initialData.type,
         startDate: initialData.startDate ? parseISO(initialData.startDate) : undefined,
         endDate: initialData.endDate ? parseISO(initialData.endDate) : undefined,
@@ -169,10 +184,12 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       counterAccountId: values.counterAccountId || undefined,
       counterAccountNumber: selectedCounterAccount?.number,
       counterAccountName: selectedCounterAccount?.name,
-      amount: values.amount,
+      amountActual: values.amountActual,
+      amountBestCase: values.amountBestCase,
+      amountWorstCase: values.amountWorstCase,
       type: values.type,
       startDate: values.startDate?.toISOString(),
-      endDate: values.isRecurring && values.endDate ? values.endDate.toISOString() : undefined, // Only set endDate if recurring and provided
+      endDate: values.isRecurring && values.endDate ? values.endDate.toISOString() : undefined,
       isRecurring: values.isRecurring,
       recurrence: values.isRecurring ? values.recurrence : 'None',
     };
@@ -182,7 +199,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
           description: '',
           accountId: '',
           counterAccountId: '',
-          amount: 0,
+          amountActual: 0,
+          amountBestCase: undefined,
+          amountWorstCase: undefined,
           type: 'Expense',
           startDate: new Date(),
           endDate: undefined,
@@ -234,19 +253,44 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             )}
             />
         </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <FormField
             control={form.control}
-            name="amount"
+            name="amountActual"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Betrag (CHF)</FormLabel>
+                <FormLabel>Betrag Standard (CHF)</FormLabel>
                 <FormControl><Input type="number" step="0.01" placeholder="100.00" {...field} /></FormControl>
                 <FormMessage />
                 </FormItem>
             )}
             />
             <FormField
+            control={form.control}
+            name="amountBestCase"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Betrag Best-Case (optional)</FormLabel>
+                <FormControl><Input type="number" step="0.01" placeholder="z.B. 90.00" {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="amountWorstCase"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Betrag Worst-Case (optional)</FormLabel>
+                <FormControl><Input type="number" step="0.01" placeholder="z.B. 110.00" {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        </div>
+        
+        <FormField
             control={form.control}
             name="type"
             render={({ field }) => (
@@ -264,7 +308,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
                 </FormItem>
             )}
             />
-        </div>
+
         <FormField
             control={form.control}
             name="isRecurring"
@@ -278,9 +322,9 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
                         field.onChange(checked);
                         if (!checked) {
                             form.setValue('recurrence', 'None');
-                            form.setValue('endDate', undefined); // Clear end date if not recurring
+                            form.setValue('endDate', undefined); 
                         } else {
-                           if(form.getValues('recurrence') === 'None') form.setValue('recurrence', 'Monthly'); // Default to Monthly if recurring
+                           if(form.getValues('recurrence') === 'None') form.setValue('recurrence', 'Monthly'); 
                         }
                     }} />
                 </FormControl>
@@ -420,3 +464,5 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
     </Popover>
   );
 }
+
+    

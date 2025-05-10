@@ -19,9 +19,8 @@ import { useGetBudgets } from '@/hooks/useBudgets';
 import { useGetAllBudgetEntriesForTenant } from '@/hooks/useBudgetEntries';
 import { useGetAllJournalEntriesForTenant, useGetJournalEntriesBeforeDate } from '@/hooks/useJournalEntries'; 
 import { calculateBudgetReportData, type BudgetReportData } from '@/lib/budgetReporting';
-import type { AccountGroup, AggregationPeriod, JournalEntry, TenantChartOfAccounts, CombinedBudgetReportChartItem } from '@/types';
+import type { AccountGroup, AggregationPeriod, CombinedBudgetReportChartItem } from '@/types';
 import { formatCurrency, cn } from '@/lib/utils';
-import * as journalEntryService from '@/services/journalEntryService'; // For direct service call
 import { 
   format, 
   startOfMonth, 
@@ -30,7 +29,6 @@ import {
   startOfYear, 
   endOfYear, 
   subMonths,
-  subDays, 
   isWithinInterval,
   eachMonthOfInterval,
   eachWeekOfInterval,
@@ -51,10 +49,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 
 const chartConfig = {
-  actualJournalProfitLoss: { label: "Ist G/V", color: "hsl(var(--chart-0))" }, // Added new color, ensure it exists in globals.css or define here
-  actualProfitLoss: { label: "Budget P/L Standard", color: "hsl(var(--chart-1))" },
-  bestCaseProfitLoss: { label: "Budget P/L Best-Case", color: "hsl(var(--chart-2))" },
-  worstCaseProfitLoss: { label: "Budget P/L Worst-Case", color: "hsl(var(--chart-3))" },
+  actualJournalProfitLoss: { label: "Ist G/V", color: "hsl(var(--chart-0))" }, 
+  actualProfitLoss: { label: "Budget G/V Standard", color: "hsl(var(--chart-1))" },
+  bestCaseProfitLoss: { label: "Budget G/V Best-Case", color: "hsl(var(--chart-2))" },
+  worstCaseProfitLoss: { label: "Budget G/V Worst-Case", color: "hsl(var(--chart-3))" },
   actualRevenue: { label: "Eff. Ertrag", color: "hsl(var(--chart-4))" }, 
   actualExpense: { label: "Eff. Aufwand", color: "hsl(var(--chart-5))" }, 
 } satisfies ChartConfig;
@@ -74,7 +72,7 @@ export default function BudgetReportsPage() {
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
   const { data: budgets, isLoading: isLoadingBudgets, error: budgetsError } = useGetBudgets(tenantId);
   const { data: allBudgetEntries, isLoading: isLoadingBudgetEntries, error: budgetEntriesError } = useGetAllBudgetEntriesForTenant(tenantId);
-  const { data: allJournalEntries, isLoading: isLoadingJournalEntries, error: journalEntriesError } = useGetAllJournalEntriesForTenant(tenantId); // Used for actuals within report period
+  const { data: allJournalEntries, isLoading: isLoadingJournalEntries, error: journalEntriesError } = useGetAllJournalEntriesForTenant(tenantId); 
   
   const { data: historicalJournalEntries, isLoading: isLoadingHistoricalEntries } = useGetJournalEntriesBeforeDate(tenantId, startDate);
 
@@ -103,12 +101,12 @@ export default function BudgetReportsPage() {
             entry.lines.forEach(line => {
                 const account = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === line.accountId);
                 if (account) {
-                    const group = chartOfAccounts.groups.find(g => g.accounts.some(acc => acc.id === account.id));
+                    const group = chartOfAccounts.groups.find(g => g.accounts.some(acc => acc.id === line.accountId));
                     const mainGroup = group?.isFixed ? group : chartOfAccounts.groups.find(g => g.id === group?.parentId);
                     if (mainGroup?.mainType === 'Revenue') {
-                        pnl -= (line.debit || 0) - (line.credit || 0); // Revenue decreases with debit, increases with credit
+                        pnl -= (line.debit || 0) - (line.credit || 0); 
                     } else if (mainGroup?.mainType === 'Expense') {
-                        pnl += (line.debit || 0) - (line.credit || 0); // Expense increases with debit, decreases with credit
+                        pnl += (line.debit || 0) - (line.credit || 0); 
                     }
                 }
             });
@@ -123,6 +121,7 @@ export default function BudgetReportsPage() {
     if (!clientLoaded || !chartOfAccounts || !budgets || !allBudgetEntries || !startDate || !endDate) {
       return null;
     }
+    // Pass budgets, though it's not used for scenario filtering anymore in the new logic
     return calculateBudgetReportData(chartOfAccounts, budgets, allBudgetEntries, startDate, endDate, aggregationPeriod);
   }, [clientLoaded, chartOfAccounts, budgets, allBudgetEntries, startDate, endDate, aggregationPeriod]);
   
@@ -142,29 +141,22 @@ export default function BudgetReportsPage() {
     switch (aggregationPeriod) {
       case 'monthly':
         periodsForActuals = eachMonthOfInterval({ start: startDate, end: endDate }).map(d => {
-          const ps = startOfMonth(d);
-          const pe = endOfMonth(d);
-          const pk = format(d, "yyyy-MM");
+          const ps = startOfMonth(d); const pe = endOfMonth(d); const pk = format(d, "yyyy-MM");
           const pl = format(d, "MMM yy", { locale: de });
           return {periodStart: ps, periodEnd: pe, periodKey: pk, periodLabel: pl, sortKey: pk };
         });
         break;
       case 'weekly':
         periodsForActuals = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 }).map(d => {
-          const ps = startOfWeek(d, { weekStartsOn: 1});
-          const pe = endOfWeek(d, { weekStartsOn: 1});
-          const year = getISOWeekYear(d);
-          const weekNum = getISOWeek(d);
-          const pk = `${year}-W${String(weekNum).padStart(2, '0')}`;
-          const pl = `KW${weekNum} '${String(year).slice(-2)}`;
+          const ps = startOfWeek(d, { weekStartsOn: 1}); const pe = endOfWeek(d, { weekStartsOn: 1});
+          const year = getISOWeekYear(d); const weekNum = getISOWeek(d);
+          const pk = `${year}-W${String(weekNum).padStart(2, '0')}`; const pl = `KW${weekNum} '${String(year).slice(-2)}`;
           return { periodStart: ps, periodEnd: pe, periodKey: pk, periodLabel: pl, sortKey: pk };
         });
         break;
       case 'daily':
         periodsForActuals = eachDayOfInterval({ start: startDate, end: endDate }).map(d => {
-          const ps = startOfDay(d);
-          const pe = endOfDay(d);
-          const pk = format(d, 'yyyy-MM-dd');
+          const ps = startOfDay(d); const pe = endOfDay(d); const pk = format(d, 'yyyy-MM-dd');
           const pl = format(d, "dd.MM.yy", { locale: de });
           return { periodStart: ps, periodEnd: pe, periodKey: pk, periodLabel: pl, sortKey: pk };
         });
@@ -172,8 +164,7 @@ export default function BudgetReportsPage() {
     }
     
     periodsForActuals.forEach(({periodStart, periodEnd, periodKey, periodLabel, sortKey}) => {
-       let currentPeriodStart = periodStart;
-       let currentPeriodEnd = periodEnd;
+       let currentPeriodStart = periodStart; let currentPeriodEnd = periodEnd;
        if (isAfter(currentPeriodEnd, endOfDay(endDate))) currentPeriodEnd = endOfDay(endDate);
        if (isBefore(currentPeriodStart, startOfDay(startDate))) currentPeriodStart = startOfDay(startDate);
 
@@ -198,8 +189,8 @@ export default function BudgetReportsPage() {
                     }
                 }
                const netChange = (line.debit || 0) - (line.credit || 0);
-               if (mainTypeForAggregation === 'Revenue') currentPeriodActuals.revenue -= netChange; // Revenue has credit nature
-               else if (mainTypeForAggregation === 'Expense') currentPeriodActuals.expenses += netChange; // Expense has debit nature
+               if (mainTypeForAggregation === 'Revenue') currentPeriodActuals.revenue -= netChange; 
+               else if (mainTypeForAggregation === 'Expense') currentPeriodActuals.expenses += netChange;
              }
            });
          }
@@ -232,7 +223,6 @@ export default function BudgetReportsPage() {
       const budgetItem = budgetReportData?.chartData.find(item => item.periodLabel === label);
       const actualItem = actualChartDataRaw.find(item => item.periodLabel === label);
 
-      // P/L for *this* period from actual journal entries
       const periodActualJournalPnl = (actualItem?.revenue || 0) - (actualItem?.expenses || 0);
       cumulativeActualJournalPnl += periodActualJournalPnl;
 
@@ -243,7 +233,7 @@ export default function BudgetReportsPage() {
       return {
         periodLabel: label,
         actualJournalRevenue: actualItem?.revenue || 0, 
-        actualJournalExpense: actualItem?.expenses || 0, // Store as positive for bar chart
+        actualJournalExpense: actualItem?.expenses || 0, 
         
         cumulativeActualJournalProfitLoss: cumulativeActualJournalPnl,
         cumulativeActualBudgetProfitLoss: cumulativeBudgetActualPnl,
@@ -280,9 +270,9 @@ export default function BudgetReportsPage() {
   };
 
   const revenueTotals = calculateTotals('Revenue');
-  const expenseTotals = calculateTotals('Expense'); // Expenses are stored as negative if they decrease P/L.
+  const expenseTotals = calculateTotals('Expense'); 
   const profitLossTotals = {
-      actual: revenueTotals.actual + expenseTotals.actual, // Direct sum as expenses are negative
+      actual: revenueTotals.actual + expenseTotals.actual, 
       bestCase: revenueTotals.bestCase + expenseTotals.bestCase,
       worstCase: revenueTotals.worstCase + expenseTotals.worstCase,
   };
@@ -322,23 +312,7 @@ export default function BudgetReportsPage() {
     }
   };
 
-  if (isLoading && !clientLoaded) {
-    return (
-      <div className="space-y-6 p-4 md:p-8">
-        <Skeleton className="h-10 w-1/3 mb-2" /> <Skeleton className="h-6 w-2/3 mb-6" />
-        <div className="flex flex-col gap-4 mb-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-                 <Skeleton className="h-10 w-full sm:w-72" /> <Skeleton className="h-10 w-full sm:w-72" />
-            </div>
-            <div className="flex flex-wrap gap-2">
-                <Skeleton className="h-9 w-28" /> <Skeleton className="h-9 w-28" /> <Skeleton className="h-9 w-28" />
-            </div>
-        </div>
-        <Card><CardHeader><Skeleton className="h-8 w-1/2" /></CardHeader><CardContent><Skeleton className="h-[300px] w-full" /></CardContent></Card>
-        <Card><CardHeader><Skeleton className="h-8 w-1/2" /></CardHeader><CardContent><Skeleton className="h-[200px] w-full" /></CardContent></Card>
-      </div>
-    );
-  }
+  if (isLoading && clientLoaded && <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />)
 
   if (combinedError) {
     return (
@@ -463,9 +437,9 @@ export default function BudgetReportsPage() {
                     </Bar>
 
                     <Line type="monotone" dataKey="cumulativeActualJournalProfitLoss" stroke="var(--color-actualJournalProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Ist G/V" hide={!seriesVisibility.actualJournalProfitLoss}/>
-                    <Line type="monotone" dataKey="cumulativeActualBudgetProfitLoss" stroke="var(--color-actualProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Budget P/L Standard" hide={!seriesVisibility.actualProfitLoss}/>
-                    <Line type="monotone" dataKey="cumulativeBestCaseBudgetProfitLoss" stroke="var(--color-bestCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Best-Case" hide={!seriesVisibility.bestCaseProfitLoss}/>
-                    <Line type="monotone" dataKey="cumulativeWorstCaseBudgetProfitLoss" stroke="var(--color-worstCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Worst-Case" hide={!seriesVisibility.worstCaseProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeActualBudgetProfitLoss" stroke="var(--color-actualProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Budget G/V Standard" hide={!seriesVisibility.actualProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeBestCaseBudgetProfitLoss" stroke="var(--color-bestCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget G/V Best-Case" hide={!seriesVisibility.bestCaseProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeWorstCaseBudgetProfitLoss" stroke="var(--color-worstCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget G/V Worst-Case" hide={!seriesVisibility.worstCaseProfitLoss}/>
                   </ComposedChart>
                 </ChartContainer>
               ) : (
@@ -478,7 +452,7 @@ export default function BudgetReportsPage() {
             <CardHeader>
               <CardTitle>Budgetübersicht nach Konten</CardTitle>
               <CardDescription>
-                Budgetierte Beträge pro Konto und Szenario für den Zeitraum {startDate ? format(startDate, "dd.MM.yy", { locale: de }) : ''} - {endDate ? format(endDate, "dd.MM.yy", { locale: de }) : ''}.
+                Budgetierte Beträge pro Konto für den Zeitraum {startDate ? format(startDate, "dd.MM.yy", { locale: de }) : ''} - {endDate ? format(endDate, "dd.MM.yy", { locale: de }) : ''}.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -532,3 +506,5 @@ export default function BudgetReportsPage() {
     </div>
   );
 }
+
+    

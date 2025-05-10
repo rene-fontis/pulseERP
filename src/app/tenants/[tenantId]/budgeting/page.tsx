@@ -135,7 +135,7 @@ export default function ManageBudgetsPage() {
               <DialogHeader>
                 <DialogTitle>Neues Budget erstellen</DialogTitle>
                 <DialogDescriptionComponent>
-                  Definieren Sie ein neues Budget und wählen Sie ein Szenario.
+                  Definieren Sie ein neues Budget.
                 </DialogDescriptionComponent>
               </DialogHeader>
               <BudgetForm 
@@ -156,7 +156,7 @@ export default function ManageBudgetsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Szenario</TableHead>
+                    {/* Scenario column removed */}
                     <TableHead>Beschreibung</TableHead>
                     <TableHead>Erstellt am</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
@@ -182,15 +182,7 @@ export default function ManageBudgetsPage() {
                             </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="align-top">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            budget.scenario === 'Actual' ? 'bg-blue-100 text-blue-700' :
-                            budget.scenario === 'Best Case' ? 'bg-green-100 text-green-700' :
-                            budget.scenario === 'Worst Case' ? 'bg-red-100 text-red-700' : ''
-                          }`}>
-                          {budget.scenario === "Actual" ? "Standard" : budget.scenario === "Best Case" ? "Best-Case" : "Worst-Case"}
-                        </span>
-                      </TableCell>
+                      {/* Scenario Cell removed */}
                       <TableCell className="align-top">{budget.description || '-'}</TableCell>
                       <TableCell className="align-top">{formatDate(budget.createdAt)}</TableCell>
                       <TableCell className="text-right space-x-2 align-top">
@@ -226,7 +218,7 @@ export default function ManageBudgetsPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-10 text-muted-foreground"> {/* Colspan adjusted */}
                         Keine Budgets gefunden. Erstellen Sie eines, um loszulegen!
                       </TableCell>
                     </TableRow>
@@ -262,3 +254,4 @@ export default function ManageBudgetsPage() {
   );
 }
 
+    

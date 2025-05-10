@@ -96,7 +96,7 @@ export default function BudgetEntriesPage() {
     if (!clientLoaded) return "Lädt...";
     if (!startDate) return "-";
     const start = format(parseISO(startDate), "dd.MM.yy", { locale: de });
-    if (!endDate) return start; // For single, non-recurring entries if endDate is not applicable/set
+    if (!endDate) return start; 
     const end = format(parseISO(endDate), "dd.MM.yy", { locale: de });
     return `${start} - ${end}`;
   };
@@ -144,11 +144,10 @@ export default function BudgetEntriesPage() {
         </Button>
       <div className="mb-6">
         <div className="flex items-center mb-1">
-            {/* Icon for budget entries, e.g., ListChecks or similar */}
           <h1 className="text-3xl font-bold">Budgeteinträge: {budget?.name || ''}</h1>
         </div>
         <p className="text-muted-foreground">
-          Verwalten Sie die einzelnen Einträge für das Budget "{budget?.name}" (Szenario: {budget?.scenario}).
+          Verwalten Sie die einzelnen Einträge für das Budget "{budget?.name}".
         </p>
       </div>
 
@@ -190,7 +189,9 @@ export default function BudgetEntriesPage() {
                     <TableHead>Beschreibung</TableHead>
                     <TableHead>Konto</TableHead>
                     <TableHead>Gegenkonto</TableHead>
-                    <TableHead className="text-right">Betrag</TableHead>
+                    <TableHead className="text-right">Betrag Standard</TableHead>
+                    <TableHead className="text-right">Betrag Best-Case</TableHead>
+                    <TableHead className="text-right">Betrag Worst-Case</TableHead>
                     <TableHead>Typ</TableHead>
                     <TableHead>Zeitraum</TableHead>
                     <TableHead>Intervall</TableHead>
@@ -203,7 +204,9 @@ export default function BudgetEntriesPage() {
                       <TableCell className="font-medium max-w-xs truncate" title={entry.description}>{entry.description}</TableCell>
                       <TableCell>{entry.accountName ? `${entry.accountNumber} - ${entry.accountName}` : entry.accountId.slice(0,8)+'...'}</TableCell>
                       <TableCell>{entry.counterAccountName ? `${entry.counterAccountNumber} - ${entry.counterAccountName}` : '-'}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(entry.amountActual)}</TableCell>
+                      <TableCell className="text-right">{entry.amountBestCase != null ? formatCurrency(entry.amountBestCase) : '-'}</TableCell>
+                      <TableCell className="text-right">{entry.amountWorstCase != null ? formatCurrency(entry.amountWorstCase) : '-'}</TableCell>
                       <TableCell>
                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${entry.type === 'Income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {entry.type === 'Income' ? 'Einnahme' : 'Ausgabe'}
@@ -244,7 +247,7 @@ export default function BudgetEntriesPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-10 text-muted-foreground"> {/* Colspan updated */}
                         Keine Einträge für dieses Budget gefunden.
                       </TableCell>
                     </TableRow>
@@ -281,3 +284,5 @@ export default function BudgetEntriesPage() {
     </div>
   );
 }
+
+    

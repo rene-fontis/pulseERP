@@ -9,15 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Budget, BudgetFormValues, BudgetScenario } from '@/types';
+import type { Budget, BudgetFormValues } from '@/types';
 
-const budgetScenarios: BudgetScenario[] = ["Actual", "Best Case", "Worst Case"];
-
+// Scenario removed from main budget entity
 const formSchema = z.object({
   name: z.string().min(2, "Budgetname muss mindestens 2 Zeichen lang sein."),
   description: z.string().optional(),
-  scenario: z.enum(budgetScenarios, { required_error: "Szenario ist erforderlich." }),
 });
 
 interface BudgetFormProps {
@@ -33,12 +30,10 @@ export function BudgetForm({ onSubmit, initialData, isSubmitting }: BudgetFormPr
       ? {
           name: initialData.name,
           description: initialData.description || '',
-          scenario: initialData.scenario,
         }
       : {
           name: '',
           description: '',
-          scenario: 'Actual',
         },
   });
 
@@ -75,32 +70,7 @@ export function BudgetForm({ onSubmit, initialData, isSubmitting }: BudgetFormPr
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="scenario"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Szenario</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Szenario wählen..." />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {budgetScenarios.map(scenario => (
-                    <SelectItem key={scenario} value={scenario}>
-                      {scenario === "Actual" ? "Standard / Effektiv" : 
-                       scenario === "Best Case" ? "Best Case" : "Worst Case"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>Wählen Sie das Szenario für dieses Budget.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Scenario Select removed */}
         <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? 'Speichern...' : (initialData ? 'Änderungen speichern' : 'Budget erstellen')}
         </Button>
@@ -108,3 +78,5 @@ export function BudgetForm({ onSubmit, initialData, isSubmitting }: BudgetFormPr
     </Form>
   );
 }
+
+    

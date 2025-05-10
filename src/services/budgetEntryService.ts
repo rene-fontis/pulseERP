@@ -1,9 +1,10 @@
+
 "use client";
 
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { BudgetEntry, NewBudgetEntryPayload, BudgetEntryFormValues } from '@/types';
-import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils'; // Assuming you have this utility
+import type { BudgetEntry, NewBudgetEntryPayload } from '@/types';
+import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils'; 
 
 const budgetEntriesCollectionRef = collection(db, 'budgetEntries');
 
@@ -19,7 +20,9 @@ const mapDocToBudgetEntry = (docSnapshot: any): BudgetEntry => {
     counterAccountNumber: data.counterAccountNumber,
     counterAccountName: data.counterAccountName,
     description: data.description,
-    amount: data.amount,
+    amountActual: data.amountActual,
+    amountBestCase: data.amountBestCase, // Can be null/undefined
+    amountWorstCase: data.amountWorstCase, // Can be null/undefined
     type: data.type,
     startDate: data.startDate ? formatFirestoreTimestamp(data.startDate) : undefined,
     endDate: data.endDate ? formatFirestoreTimestamp(data.endDate) : undefined,
@@ -49,7 +52,7 @@ export const addBudgetEntry = async (newEntryData: NewBudgetEntryPayload): Promi
   const now = serverTimestamp();
   
   const dataToSave: any = {
-    ...newEntryData,
+    ...newEntryData, // Includes amountActual, amountBestCase, amountWorstCase
     isRecurring: newEntryData.isRecurring || false,
     recurrence: newEntryData.recurrence || 'None',
     createdAt: now,
@@ -62,12 +65,15 @@ export const addBudgetEntry = async (newEntryData: NewBudgetEntryPayload): Promi
   if (newEntryData.endDate) dataToSave.endDate = Timestamp.fromDate(new Date(newEntryData.endDate));
   else delete dataToSave.endDate; 
   
-  // Ensure optional fields are removed if undefined/empty to avoid storing nulls unnecessarily
   if (!newEntryData.accountNumber) delete dataToSave.accountNumber;
   if (!newEntryData.accountName) delete dataToSave.accountName;
   if (!newEntryData.counterAccountId) delete dataToSave.counterAccountId;
   if (!newEntryData.counterAccountNumber) delete dataToSave.counterAccountNumber;
   if (!newEntryData.counterAccountName) delete dataToSave.counterAccountName;
+
+  // Ensure optional amounts are stored as null if undefined or empty, or the value if present
+  dataToSave.amountBestCase = newEntryData.amountBestCase === undefined || newEntryData.amountBestCase === null ? null : newEntryData.amountBestCase;
+  dataToSave.amountWorstCase = newEntryData.amountWorstCase === undefined || newEntryData.amountWorstCase === null ? null : newEntryData.amountWorstCase;
 
 
   const docRef = await addDoc(budgetEntriesCollectionRef, dataToSave);
@@ -95,6 +101,15 @@ export const updateBudgetEntry = async (entryId: string, entryData: Partial<NewB
     updateData.counterAccountName = null;
   }
 
+  // Handle optional amounts for update
+  if (entryData.hasOwnProperty('amountBestCase')) {
+    updateData.amountBestCase = entryData.amountBestCase === undefined || entryData.amountBestCase === null ? null : entryData.amountBestCase;
+  }
+  if (entryData.hasOwnProperty('amountWorstCase')) {
+    updateData.amountWorstCase = entryData.amountWorstCase === undefined || entryData.amountWorstCase === null ? null : entryData.amountWorstCase;
+  }
+
+
   await updateDoc(entryDocRef, updateData);
   const updatedDocSnapshot = await getDoc(entryDocRef);
   if (updatedDocSnapshot.exists()) {
@@ -108,3 +123,5 @@ export const deleteBudgetEntry = async (entryId: string): Promise<boolean> => {
   await deleteDoc(entryDocRef);
   return true;
 };
+
+    

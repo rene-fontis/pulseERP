@@ -13,7 +13,7 @@ const mapDocToBudget = (docSnapshot: any): Budget => {
     tenantId: data.tenantId,
     name: data.name,
     description: data.description || '',
-    scenario: data.scenario || 'Actual',
+    // scenario: data.scenario || 'Actual', // Scenario removed
     createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, 'now'),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, 'now'),
   } as Budget;
@@ -38,8 +38,9 @@ export const addBudget = async (tenantId: string, budgetData: BudgetFormValues):
   const now = serverTimestamp();
   const newBudget = {
     tenantId,
-    ...budgetData,
+    name: budgetData.name, // name is now directly from BudgetFormValues
     description: budgetData.description || '',
+    // scenario: budgetData.scenario, // Scenario removed
     createdAt: now,
     updatedAt: now,
   };
@@ -57,6 +58,7 @@ export const updateBudget = async (budgetId: string, budgetData: Partial<BudgetF
   if (budgetData.description === undefined && !updateData.hasOwnProperty('description')) {
     updateData.description = '';
   }
+  // No scenario to handle in updateData for Budget itself
   await updateDoc(budgetDocRef, updateData);
   const updatedDocSnapshot = await getDoc(budgetDocRef);
   if (updatedDocSnapshot.exists()) {
@@ -76,3 +78,5 @@ export const deleteBudget = async (budgetId: string): Promise<boolean> => {
   await deleteDoc(budgetDocRef);
   return true;
 };
+
+    
