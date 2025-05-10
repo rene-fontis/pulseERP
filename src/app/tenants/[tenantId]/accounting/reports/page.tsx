@@ -24,7 +24,6 @@ import {
   ResponsiveContainer,
   LabelList,
   ReferenceLine,
-  LegendProps,
 } from 'recharts';
 import {
   ChartContainer,
@@ -120,7 +119,7 @@ export default function TenantReportsPage() {
 
   const handleLegendClick = (data: any) => {
     const { dataKey } = data;
-    if (dataKey) {
+    if (dataKey && typeof dataKey === 'string' && chartConfig.hasOwnProperty(dataKey)) {
         setSeriesVisibility(prev => ({
             ...prev,
             [dataKey]: !prev[dataKey]
@@ -229,7 +228,7 @@ export default function TenantReportsPage() {
           <CardDescription className="flex items-center">
             <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
             {selectedFiscalYearDetails ? 
-                `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - {formatDate(selectedFiscalYearDetails.endDate)})` 
+                `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${formatDate(selectedFiscalYearDetails.startDate)} - ${formatDate(selectedFiscalYearDetails.endDate)})` 
                 : (isLoadingSelectedFiscalYear ? "Lade Geschäftsjahres Info..." : "Bitte Geschäftsjahr wählen")}
           </CardDescription>
         </CardHeader>
@@ -262,10 +261,9 @@ export default function TenantReportsPage() {
                   }} />}
                 />
                 <ChartLegend 
-                    content={<ChartLegendContent />} 
+                    content={<ChartLegendContent onClick={handleLegendClick} />} 
                     verticalAlign="top" 
                     wrapperStyle={{ paddingBottom: '20px' }}
-                    onClick={handleLegendClick} 
                 />
                 <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={2} strokeOpacity={0.9} />
                 <Bar dataKey="Ertrag" fill="var(--color-Ertrag)" radius={[4, 4, 0, 0]} barSize={25} hide={!seriesVisibility.Ertrag}>
