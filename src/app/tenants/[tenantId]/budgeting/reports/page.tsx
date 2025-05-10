@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -16,10 +17,11 @@ import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetBudgets } from '@/hooks/useBudgets';
 import { useGetAllBudgetEntriesForTenant } from '@/hooks/useBudgetEntries';
-import { useGetAllJournalEntriesForTenant } from '@/hooks/useJournalEntries'; // Import hook for actuals
+import { useGetAllJournalEntriesForTenant, useGetJournalEntriesBeforeDate } from '@/hooks/useJournalEntries'; 
 import { calculateBudgetReportData, type BudgetReportData } from '@/lib/budgetReporting';
-import type { AccountGroup, AggregationPeriod, BudgetScenario, JournalEntry, TenantChartOfAccounts } from '@/types'; // Added JournalEntry, TenantChartOfAccounts
+import type { AccountGroup, AggregationPeriod, JournalEntry, TenantChartOfAccounts, CombinedBudgetReportChartItem } from '@/types';
 import { formatCurrency, cn } from '@/lib/utils';
+import * as journalEntryService from '@/services/journalEntryService'; // For direct service call
 import { 
   format, 
   startOfMonth, 
@@ -27,7 +29,8 @@ import {
   parseISO, 
   startOfYear, 
   endOfYear, 
-  subMonths, 
+  subMonths,
+  subDays, 
   isWithinInterval,
   eachMonthOfInterval,
   eachWeekOfInterval,
@@ -48,11 +51,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 
 const chartConfig = {
+  actualJournalProfitLoss: { label: "Ist G/V", color: "hsl(var(--chart-0))" }, // Added new color, ensure it exists in globals.css or define here
   actualProfitLoss: { label: "Budget P/L Standard", color: "hsl(var(--chart-1))" },
   bestCaseProfitLoss: { label: "Budget P/L Best-Case", color: "hsl(var(--chart-2))" },
   worstCaseProfitLoss: { label: "Budget P/L Worst-Case", color: "hsl(var(--chart-3))" },
-  actualRevenue: { label: "Eff. Ertrag", color: "hsl(var(--chart-4))" }, // Blueish
-  actualExpense: { label: "Eff. Aufwand", color: "hsl(var(--chart-5))" }, // Orangish
+  actualRevenue: { label: "Eff. Ertrag", color: "hsl(var(--chart-4))" }, 
+  actualExpense: { label: "Eff. Aufwand", color: "hsl(var(--chart-5))" }, 
 } satisfies ChartConfig;
 
 export default function BudgetReportsPage() {
@@ -63,14 +67,20 @@ export default function BudgetReportsPage() {
   const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfYear(new Date()));
   const [aggregationPeriod, setAggregationPeriod] = useState<AggregationPeriod>('monthly');
+  const [initialPnl, setInitialPnl] = useState(0);
+
 
   const { data: tenant, isLoading: isLoadingTenant, error: tenantError } = useGetTenantById(tenantId);
   const { data: chartOfAccounts, isLoading: isLoadingCoA, error: coaError } = useGetTenantChartOfAccountsById(tenant?.chartOfAccountsId);
   const { data: budgets, isLoading: isLoadingBudgets, error: budgetsError } = useGetBudgets(tenantId);
   const { data: allBudgetEntries, isLoading: isLoadingBudgetEntries, error: budgetEntriesError } = useGetAllBudgetEntriesForTenant(tenantId);
-  const { data: allJournalEntries, isLoading: isLoadingJournalEntries, error: journalEntriesError } = useGetAllJournalEntriesForTenant(tenantId);
+  const { data: allJournalEntries, isLoading: isLoadingJournalEntries, error: journalEntriesError } = useGetAllJournalEntriesForTenant(tenantId); // Used for actuals within report period
+  
+  const { data: historicalJournalEntries, isLoading: isLoadingHistoricalEntries } = useGetJournalEntriesBeforeDate(tenantId, startDate);
+
 
   const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({
+    actualJournalProfitLoss: true,
     actualProfitLoss: true,
     bestCaseProfitLoss: true,
     worstCaseProfitLoss: true,
@@ -81,6 +91,33 @@ export default function BudgetReportsPage() {
   useEffect(() => {
     setClientLoaded(true);
   }, []);
+
+  useEffect(() => {
+    const calculateInitialPnl = () => {
+        if (!historicalJournalEntries || !chartOfAccounts || !clientLoaded) {
+            setInitialPnl(0);
+            return;
+        }
+        let pnl = 0;
+        historicalJournalEntries.forEach(entry => {
+            entry.lines.forEach(line => {
+                const account = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === line.accountId);
+                if (account) {
+                    const group = chartOfAccounts.groups.find(g => g.accounts.some(acc => acc.id === account.id));
+                    const mainGroup = group?.isFixed ? group : chartOfAccounts.groups.find(g => g.id === group?.parentId);
+                    if (mainGroup?.mainType === 'Revenue') {
+                        pnl -= (line.debit || 0) - (line.credit || 0); // Revenue decreases with debit, increases with credit
+                    } else if (mainGroup?.mainType === 'Expense') {
+                        pnl += (line.debit || 0) - (line.credit || 0); // Expense increases with debit, decreases with credit
+                    }
+                }
+            });
+        });
+        setInitialPnl(pnl);
+    };
+    calculateInitialPnl();
+  }, [historicalJournalEntries, chartOfAccounts, clientLoaded]);
+
 
   const budgetReportData: BudgetReportData | null = useMemo(() => {
     if (!clientLoaded || !chartOfAccounts || !budgets || !allBudgetEntries || !startDate || !endDate) {
@@ -161,8 +198,8 @@ export default function BudgetReportsPage() {
                     }
                 }
                const netChange = (line.debit || 0) - (line.credit || 0);
-               if (mainTypeForAggregation === 'Revenue') currentPeriodActuals.revenue -= netChange;
-               else if (mainTypeForAggregation === 'Expense') currentPeriodActuals.expenses += netChange;
+               if (mainTypeForAggregation === 'Revenue') currentPeriodActuals.revenue -= netChange; // Revenue has credit nature
+               else if (mainTypeForAggregation === 'Expense') currentPeriodActuals.expenses += netChange; // Expense has debit nature
              }
            });
          }
@@ -172,41 +209,52 @@ export default function BudgetReportsPage() {
   }, [clientLoaded, allJournalEntries, startDate, endDate, chartOfAccounts, aggregationPeriod]);
 
 
-  const combinedChartData = useMemo(() => {
-    if (!clientLoaded || (!budgetReportData?.chartData && !actualChartDataRaw)) return [];
+  const combinedChartData: CombinedBudgetReportChartItem[] = useMemo(() => {
+    if (!clientLoaded || (!budgetReportData?.chartData && actualChartDataRaw.length === 0)) return [];
   
-    const budgetMap = new Map(budgetReportData?.chartData.map(item => [item.periodLabel, item]) || []);
-    const actualsMap = new Map(actualChartDataRaw.map(item => [item.periodLabel, item]));
-  
-    const allPeriodLabels = new Set([
-      ...(budgetReportData?.chartData.map(item => item.periodLabel) || []),
-      ...actualChartDataRaw.map(item => item.periodLabel)
-    ]);
-  
-    // Sort based on the sortKey from actuals if available, or by label
-    // This assumes budgetReportData also has a comparable structure for sorting, or relies on labels
-    const sortedLabels = Array.from(allPeriodLabels).sort((a, b) => {
-      const sortKeyA = actualsMap.get(a)?.sortKey || a;
-      const sortKeyB = actualsMap.get(b)?.sortKey || b;
-      return sortKeyA.localeCompare(sortKeyB);
+    const budgetPeriodLabels = budgetReportData?.chartData.map(item => item.periodLabel) || [];
+    const actualPeriodLabels = actualChartDataRaw.map(item => item.periodLabel);
+    const allPeriodLabelsSet = new Set([...budgetPeriodLabels, ...actualPeriodLabels]);
+    
+    const sortedActualChartDataRawForSort = [...actualChartDataRaw].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    const sortedUniquePeriodLabels = Array.from(allPeriodLabelsSet).sort((a,b) => {
+        const sortKeyA = sortedActualChartDataRawForSort.find(item => item.periodLabel === a)?.sortKey || a;
+        const sortKeyB = sortedActualChartDataRawForSort.find(item => item.periodLabel === b)?.sortKey || b;
+        return sortKeyA.localeCompare(sortKeyB);
     });
-  
-    return sortedLabels.map(label => {
-      const budgetItem = budgetMap.get(label);
-      const actualItem = actualsMap.get(label);
+
+    let cumulativeActualJournalPnl = initialPnl;
+    let cumulativeBudgetActualPnl = initialPnl;
+    let cumulativeBudgetBestCasePnl = initialPnl;
+    let cumulativeBudgetWorstCasePnl = initialPnl;
+
+    return sortedUniquePeriodLabels.map(label => {
+      const budgetItem = budgetReportData?.chartData.find(item => item.periodLabel === label);
+      const actualItem = actualChartDataRaw.find(item => item.periodLabel === label);
+
+      // P/L for *this* period from actual journal entries
+      const periodActualJournalPnl = (actualItem?.revenue || 0) - (actualItem?.expenses || 0);
+      cumulativeActualJournalPnl += periodActualJournalPnl;
+
+      cumulativeBudgetActualPnl += budgetItem?.periodActualBudgetProfitLoss || 0;
+      cumulativeBudgetBestCasePnl += budgetItem?.periodBestCaseBudgetProfitLoss || 0;
+      cumulativeBudgetWorstCasePnl += budgetItem?.periodWorstCaseBudgetProfitLoss || 0;
+      
       return {
         periodLabel: label,
-        actualProfitLoss: budgetItem?.actualProfitLoss || 0,
-        bestCaseProfitLoss: budgetItem?.bestCaseProfitLoss || 0,
-        worstCaseProfitLoss: budgetItem?.worstCaseProfitLoss || 0,
-        actualRevenue: actualItem?.revenue || 0,
-        actualExpense: -(actualItem?.expenses || 0), // Ensure expenses are negative
+        actualJournalRevenue: actualItem?.revenue || 0, 
+        actualJournalExpense: actualItem?.expenses || 0, // Store as positive for bar chart
+        
+        cumulativeActualJournalProfitLoss: cumulativeActualJournalPnl,
+        cumulativeActualBudgetProfitLoss: cumulativeBudgetActualPnl,
+        cumulativeBestCaseBudgetProfitLoss: cumulativeBudgetBestCasePnl,
+        cumulativeWorstCaseBudgetProfitLoss: cumulativeBudgetWorstCasePnl,
       };
     });
-  }, [clientLoaded, budgetReportData, actualChartDataRaw]);
+  }, [clientLoaded, budgetReportData, actualChartDataRaw, initialPnl]);
 
 
-  const isLoading = isLoadingTenant || isLoadingCoA || isLoadingBudgets || isLoadingBudgetEntries || isLoadingJournalEntries || !clientLoaded;
+  const isLoading = isLoadingTenant || isLoadingCoA || isLoadingBudgets || isLoadingBudgetEntries || isLoadingJournalEntries || isLoadingHistoricalEntries || !clientLoaded;
   const combinedError = tenantError || coaError || budgetsError || budgetEntriesError || journalEntriesError;
 
   const pnlAccounts = useMemo(() => {
@@ -225,19 +273,20 @@ export default function BudgetReportsPage() {
   const calculateTotals = (mainType?: AccountGroup['mainType']) => {
     const relevantAccounts = mainType ? pnlAccounts.filter(acc => acc.mainType === mainType) : pnlAccounts;
     return {
-      actual: relevantAccounts.reduce((sum, acc) => sum + (acc.mainType === 'Revenue' ? acc.actualAmount : -acc.actualAmount), 0),
-      bestCase: relevantAccounts.reduce((sum, acc) => sum + (acc.mainType === 'Revenue' ? acc.bestCaseAmount : -acc.bestCaseAmount), 0),
-      worstCase: relevantAccounts.reduce((sum, acc) => sum + (acc.mainType === 'Revenue' ? acc.worstCaseAmount : -acc.worstCaseAmount), 0),
+      actual: relevantAccounts.reduce((sum, acc) => sum + acc.actualAmount, 0),
+      bestCase: relevantAccounts.reduce((sum, acc) => sum + acc.bestCaseAmount, 0),
+      worstCase: relevantAccounts.reduce((sum, acc) => sum + acc.worstCaseAmount, 0),
     };
   };
 
   const revenueTotals = calculateTotals('Revenue');
-  const expenseTotals = calculateTotals('Expense');
+  const expenseTotals = calculateTotals('Expense'); // Expenses are stored as negative if they decrease P/L.
   const profitLossTotals = {
-      actual: revenueTotals.actual - expenseTotals.actual,
-      bestCase: revenueTotals.bestCase - expenseTotals.bestCase,
-      worstCase: revenueTotals.worstCase - expenseTotals.worstCase,
+      actual: revenueTotals.actual + expenseTotals.actual, // Direct sum as expenses are negative
+      bestCase: revenueTotals.bestCase + expenseTotals.bestCase,
+      worstCase: revenueTotals.worstCase + expenseTotals.worstCase,
   };
+
 
   const setDateRange = (start: Date, end: Date) => {
     setStartDate(start);
@@ -258,8 +307,9 @@ export default function BudgetReportsPage() {
   
   const handleSetLastYear = () => {
     const now = new Date();
-    const lastYear = subMonths(now, 12);
-    setDateRange(startOfYear(lastYear), endOfYear(lastYear));
+    const lastYearStart = startOfYear(subMonths(now, 12));
+    const lastYearEnd = endOfYear(subMonths(now, 12));
+    setDateRange(lastYearStart, lastYearEnd);
   };
 
   const handleLegendClick = (data: any) => {
@@ -376,7 +426,7 @@ export default function BudgetReportsPage() {
                     <div>
                         <CardTitle className="text-2xl font-bold">Erfolgsentwicklung</CardTitle>
                         <CardDescription>
-                            Budgetierter P/L und effektiver Ertrag/Aufwand für den Zeitraum {startDate ? format(startDate, "dd.MM.yy", { locale: de }) : ''} - {endDate ? format(endDate, "dd.MM.yy", { locale: de }) : ''}.
+                            Budgetierter G/V und effektiver Ertrag/Aufwand für den Zeitraum {startDate ? format(startDate, "dd.MM.yy", { locale: de }) : ''} - {endDate ? format(endDate, "dd.MM.yy", { locale: de }) : ''}.
                         </CardDescription>
                     </div>
                     <div className="flex items-center space-x-2 mt-2 sm:mt-0">
@@ -405,16 +455,17 @@ export default function BudgetReportsPage() {
                     <ChartLegend content={<ChartLegendContent onClick={handleLegendClick} />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} />
                     <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={2} />
                     
-                    <Bar dataKey="actualRevenue" fill="var(--color-actualRevenue)" radius={[4, 4, 0, 0]} barSize={15} hide={!seriesVisibility.actualRevenue}>
-                        <LabelList dataKey="actualRevenue" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                    <Bar dataKey="actualJournalRevenue" fill="var(--color-actualRevenue)" radius={[4, 4, 0, 0]} barSize={15} hide={!seriesVisibility.actualRevenue} name="Eff. Ertrag">
+                        <LabelList dataKey="actualJournalRevenue" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
                     </Bar>
-                    <Bar dataKey="actualExpense" fill="var(--color-actualExpense)" radius={[0, 0, 4, 4]} barSize={15} hide={!seriesVisibility.actualExpense}>
-                        <LabelList dataKey="actualExpense" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(Math.abs(value)) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                    <Bar dataKey="actualJournalExpense" fill="var(--color-actualExpense)" radius={[0, 0, 4, 4]} barSize={15} hide={!seriesVisibility.actualExpense} name="Eff. Aufwand">
+                        <LabelList dataKey="actualJournalExpense" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
                     </Bar>
 
-                    <Line type="monotone" dataKey="actualProfitLoss" stroke="var(--color-actualProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Budget P/L Standard" hide={!seriesVisibility.actualProfitLoss}/>
-                    <Line type="monotone" dataKey="bestCaseProfitLoss" stroke="var(--color-bestCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Best-Case" hide={!seriesVisibility.bestCaseProfitLoss}/>
-                    <Line type="monotone" dataKey="worstCaseProfitLoss" stroke="var(--color-worstCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Worst-Case" hide={!seriesVisibility.worstCaseProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeActualJournalProfitLoss" stroke="var(--color-actualJournalProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Ist G/V" hide={!seriesVisibility.actualJournalProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeActualBudgetProfitLoss" stroke="var(--color-actualProfitLoss)" strokeWidth={2.5} dot={{r:4}} name="Budget P/L Standard" hide={!seriesVisibility.actualProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeBestCaseBudgetProfitLoss" stroke="var(--color-bestCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Best-Case" hide={!seriesVisibility.bestCaseProfitLoss}/>
+                    <Line type="monotone" dataKey="cumulativeWorstCaseBudgetProfitLoss" stroke="var(--color-worstCaseProfitLoss)" strokeWidth={2} dot={{r:3}} name="Budget P/L Worst-Case" hide={!seriesVisibility.worstCaseProfitLoss}/>
                   </ComposedChart>
                 </ChartContainer>
               ) : (
@@ -462,7 +513,7 @@ export default function BudgetReportsPage() {
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
                             <TableCell colSpan={2}>Aufwände</TableCell>
-                            <TableCell className="text-right">{formatCurrency(expenseTotals.actual)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(expenseTotals.actual)}</TableCell> {/* Already negative or zero */}
                             <TableCell className="text-right">{formatCurrency(expenseTotals.bestCase)}</TableCell>
                             <TableCell className="text-right">{formatCurrency(expenseTotals.worstCase)}</TableCell>
                         </TableRow>

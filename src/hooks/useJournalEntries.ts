@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +9,7 @@ const journalEntryQueryKeys = {
   all: (tenantId?: string) => ['journalEntries', tenantId || 'allScope'] as const,
   list: (tenantId: string, fiscalYearId?: string | null) => [...journalEntryQueryKeys.all(tenantId), 'list', fiscalYearId ?? 'allFiscalYears'] as const,
   detail: (tenantId: string, entryId: string) => [...journalEntryQueryKeys.all(tenantId), 'detail', entryId] as const,
+  beforeDate: (tenantId: string, date: Date) => [...journalEntryQueryKeys.all(tenantId), 'beforeDate', date.toISOString()] as const,
 };
 
 const tenantAllJournalEntriesQueryKeys = { // For fetching all entries for a tenant
@@ -20,6 +22,14 @@ export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: str
     queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId),
     queryFn: () => (tenantId ? journalEntryService.getJournalEntries(tenantId, fiscalYearId === null ? undefined : fiscalYearId) : Promise.resolve([])),
     enabled: !!tenantId, // Entries are always tenant-specific
+  });
+}
+
+export function useGetJournalEntriesBeforeDate(tenantId: string | null, date: Date | undefined) {
+  return useQuery<JournalEntry[], Error>({
+    queryKey: journalEntryQueryKeys.beforeDate(tenantId!, date!),
+    queryFn: () => (tenantId && date ? journalEntryService.getJournalEntriesBeforeDate(tenantId, date) : Promise.resolve([])),
+    enabled: !!tenantId && !!date,
   });
 }
 
@@ -39,6 +49,7 @@ export function useAddJournalEntry(tenantId: string) {
       // Also invalidate the "all fiscal years" list if it was used
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
       queryClient.invalidateQueries({ queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId) }); // Invalidate all tenant entries too
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.all(tenantId) }); // General invalidation for the tenant
     },
   });
 }
@@ -53,6 +64,7 @@ export function useUpdateJournalEntry(tenantId: string) {
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.detail(tenantId, variables.entryId) });
       queryClient.invalidateQueries({ queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId) }); // Invalidate all tenant entries too
+      queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.all(tenantId) });
     },
   });
 }
@@ -89,3 +101,4 @@ export function useGetAllJournalEntriesForTenant(tenantId: string | null) {
     enabled: !!tenantId,
   });
 }
+

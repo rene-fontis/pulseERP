@@ -257,14 +257,29 @@ export interface BudgetReportAccountEntry {
 }
 
 export interface BudgetReportChartDataItem {
-  periodLabel: string; // e.g., "Jan '24"
-  actualProfitLoss: number;
-  bestCaseProfitLoss: number;
-  worstCaseProfitLoss: number;
+  periodLabel: string;
+  // Periodical P/L for each budget scenario for THIS period
+  periodActualBudgetProfitLoss: number;
+  periodBestCaseBudgetProfitLoss: number;
+  periodWorstCaseBudgetProfitLoss: number;
 }
 
 export interface BudgetReportData {
   tableData: BudgetReportAccountEntry[];
   chartData: BudgetReportChartDataItem[];
 }
+
+// Combined data structure for the budget report chart in the page component
+export interface CombinedBudgetReportChartItem {
+  periodLabel: string;
+  actualJournalRevenue?: number; // For bars - Periodical Actual Revenue from Journal
+  actualJournalExpense?: number; // For bars (positive value) - Periodical Actual Expense from Journal
+  
+  // Lines for CUMULATIVE P/L
+  cumulativeActualJournalProfitLoss: number; // From Journal
+  cumulativeActualBudgetProfitLoss: number;  // From Budget Scenario 'Actual'
+  cumulativeBestCaseBudgetProfitLoss: number;// From Budget Scenario 'Best Case'
+  cumulativeWorstCaseBudgetProfitLoss: number;// From Budget Scenario 'Worst Case'
+}
+
 

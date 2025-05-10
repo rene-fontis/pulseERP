@@ -105,8 +105,9 @@ export function calculateBudgetReportData(
 
   const accountMap = new Map<string, Account & { mainType: AccountGroup['mainType'] }>();
   chartOfAccounts.groups.forEach(group => {
+    const effectiveMainType = group.isFixed ? group.mainType : chartOfAccounts.groups.find(g => g.id === group.parentId)?.mainType || group.mainType;
     group.accounts.forEach(acc => {
-      accountMap.set(acc.id, { ...acc, mainType: group.mainType });
+      accountMap.set(acc.id, { ...acc, mainType: effectiveMainType });
     });
   });
 
@@ -137,24 +138,29 @@ export function calculateBudgetReportData(
     }
 
     const totalAmountForPeriod = entry.amount * occurrences;
-    const amountToAdd = entry.type === 'Income' ? totalAmountForPeriod : -totalAmountForPeriod;
+    // For P&L accounts: Income increases P/L, Expense decreases P/L.
+    // If mainType is Revenue, positive amount is income. If Expense, positive amount is expense.
+    // We store income as positive, expense as positive for P/L calculation: P/L = Income - Expense
+    // Budget entry type 'Income' means it's an income, 'Expense' means it's an expense.
+    const pnlImpact = entry.type === 'Income' ? totalAmountForPeriod : -totalAmountForPeriod;
+
 
     switch (budget.scenario) {
       case 'Actual':
-        aggregate.actualAmount += amountToAdd;
-        // If an account has an 'Actual' entry, it contributes to best/worst too unless overridden
+        aggregate.actualAmount += pnlImpact;
+        // If an account has an 'Actual' entry, it contributes to best/worst too unless overridden for that specific scenario
         if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case')) {
-             aggregate.bestCaseAmount += amountToAdd;
+             aggregate.bestCaseAmount += pnlImpact;
         }
         if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case')) {
-             aggregate.worstCaseAmount += amountToAdd;
+             aggregate.worstCaseAmount += pnlImpact;
         }
         break;
       case 'Best Case':
-        aggregate.bestCaseAmount += amountToAdd;
+        aggregate.bestCaseAmount += pnlImpact;
         break;
       case 'Worst Case':
-        aggregate.worstCaseAmount += amountToAdd;
+        aggregate.worstCaseAmount += pnlImpact;
         break;
     }
     accountAggregates.set(entry.accountId, aggregate);
@@ -162,7 +168,7 @@ export function calculateBudgetReportData(
   reportData.tableData = Array.from(accountAggregates.values());
 
 
-  // --- Prepare Chart Data ---
+  // --- Prepare Chart Data (Periodical P/L for budget scenarios) ---
   let periods: Date[] = [];
   switch (aggregationPeriod) {
     case 'monthly':
@@ -197,21 +203,14 @@ export function calculateBudgetReportData(
         break;
     }
     
-    // Ensure periodEnd does not exceed reportEndDate
-    if (isAfter(periodEnd, reportEndDate)) {
-        periodEnd = reportEndDate;
-    }
-    // Ensure periodStart does not predate reportStartDate
-    if (isBefore(periodStart, reportStartDate)) {
-        periodStart = reportStartDate;
-    }
-
+    if (isAfter(periodEnd, reportEndDate)) periodEnd = reportEndDate;
+    if (isBefore(periodStart, reportStartDate)) periodStart = reportStartDate;
 
     const chartItem: BudgetReportChartDataItem = {
       periodLabel,
-      actualProfitLoss: 0,
-      bestCaseProfitLoss: 0,
-      worstCaseProfitLoss: 0,
+      periodActualBudgetProfitLoss: 0,
+      periodBestCaseBudgetProfitLoss: 0,
+      periodWorstCaseBudgetProfitLoss: 0,
     };
 
     allTenantBudgetEntries.forEach(entry => {
@@ -225,24 +224,23 @@ export function calculateBudgetReportData(
       if (!account || (account.mainType !== 'Revenue' && account.mainType !== 'Expense')) return;
 
       const totalAmountForSubPeriod = entry.amount * occurrences;
-      const amountChange = entry.type === 'Income' ? totalAmountForSubPeriod : -totalAmountForSubPeriod;
+      const pnlImpactForSubPeriod = entry.type === 'Income' ? totalAmountForSubPeriod : -totalAmountForSubPeriod;
 
       switch (budget.scenario) {
         case 'Actual':
-          chartItem.actualProfitLoss += amountChange;
-          // Contribution to best/worst if not overridden.
+          chartItem.periodActualBudgetProfitLoss += pnlImpactForSubPeriod;
            if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
-             chartItem.bestCaseProfitLoss += amountChange;
+             chartItem.periodBestCaseBudgetProfitLoss += pnlImpactForSubPeriod;
            }
            if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
-            chartItem.worstCaseProfitLoss += amountChange;
+            chartItem.periodWorstCaseBudgetProfitLoss += pnlImpactForSubPeriod;
            }
           break;
         case 'Best Case':
-          chartItem.bestCaseProfitLoss += amountChange;
+          chartItem.periodBestCaseBudgetProfitLoss += pnlImpactForSubPeriod;
           break;
         case 'Worst Case':
-          chartItem.worstCaseProfitLoss += amountChange;
+          chartItem.periodWorstCaseBudgetProfitLoss += pnlImpactForSubPeriod;
           break;
       }
     });

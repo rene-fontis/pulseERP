@@ -34,13 +34,26 @@ export const getJournalEntries = async (tenantId: string, fiscalYearId?: string)
   if (fiscalYearId) {
     queryConstraints.push(where("fiscalYearId", "==", fiscalYearId));
   }
-  queryConstraints.push(orderBy("date", "desc"));
-  queryConstraints.push(orderBy("entryNumber", "desc"));
+  // Order for display in journal view
+  queryConstraints.push(orderBy("date", "desc")); 
+  queryConstraints.push(orderBy("entryNumber", "desc")); 
   
   const q = query(journalEntriesCollectionRef, ...queryConstraints);
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(mapDocToJournalEntry);
 };
+
+export const getJournalEntriesBeforeDate = async (tenantId: string, date: Date): Promise<JournalEntry[]> => {
+  const qConstraints = [
+    where("tenantId", "==", tenantId),
+    where("date", "<", Timestamp.fromDate(date)), // Entries strictly before the start date of the report period
+    orderBy("date", "asc") 
+  ];
+  const q = query(journalEntriesCollectionRef, ...qConstraints);
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(mapDocToJournalEntry);
+};
+
 
 export const addJournalEntry = async (entryData: NewJournalEntryPayload): Promise<JournalEntry> => {
   const now = serverTimestamp();
@@ -123,3 +136,4 @@ export const deleteJournalEntry = async (entryId: string): Promise<boolean> => {
   await deleteDoc(docRef);
   return true;
 };
+
