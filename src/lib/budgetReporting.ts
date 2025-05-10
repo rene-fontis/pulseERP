@@ -1,162 +1,255 @@
 
-import type { TenantChartOfAccounts, Budget, BudgetEntry, AccountGroup, AggregationPeriod, BudgetReportData, BudgetReportAccountEntry, BudgetReportChartDataItem } from '@/types';
-import { parseISO, format, getYear, getMonth, isWithinInterval, startOfMonth, endOfMonth, addMonths, addYears, differenceInCalendarMonths, differenceInCalendarDays, getISODay } from 'date-fns';
+import type {
+  TenantChartOfAccounts,
+  Budget,
+  BudgetEntry,
+  BudgetReportData,
+  BudgetReportAccountEntry,
+  BudgetReportChartDataItem,
+  Account,
+  AccountGroup,
+  AggregationPeriod,
+  BudgetScenario,
+} from '@/types';
+import {
+  parseISO,
+  format,
+  addMonths,
+  addWeeks,
+  addDays,
+  isWithinInterval,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  startOfDay,
+  endOfDay,
+  eachMonthOfInterval,
+  eachWeekOfInterval,
+  eachDayOfInterval,
+  isBefore,
+  isAfter,
+  isEqual,
+  getMonth,
+  getYear,
+} from 'date-fns';
 import { de } from 'date-fns/locale';
 
-function countOccurrencesInPeriod(entry: BudgetEntry, periodStart: Date, periodEnd: Date): number {
-  if (!entry.isRecurring || entry.recurrence === 'None' || !entry.startDate) {
-    // For non-recurring, check if its single date is within the period
-    if (!entry.isRecurring && entry.startDate) {
-        const singleEntryDate = parseISO(entry.startDate);
-        return isWithinInterval(singleEntryDate, { start: periodStart, end: periodEnd }) ? 1 : 0;
-    }
-    return 0;
+function countOccurrencesInPeriod(
+  entry: BudgetEntry,
+  periodStart: Date,
+  periodEnd: Date
+): number {
+  if (!entry.startDate) return 0;
+
+  const entryStartDate = startOfDay(parseISO(entry.startDate));
+  const entryOwnEndDate = entry.endDate ? endOfDay(parseISO(entry.endDate)) : null;
+
+  // If the entry itself is outside the query period entirely, return 0.
+  if (entryOwnEndDate && isBefore(entryOwnEndDate, periodStart)) return 0;
+  if (isAfter(entryStartDate, periodEnd)) return 0;
+
+  if (!entry.isRecurring || entry.recurrence === 'None') {
+    return isWithinInterval(entryStartDate, { start: periodStart, end: periodEnd }) ? 1 : 0;
   }
 
-  const entryStartDate = parseISO(entry.startDate);
-  const entryOwnEndDate = entry.endDate ? parseISO(entry.endDate) : null;
-  let count = 0;
+  let occurrences = 0;
   let currentDate = entryStartDate;
 
   // Adjust currentDate to be the first occurrence >= periodStart
-  while (currentDate < periodStart) {
-    if (entryOwnEndDate && currentDate > entryOwnEndDate) return 0; // Entire recurrence is before periodStart and also ended
+  while (isBefore(currentDate, periodStart)) {
     switch (entry.recurrence) {
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
       case 'Bimonthly': currentDate = addMonths(currentDate, 2); break;
       case 'Quarterly': currentDate = addMonths(currentDate, 3); break;
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
-      case 'Yearly': currentDate = addYears(currentDate, 1); break;
-      default: return 0;
+      case 'Yearly': currentDate = addMonths(currentDate, 12); break;
+      default: return 0; // Should not happen with 'None' handled
     }
   }
   
-  // Now count occurrences within the period
-  while (currentDate <= periodEnd) {
-    if (entryOwnEndDate && currentDate > entryOwnEndDate) break; 
-    count++;
+  while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
+    if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) {
+      break; 
+    }
+    if (isWithinInterval(currentDate, { start: periodStart, end: periodEnd })) {
+      occurrences++;
+    }
+
     switch (entry.recurrence) {
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
       case 'Bimonthly': currentDate = addMonths(currentDate, 2); break;
       case 'Quarterly': currentDate = addMonths(currentDate, 3); break;
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
-      case 'Yearly': currentDate = addYears(currentDate, 1); break;
-      default: return count;
+      case 'Yearly': currentDate = addMonths(currentDate, 12); break;
+      default: return occurrences; // Should not happen
     }
   }
-  return count;
+  return occurrences;
 }
-
 
 export function calculateBudgetReportData(
   chartOfAccounts: TenantChartOfAccounts,
-  allBudgets: Budget[],
-  allBudgetEntries: BudgetEntry[],
+  allTenantBudgets: Budget[],
+  allTenantBudgetEntries: BudgetEntry[],
   reportStartDate: Date,
   reportEndDate: Date,
-  aggregationPeriod: AggregationPeriod = 'monthly' // Currently mainly for chart, table aggregates over full period
+  aggregationPeriod: AggregationPeriod = 'monthly'
 ): BudgetReportData {
-  
-  const tableDataMap = new Map<string, BudgetReportAccountEntry>();
+  const reportData: BudgetReportData = {
+    tableData: [],
+    chartData: [],
+  };
 
-  // Initialize tableDataMap with P&L accounts from CoA
+  const accountMap = new Map<string, Account & { mainType: AccountGroup['mainType'] }>();
   chartOfAccounts.groups.forEach(group => {
-    if (group.mainType === 'Revenue' || group.mainType === 'Expense') {
-      group.accounts.forEach(account => {
-        tableDataMap.set(account.id, {
-          accountId: account.id,
-          accountNumber: account.number,
-          accountName: account.name,
-          mainType: group.mainType,
-          actualAmount: 0,
-          bestCaseAmount: 0,
-          worstCaseAmount: 0,
-        });
-      });
-    }
+    group.accounts.forEach(acc => {
+      accountMap.set(acc.id, { ...acc, mainType: group.mainType });
+    });
   });
 
-  allBudgetEntries.forEach(entry => {
-    const budget = allBudgets.find(b => b.id === entry.budgetId);
-    if (!budget) return; // Entry belongs to a budget not in the list, skip
+  // --- Prepare Table Data ---
+  const accountAggregates = new Map<string, BudgetReportAccountEntry>();
 
-    const accountEntryForTable = tableDataMap.get(entry.accountId);
-    if (!accountEntryForTable) return; // Budget entry for an account not in P&L, skip for table
-
+  allTenantBudgetEntries.forEach(entry => {
     const occurrences = countOccurrencesInPeriod(entry, reportStartDate, reportEndDate);
-    if (occurrences === 0) return; // Entry not active in this period
+    if (occurrences === 0) return;
+
+    const budget = allTenantBudgets.find(b => b.id === entry.budgetId);
+    if (!budget) return;
+
+    const account = accountMap.get(entry.accountId);
+    if (!account) return;
+    
+    let aggregate = accountAggregates.get(entry.accountId);
+    if (!aggregate) {
+      aggregate = {
+        accountId: entry.accountId,
+        accountNumber: account.number,
+        accountName: account.name,
+        mainType: account.mainType,
+        actualAmount: 0,
+        bestCaseAmount: 0,
+        worstCaseAmount: 0,
+      };
+    }
 
     const totalAmountForPeriod = entry.amount * occurrences;
     const amountToAdd = entry.type === 'Income' ? totalAmountForPeriod : -totalAmountForPeriod;
-    
-    // For table data (total over selected period)
-    if (budget.scenario === 'Actual') {
-      accountEntryForTable.actualAmount += amountToAdd;
-      accountEntryForTable.bestCaseAmount += amountToAdd;
-      accountEntryForTable.worstCaseAmount += amountToAdd;
-    } else if (budget.scenario === 'Best Case') {
-      accountEntryForTable.bestCaseAmount += amountToAdd;
-    } else if (budget.scenario === 'Worst Case') {
-      accountEntryForTable.worstCaseAmount += amountToAdd;
+
+    switch (budget.scenario) {
+      case 'Actual':
+        aggregate.actualAmount += amountToAdd;
+        // If an account has an 'Actual' entry, it contributes to best/worst too unless overridden
+        if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case')) {
+             aggregate.bestCaseAmount += amountToAdd;
+        }
+        if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case')) {
+             aggregate.worstCaseAmount += amountToAdd;
+        }
+        break;
+      case 'Best Case':
+        aggregate.bestCaseAmount += amountToAdd;
+        break;
+      case 'Worst Case':
+        aggregate.worstCaseAmount += amountToAdd;
+        break;
     }
+    accountAggregates.set(entry.accountId, aggregate);
   });
-
-  const tableData = Array.from(tableDataMap.values());
-
-  // Chart Data Calculation (monthly profit/loss for each scenario)
-  const chartData: BudgetReportChartDataItem[] = [];
-  let currentChartPeriodStart = startOfMonth(reportStartDate);
-
-  while (currentChartPeriodStart <= reportEndDate) {
-    const currentChartPeriodEnd = endOfMonth(currentChartPeriodStart);
-    const periodLabel = format(currentChartPeriodStart, "MMM yy", { locale: de });
-
-    let monthlyActualProfitLoss = 0;
-    let monthlyBestCaseProfitLoss = 0;
-    let monthlyWorstCaseProfitLoss = 0;
-
-    allBudgetEntries.forEach(entry => {
-      const budget = allBudgets.find(b => b.id === entry.budgetId);
-      if (!budget) return;
-
-      const accountForEntry = chartOfAccounts.groups
-        .flatMap(g => g.accounts)
-        .find(a => a.id === entry.accountId);
-      
-      if (!accountForEntry) return;
-      
-      const groupOfAccount = chartOfAccounts.groups.find(g => g.accounts.some(a => a.id === entry.accountId));
-      if(!groupOfAccount || (groupOfAccount.mainType !== 'Revenue' && groupOfAccount.mainType !== 'Expense')) return;
+  reportData.tableData = Array.from(accountAggregates.values());
 
 
-      const occurrencesThisMonth = countOccurrencesInPeriod(entry, currentChartPeriodStart, currentChartPeriodEnd);
-      if (occurrencesThisMonth === 0) return;
-
-      const monthlyTotalAmount = entry.amount * occurrencesThisMonth;
-      const amountToAddForPL = entry.type === 'Income' ? monthlyTotalAmount : -monthlyTotalAmount;
-
-      if (budget.scenario === 'Actual') {
-        monthlyActualProfitLoss += amountToAddForPL;
-        monthlyBestCaseProfitLoss += amountToAddForPL;
-        monthlyWorstCaseProfitLoss += amountToAddForPL;
-      } else if (budget.scenario === 'Best Case') {
-        monthlyBestCaseProfitLoss += amountToAddForPL;
-      } else if (budget.scenario === 'Worst Case') {
-        monthlyWorstCaseProfitLoss += amountToAddForPL;
-      }
-    });
-    
-    chartData.push({
-      periodLabel,
-      actualProfitLoss: monthlyActualProfitLoss,
-      bestCaseProfitLoss: monthlyBestCaseProfitLoss,
-      worstCaseProfitLoss: monthlyWorstCaseProfitLoss,
-    });
-
-    currentChartPeriodStart = addMonths(currentChartPeriodStart, 1);
+  // --- Prepare Chart Data ---
+  let periods: Date[] = [];
+  switch (aggregationPeriod) {
+    case 'monthly':
+      periods = eachMonthOfInterval({ start: reportStartDate, end: reportEndDate });
+      break;
+    case 'weekly':
+      periods = eachWeekOfInterval({ start: reportStartDate, end: reportEndDate }, { weekStartsOn: 1 });
+      break;
+    case 'daily':
+      periods = eachDayOfInterval({ start: reportStartDate, end: reportEndDate });
+      break;
   }
 
-  return { tableData, chartData };
+  periods.forEach(periodDate => {
+    let periodStart: Date, periodEnd: Date, periodLabel: string;
+
+    switch (aggregationPeriod) {
+      case 'monthly':
+        periodStart = startOfMonth(periodDate);
+        periodEnd = endOfMonth(periodDate);
+        periodLabel = format(periodDate, "MMM yy", { locale: de });
+        break;
+      case 'weekly':
+        periodStart = startOfWeek(periodDate, { weekStartsOn: 1 });
+        periodEnd = endOfWeek(periodDate, { weekStartsOn: 1 });
+        periodLabel = `KW${format(periodDate, "ww", { locale: de })} '${format(periodDate, "yy", { locale: de })}`;
+        break;
+      case 'daily':
+        periodStart = startOfDay(periodDate);
+        periodEnd = endOfDay(periodDate);
+        periodLabel = format(periodDate, "dd.MM.yy", { locale: de });
+        break;
+    }
+    
+    // Ensure periodEnd does not exceed reportEndDate
+    if (isAfter(periodEnd, reportEndDate)) {
+        periodEnd = reportEndDate;
+    }
+    // Ensure periodStart does not predate reportStartDate
+    if (isBefore(periodStart, reportStartDate)) {
+        periodStart = reportStartDate;
+    }
+
+
+    const chartItem: BudgetReportChartDataItem = {
+      periodLabel,
+      actualProfitLoss: 0,
+      bestCaseProfitLoss: 0,
+      worstCaseProfitLoss: 0,
+    };
+
+    allTenantBudgetEntries.forEach(entry => {
+      const occurrences = countOccurrencesInPeriod(entry, periodStart, periodEnd);
+      if (occurrences === 0) return;
+
+      const budget = allTenantBudgets.find(b => b.id === entry.budgetId);
+      if (!budget) return;
+
+      const account = accountMap.get(entry.accountId);
+      if (!account || (account.mainType !== 'Revenue' && account.mainType !== 'Expense')) return;
+
+      const totalAmountForSubPeriod = entry.amount * occurrences;
+      const amountChange = entry.type === 'Income' ? totalAmountForSubPeriod : -totalAmountForSubPeriod;
+
+      switch (budget.scenario) {
+        case 'Actual':
+          chartItem.actualProfitLoss += amountChange;
+          // Contribution to best/worst if not overridden.
+           if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Best Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
+             chartItem.bestCaseProfitLoss += amountChange;
+           }
+           if (!allTenantBudgetEntries.some(be => be.accountId === entry.accountId && be.budgetId !== entry.budgetId && allTenantBudgets.find(b=>b.id === be.budgetId)?.scenario === 'Worst Case' && countOccurrencesInPeriod(be, periodStart, periodEnd) > 0)) {
+            chartItem.worstCaseProfitLoss += amountChange;
+           }
+          break;
+        case 'Best Case':
+          chartItem.bestCaseProfitLoss += amountChange;
+          break;
+        case 'Worst Case':
+          chartItem.worstCaseProfitLoss += amountChange;
+          break;
+      }
+    });
+    reportData.chartData.push(chartItem);
+  });
+
+  return reportData;
 }
+
+    
