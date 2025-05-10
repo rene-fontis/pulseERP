@@ -10,6 +10,11 @@ const journalEntryQueryKeys = {
   detail: (tenantId: string, entryId: string) => [...journalEntryQueryKeys.all(tenantId), 'detail', entryId] as const,
 };
 
+const tenantAllJournalEntriesQueryKeys = { // For fetching all entries for a tenant
+  all: (tenantId: string) => ['allTenantJournalEntries', tenantId] as const,
+};
+
+
 export function useGetJournalEntries(tenantId: string | null, fiscalYearId?: string | null) {
   return useQuery<JournalEntry[], Error>({
     queryKey: journalEntryQueryKeys.list(tenantId!, fiscalYearId),
@@ -33,6 +38,7 @@ export function useAddJournalEntry(tenantId: string) {
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data.fiscalYearId) });
       // Also invalidate the "all fiscal years" list if it was used
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
+      queryClient.invalidateQueries({ queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId) }); // Invalidate all tenant entries too
     },
   });
 }
@@ -46,6 +52,7 @@ export function useUpdateJournalEntry(tenantId: string) {
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, data?.fiscalYearId) });
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.list(tenantId, null) });
       queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.detail(tenantId, variables.entryId) });
+      queryClient.invalidateQueries({ queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId) }); // Invalidate all tenant entries too
     },
   });
 }
@@ -62,7 +69,23 @@ export function useDeleteJournalEntry(tenantId: string) {
         // For now, invalidate all lists for the tenant, or refine if fiscalYearId is available.
         // Invalidate both specific fiscal year lists and the "all fiscal years" list.
         queryClient.invalidateQueries({ queryKey: journalEntryQueryKeys.all(tenantId) }); 
+        queryClient.invalidateQueries({ queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId) }); // Invalidate all tenant entries too
       }
     },
+  });
+}
+
+
+// New hook to fetch all journal entries for a given tenant, regardless of fiscal year.
+export function useGetAllJournalEntriesForTenant(tenantId: string | null) {
+  return useQuery<JournalEntry[], Error>({
+    queryKey: tenantAllJournalEntriesQueryKeys.all(tenantId!),
+    queryFn: async () => {
+        if (!tenantId) return [];
+        // Assuming journalEntryService.getJournalEntries(tenantId, undefined) fetches ALL entries for the tenant.
+        // If it doesn't, this service function or its usage here would need adjustment.
+        return journalEntryService.getJournalEntries(tenantId, undefined); 
+    },
+    enabled: !!tenantId,
   });
 }
