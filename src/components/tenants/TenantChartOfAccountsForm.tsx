@@ -420,12 +420,6 @@ function AccountsArrayField({ control, groupIndex, form, isFixedGroup }: Account
               </FormItem>
             )}
           />
-           {(isSystemAcc || isRetainedEarningsAcc) && (
-             <p className="text-xs text-muted-foreground mt-1">
-                {isSystemAcc && "Systemkonto, nicht bearbeitbar. "}
-                {isRetainedEarningsAcc && "Konto für Gewinn-/Verlustvortrag, nicht bearbeitbar."}
-            </p>
-           )}
         </Card>
       )})}
       {!isFixedGroup && ( // Only allow adding accounts to non-fixed (sub)groups
