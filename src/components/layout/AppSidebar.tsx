@@ -71,7 +71,7 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled 
+            disabled // Keep disabled as per previous state unless explicitly requested otherwise
         >
             <Link href="/admin/import">
                 <Users /> 
@@ -179,8 +179,13 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/`) }>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports') }>
                                       <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting/reports`}>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                             </SidebarMenuSub>
@@ -369,5 +374,3 @@ export function AppSidebar() {
   );
 }
 
-
-    

@@ -1,3 +1,4 @@
+
 export interface Tenant {
   id: string;
   name: string;
@@ -243,3 +244,27 @@ export type BudgetEntryFormValues = {
 };
 
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
+
+// --- Budget Reporting Types ---
+export interface BudgetReportAccountEntry {
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  mainType: AccountGroup['mainType']; // From CoA
+  actualAmount: number;
+  bestCaseAmount: number;
+  worstCaseAmount: number;
+}
+
+export interface BudgetReportChartDataItem {
+  periodLabel: string; // e.g., "Jan '24"
+  actualProfitLoss: number;
+  bestCaseProfitLoss: number;
+  worstCaseProfitLoss: number;
+}
+
+export interface BudgetReportData {
+  tableData: BudgetReportAccountEntry[];
+  chartData: BudgetReportChartDataItem[];
+}
+
