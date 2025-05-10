@@ -7,7 +7,7 @@ import type { ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/
 // These IDs are used to uniquely identify the 5 main fixed groups across all template definitions.
 // Subgroups will use these IDs in their `parentId` field.
 const fixedGroupIds = {
-  asset: 'fixed_asset_group_global', 
+  asset: 'fixed_asset_group_global',
   liability: 'fixed_liability_group_global',
   equity: 'fixed_equity_group_global',
   revenue: 'fixed_revenue_group_global',
@@ -21,22 +21,23 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
     // Fixed Groups (Level 0) - These MUST use IDs from fixedGroupIds
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { 
-      id: fixedGroupIds.equity, 
-      name: "Eigenkapital", 
-      mainType: "Equity", 
+    {
+      id: fixedGroupIds.equity,
+      name: "Eigenkapital",
+      mainType: "Equity",
       accounts: [
-      ], 
-      isFixed: true, parentId: null, level: 0 
+         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
+      ],
+      isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
-    
+
     // Subgroups (Level 1) for KMU - Their parentId MUST reference an ID from fixedGroupIds
-    { 
-      id: crypto.randomUUID(), 
+    {
+      id: crypto.randomUUID(),
       name: "Umlaufvermögen",
-      mainType: "Asset", 
+      mainType: "Asset",
       accounts: [
         { id: crypto.randomUUID(), number: "1000", name: "Kasse", description: "Bargeldbestand", isSystemAccount: false},
         { id: crypto.randomUUID(), number: "1010", name: "PostFinance-Konto", description: "Guthaben PostFinance", isSystemAccount: false},
@@ -49,7 +50,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.asset, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Anlagevermögen",
       mainType: "Asset",
@@ -59,7 +60,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.asset, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Fremdkapital Kurzfristig",
       mainType: "Liability",
@@ -70,7 +71,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.liability, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Fremdkapital Langfristig",
       mainType: "Liability",
@@ -79,17 +80,17 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.liability, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
-      name: "Kapital und Reserven", 
+      name: "Kapital und Reserven",
       mainType: "Equity",
       accounts: [
-        { id: crypto.randomUUID(), number: "2800", name: "Eigenkapital (Grund-/Stammkapital)", description: "Gezeichnetes Kapital", isSystemAccount: false }, 
+        { id: crypto.randomUUID(), number: "2800", name: "Eigenkapital (Grund-/Stammkapital)", description: "Gezeichnetes Kapital", isSystemAccount: false },
         { id: crypto.randomUUID(), number: "2900", name: "Reserven", description: "Gesetzliche und freie Reserven", isSystemAccount: false },
       ],
       parentId: fixedGroupIds.equity, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Betriebsertrag",
       mainType: "Revenue",
@@ -100,7 +101,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.revenue, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Betriebsaufwand",
       mainType: "Expense",
@@ -120,10 +121,10 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       ],
       parentId: fixedGroupIds.expense, level: 1, isFixed: false
     },
-    { 
+    {
       id: crypto.randomUUID(),
       name: "Finanzaufwand und Steuern",
-      mainType: "Expense", 
+      mainType: "Expense",
       accounts: [
         { id: crypto.randomUUID(), number: "7500", name: "Finanzaufwand", description: "Zinsaufwand, Bankspesen", isSystemAccount: false},
         { id: crypto.randomUUID(), number: "8000", name: "Steuern", description: "Direkte Steuern", isSystemAccount: false},
@@ -139,18 +140,19 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
   groups: [
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { 
-      id: fixedGroupIds.equity, 
-      name: "Eigenkapital", 
-      mainType: "Equity", 
+    {
+      id: fixedGroupIds.equity,
+      name: "Eigenkapital",
+      mainType: "Equity",
       accounts: [
-      ], 
-      isFixed: true, parentId: null, level: 0 
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
+      ],
+      isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
 
-    { 
+    {
       id: crypto.randomUUID(), name: "Liquide Mittel & Forderungen", mainType: "Asset", parentId: fixedGroupIds.asset, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "1000", name: "Kasse", description: "Bargeldbestand des Vereins", isSystemAccount: false },
@@ -159,20 +161,20 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
         { id: crypto.randomUUID(), number: "1100", name: "Forderungen", description: "Offene Forderungen (z.B. Mitgliederbeiträge)", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Kurzfristige Verbindlichkeiten", mainType: "Liability", parentId: fixedGroupIds.liability, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "2000", name: "Verbindlichkeiten", description: "Kurzfristige Schulden des Vereins", isSystemAccount: false },
       ],
     },
-     { 
+     {
       id: crypto.randomUUID(), name: "Vereinskapital & Fonds", mainType: "Equity", parentId: fixedGroupIds.equity, level: 1, isFixed: false,
       accounts: [
-        { id: crypto.randomUUID(), number: "2800", name: "Vereinsvermögen / Fondskapital", description: "Eigenmittel des Vereins", isSystemAccount: false }, 
+        { id: crypto.randomUUID(), number: "2800", name: "Vereinsvermögen / Fondskapital", description: "Eigenmittel des Vereins", isSystemAccount: false },
         { id: crypto.randomUUID(), number: "2850", name: "Zweckgebundene Fonds", description: "Mittel für spezifische Projekte", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Vereinserträge", mainType: "Revenue", parentId: fixedGroupIds.revenue, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "3000", name: "Mitgliederbeiträge", description: "Einnahmen aus Mitgliederbeiträgen", isSystemAccount: false },
@@ -181,7 +183,7 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
         { id: crypto.randomUUID(), number: "3300", name: "Subventionen", description: "Öffentliche Beiträge", isSystemAccount: false},
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Vereinsaufwände", mainType: "Expense", parentId: fixedGroupIds.expense, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "4000", name: "Aufwand für Veranstaltungen", description: "Kosten für Vereinsanlässe", isSystemAccount: false },
@@ -200,18 +202,19 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
   groups: [
     { id: fixedGroupIds.asset, name: "Vermögen (Aktiven)", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Schulden (Passiven)", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { 
-      id: fixedGroupIds.equity, 
-      name: "Nettovermögen (Eigenkapital)", 
-      mainType: "Equity", 
+    {
+      id: fixedGroupIds.equity,
+      name: "Nettovermögen (Eigenkapital)",
+      mainType: "Equity",
       accounts: [
-      ], 
-      isFixed: true, parentId: null, level: 0 
+         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
+      ],
+      isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Einnahmen (Ertrag)", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Ausgaben (Aufwand)", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
 
-    { 
+    {
       id: crypto.randomUUID(), name: "Liquide Mittel & Anlagen", mainType: "Asset", parentId: fixedGroupIds.asset, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "1000", name: "Bargeld / Portemonnaie", description: "Physisches Bargeld", isSystemAccount: false },
@@ -220,27 +223,27 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
         { id: crypto.randomUUID(), number: "1070", name: "Säule 3a Guthaben", description: "Gebundene Vorsorge", isSystemAccount: false},
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Sachanlagen", mainType: "Asset", parentId: fixedGroupIds.asset, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "1400", name: "Fahrzeuge", description: "Wert des privaten Fahrzeugs/der Fahrzeuge", isSystemAccount: false },
         { id: crypto.randomUUID(), number: "1600", name: "Immobilien (selbstgenutzt)", description: "Wert der eigengenutzten Liegenschaft", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Verbindlichkeiten", mainType: "Liability", parentId: fixedGroupIds.liability, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "2000", name: "Privatkredite / Darlehen", description: "Konsumkredite, Darlehen von Privatpersonen", isSystemAccount: false },
         { id: crypto.randomUUID(), number: "2100", name: "Hypotheken", description: "Schulden für Immobilienfinanzierung", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Eigenmittel", mainType: "Equity", parentId: fixedGroupIds.equity, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "2800", name: "Eigenmittel / Reinvermögen", description: "Differenz Vermögen - Schulden", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Regelmässige Einnahmen", mainType: "Revenue", parentId: fixedGroupIds.revenue, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "3000", name: "Lohn / Gehalt", description: "Nettoeinkommen aus unselbstständiger Erwerbstätigkeit", isSystemAccount: false },
@@ -248,7 +251,7 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
         { id: crypto.randomUUID(), number: "3500", name: "Kapitalerträge", description: "Zinsen, Dividenden", isSystemAccount: false },
       ],
     },
-    { 
+    {
       id: crypto.randomUUID(), name: "Fixe und Variable Ausgaben", mainType: "Expense", parentId: fixedGroupIds.expense, level: 1, isFixed: false,
       accounts: [
         { id: crypto.randomUUID(), number: "4000", name: "Wohnen und Energie", description: "Miete/Hypothekarzins, Nebenkosten, Strom, Heizung", isSystemAccount: false },
@@ -272,67 +275,90 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
   const fixedGroupDefinitions: AccountGroupTemplate[] = [
     { id: fixedGroupIds.asset, name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.liability, name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0 },
-    { 
-      id: fixedGroupIds.equity, 
-      name: "Eigenkapital", 
-      mainType: "Equity", 
+    {
+      id: fixedGroupIds.equity,
+      name: "Eigenkapital",
+      mainType: "Equity",
       accounts: [
-      ], 
-      isFixed: true, parentId: null, level: 0 
+        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
+      ],
+      isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
     { id: fixedGroupIds.expense, name: "Aufwand", mainType: "Expense", accounts: [], isFixed: true, parentId: null, level: 0 },
   ];
 
   const resultGroups: AccountGroupTemplate[] = [];
-  const processedFixedGroupIds = new Set<string>();
 
+  // Ensure all canonical fixed groups are present and correctly configured
   for (const fixedDef of fixedGroupDefinitions) {
-    let existingFixedGroup = groups.find(g => g.id === fixedDef.id);
+    let existingFixedGroup = groups.find(g => g.id === fixedDef.id && g.isFixed && g.mainType === fixedDef.mainType);
     if (existingFixedGroup) {
+      // Ensure properties from definition are set
       existingFixedGroup.name = fixedDef.name;
-      existingFixedGroup.mainType = fixedDef.mainType;
-      existingFixedGroup.isFixed = true;
       existingFixedGroup.parentId = null;
       existingFixedGroup.level = 0;
+      // Ensure essential accounts (like Retained Earnings) are present
+      fixedDef.accounts.forEach(defAcc => {
+        if (!existingFixedGroup!.accounts.some(acc => acc.number === defAcc.number && acc.isRetainedEarningsAccount === defAcc.isRetainedEarningsAccount)) {
+          existingFixedGroup!.accounts.push({...defAcc, id: defAcc.id || crypto.randomUUID()});
+        }
+      });
+      resultGroups.push(existingFixedGroup);
     } else {
-      existingFixedGroup = groups.find(g => g.isFixed && g.mainType === fixedDef.mainType && g.level === 0);
-      if (existingFixedGroup) {
-        existingFixedGroup.id = fixedDef.id; 
-        existingFixedGroup.name = fixedDef.name;
-        existingFixedGroup.mainType = fixedDef.mainType;
-        existingFixedGroup.isFixed = true;
-        existingFixedGroup.parentId = null;
-        existingFixedGroup.level = 0;
+      // If a fixed group is completely missing by ID, try to find by mainType and fix status, then update its ID and properties
+      const fallbackFixedGroup = groups.find(g => g.isFixed && g.mainType === fixedDef.mainType && g.level === 0);
+      if (fallbackFixedGroup) {
+        fallbackFixedGroup.id = fixedDef.id; // Correct the ID
+        fallbackFixedGroup.name = fixedDef.name;
+        fallbackFixedGroup.parentId = null;
+        fallbackFixedGroup.level = 0;
+         fixedDef.accounts.forEach(defAcc => {
+            if (!fallbackFixedGroup!.accounts.some(acc => acc.number === defAcc.number && acc.isRetainedEarningsAccount === defAcc.isRetainedEarningsAccount)) {
+              fallbackFixedGroup!.accounts.push({...defAcc, id: defAcc.id || crypto.randomUUID()});
+            }
+        });
+        resultGroups.push(fallbackFixedGroup);
       } else {
-         existingFixedGroup = { ...fixedDef, accounts: fixedDef.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID() })) };
+        // If truly missing, add the default definition
+        resultGroups.push({ ...fixedDef, accounts: fixedDef.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID() })) });
       }
     }
+  }
 
+  // Process non-fixed groups (subgroups)
   groups.forEach(group => {
-    if (!group.isFixed) { 
+    if (!group.isFixed) {
+      // Ensure parentId refers to a canonical fixed ID if it's a direct child of a fixed group
       const parentIsCanonicalFixed = Object.values(fixedGroupIds).includes(group.parentId || '');
       if (parentIsCanonicalFixed && group.parentId) {
         const parentGroup = resultGroups.find(rg => rg.id === group.parentId);
         if (parentGroup) {
-            group.mainType = parentGroup.mainType; 
+            group.mainType = parentGroup.mainType; // Subgroup inherits mainType from fixed parent
         }
-        
-        const groupToAdd = {...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))};
-        resultGroups.push(groupToAdd);
-      } else if (!group.parentId) {
-        // This case handles groups that might have been defined without a parentId and are not fixed.
-        // This could happen if the input `groups` array contains groups that are not part of the standard structure.
-        // We add them if they are not already processed (e.g. as a fixed group that was missing its canonical ID).
+        // Add only if not already added (e.g., if it was incorrectly marked as fixed before)
         if (!resultGroups.some(rg => rg.id === group.id)) {
-             const groupToAdd = {...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))};
-            resultGroups.push(groupToAdd);
+            resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
         }
+      } else if (!group.parentId && !group.isFixed){
+         // This handles groups that were not fixed and didn't have a parentId,
+         // potentially misconfigured. For safety, add them if they don't clash with existing IDs.
+         // These might need manual correction in the template definition if they are intended to be subgroups.
+         if (!resultGroups.some(rg => rg.id === group.id)) {
+            resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
+         }
+      }
+      // Note: Deeper level subgroups (level > 1) are not explicitly handled here for parentId correction to canonical IDs,
+      // assuming their parentId would correctly point to a non-fixed subgroup already processed.
+      // This simplification might need refinement if templates have very complex/deep non-standard hierarchies.
+      else if (group.parentId && !parentIsCanonicalFixed && !resultGroups.some(rg => rg.id === group.id)) {
+         // Add subgroups whose parent is not a fixed group, if they are not already there.
+         resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
       }
     }
   });
-  
-  // Deduplicate groups by ID, prioritizing fixed groups or earlier occurrences.
+
+  // Final deduplication by ID, prioritizing already processed fixed groups or earlier occurrences.
   const finalGroups = resultGroups.reduce((acc, current) => {
     if (!acc.find(item => item.id === current.id)) {
       acc.push(current);
@@ -352,21 +378,21 @@ export async function seedDefaultChartOfAccountsTemplates() {
 
     for (const template of defaultTemplates) {
       if (!existingTemplateNames.includes(template.name)) {
-        
+
         const groupsWithIds = template.groups.map(g => ({
           ...g,
-          id: g.id || crypto.randomUUID(), 
+          id: g.id || crypto.randomUUID(),
           accounts: g.accounts.map(a => ({
             ...a,
-            id: a.id || crypto.randomUUID(), 
+            id: a.id || crypto.randomUUID(),
             description: a.description || '',
             isSystemAccount: a.isSystemAccount || false,
             isRetainedEarningsAccount: a.isRetainedEarningsAccount || false,
           })),
         }));
-        
+
         const processedGroups = ensureFixedGroups(groupsWithIds);
-        
+
         const templateToSubmit: ChartOfAccountsTemplateFormValues = {
           name: template.name,
           description: template.description || '',
@@ -382,7 +408,6 @@ export async function seedDefaultChartOfAccountsTemplates() {
     console.log("Default templates seeding process completed.");
   } catch (error) {
     console.error("Error seeding default chart of accounts templates:", error);
-    throw error; 
+    throw error;
   }
 }
-
