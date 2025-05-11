@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -137,8 +136,8 @@ export default function AccountDetailPage() {
     actualNetChangeBar: true,
     lineActual: true,
     lineBudgetActual: true,
-    lineBudgetBest: false, // Initially hidden
-    lineBudgetWorst: false, // Initially hidden
+    lineBudgetBest: true, // Initially visible
+    lineBudgetWorst: true, // Initially visible
   });
 
   useEffect(() => setClientLoaded(true), []);
@@ -287,8 +286,8 @@ export default function AccountDetailPage() {
             dataPoint.actualNetChangeBar = actualPeriodicFlowThisAccount;
             dataPoint.lineActual = cumulativeActual;
             dataPoint.lineBudgetActual = cumulativeBudgetActual;
-            if (seriesVisibility.lineBudgetBest) dataPoint.lineBudgetBest = cumulativeBudgetBest;
-            if (seriesVisibility.lineBudgetWorst) dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
+            dataPoint.lineBudgetBest = cumulativeBudgetBest;
+            dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
         } else { // P&L Account
             let actualPeriodicPnlImpact = 0;
             if (accountDetails.groupMainType === 'Revenue') {
@@ -332,15 +331,15 @@ export default function AccountDetailPage() {
 
             dataPoint.lineActual = cumulativeActual;
             dataPoint.lineBudgetActual = cumulativeBudgetActual;
-            if (seriesVisibility.lineBudgetBest) dataPoint.lineBudgetBest = cumulativeBudgetBest;
-            if (seriesVisibility.lineBudgetWorst) dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
+            dataPoint.lineBudgetBest = cumulativeBudgetBest;
+            dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
         }
         return dataPoint;
     }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
     return result;
 
-}, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId, seriesVisibility]);
+}, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId]);
 
 
   const isLoadingData = isLoadingTenant || isLoadingCoA || isLoadingFiscalYears || (selectedFiscalYearId && isLoadingSelectedFY) || isLoadingJournal || isLoadingBudget || !clientLoaded;
@@ -564,8 +563,8 @@ export default function AccountDetailPage() {
 
                 <Line type="monotone" dataKey="lineActual" stroke="var(--color-lineActual)" strokeWidth={2.5} dot={{ r: 4 }} name={chartConfig.lineActual.label as string} hide={!seriesVisibility.lineActual}/>
                 <Line type="monotone" dataKey="lineBudgetActual" stroke="var(--color-lineBudgetActual)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetActual.label as string} hide={!seriesVisibility.lineBudgetActual}/>
-                {seriesVisibility.lineBudgetBest && <Line type="monotone" dataKey="lineBudgetBest" stroke="var(--color-lineBudgetBest)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetBest.label as string} hide={!seriesVisibility.lineBudgetBest}/>}
-                {seriesVisibility.lineBudgetWorst && <Line type="monotone" dataKey="lineBudgetWorst" stroke="var(--color-lineBudgetWorst)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetWorst.label as string} hide={!seriesVisibility.lineBudgetWorst}/>}
+                <Line type="monotone" dataKey="lineBudgetBest" stroke="var(--color-lineBudgetBest)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetBest.label as string} hide={!seriesVisibility.lineBudgetBest}/>
+                <Line type="monotone" dataKey="lineBudgetWorst" stroke="var(--color-lineBudgetWorst)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetWorst.label as string} hide={!seriesVisibility.lineBudgetWorst}/>
               </ComposedChart>
             </ChartContainer>
           ) : (
