@@ -25,7 +25,7 @@ import {
   eachMonthOfInterval, eachWeekOfInterval, eachDayOfInterval, 
   getISOWeekYear, getISOWeek, addMonths, addWeeks, addDays, 
   isEqual, isBefore, getYear, getMonth, 
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek // Added missing imports
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek, isAfter // Added missing import: isAfter
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -223,7 +223,7 @@ export default function AccountDetailPage() {
       return dataPoint;
     }).sort((a,b) => a.sortKey.localeCompare(b.sortKey));
 
-  }, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts]);
+  }, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId]);
 
 
   const isLoadingData = isLoadingTenant || isLoadingCoA || isLoadingFiscalYears || (selectedFiscalYearId && isLoadingSelectedFY) || isLoadingJournal || isLoadingBudget || !clientLoaded;
