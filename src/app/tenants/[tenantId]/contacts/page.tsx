@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link"; // Import Link
-import { Users, PlusCircle, Edit, Trash2, Tag, AlertCircle, Loader2 } from "lucide-react";
+import Link from "next/link"; 
+import { Users, PlusCircle, Edit, Trash2, Tag, AlertCircle, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,6 +48,7 @@ import type { Contact, Segment, NewContactPayload, NewSegmentPayload } from "@/t
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { exportContactsToCSV, downloadCSV } from "@/lib/csvExport";
 
 export default function TenantContactsPage() {
   const params = useParams();
@@ -165,6 +166,16 @@ export default function TenantContactsPage() {
       .join(", ");
   };
 
+  const handleExportAllContacts = () => {
+    if (contacts && segments) {
+      const csvString = exportContactsToCSV(contacts, segments);
+      downloadCSV(csvString, `alle_kontakte_${tenantId}_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Erfolg", description: "Alle Kontakte wurden exportiert." });
+    } else {
+      toast({ title: "Fehler", description: "Kontaktdaten oder Segmentdaten nicht geladen.", variant: "destructive" });
+    }
+  };
+
   const isLoading = (isLoadingContacts || isLoadingSegments) && !clientLoaded;
 
   if (contactsError || segmentsError) {
@@ -184,33 +195,38 @@ export default function TenantContactsPage() {
           <Users className="h-8 w-8 mr-3 text-primary" />
           <h1 className="text-3xl font-bold">Kontaktverwaltung</h1>
         </div>
-        <Dialog
-          open={isContactModalOpen}
-          onOpenChange={(isOpen) => {
-            setIsContactModalOpen(isOpen);
-            if (!isOpen) setSelectedContact(null);
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <PlusCircle className="mr-2 h-4 w-4" /> Kontakt erstellen
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{selectedContact ? "Kontakt bearbeiten" : "Neuen Kontakt erstellen"}</DialogTitle>
-              <DialogDescriptionComponent>
-                {selectedContact ? "Aktualisieren Sie die Details des Kontakts." : "Geben Sie die Details für den neuen Kontakt ein."}
-              </DialogDescriptionComponent>
-            </DialogHeader>
-            <ContactForm
-              tenantId={tenantId}
-              onSubmit={selectedContact ? handleUpdateContact : handleAddContact}
-              initialData={selectedContact}
-              isSubmitting={addContactMutation.isPending || updateContactMutation.isPending}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportAllContacts} disabled={isLoadingContacts || isLoadingSegments || !contacts || !segments}>
+            <Download className="mr-2 h-4 w-4" /> Alle exportieren (CSV)
+          </Button>
+          <Dialog
+            open={isContactModalOpen}
+            onOpenChange={(isOpen) => {
+              setIsContactModalOpen(isOpen);
+              if (!isOpen) setSelectedContact(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <PlusCircle className="mr-2 h-4 w-4" /> Kontakt erstellen
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{selectedContact ? "Kontakt bearbeiten" : "Neuen Kontakt erstellen"}</DialogTitle>
+                <DialogDescriptionComponent>
+                  {selectedContact ? "Aktualisieren Sie die Details des Kontakts." : "Geben Sie die Details für den neuen Kontakt ein."}
+                </DialogDescriptionComponent>
+              </DialogHeader>
+              <ContactForm
+                tenantId={tenantId}
+                onSubmit={selectedContact ? handleUpdateContact : handleAddContact}
+                initialData={selectedContact}
+                isSubmitting={addContactMutation.isPending || updateContactMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="shadow-xl">
@@ -376,7 +392,7 @@ export default function TenantContactsPage() {
               <CardTitle>Weitere Funktionen</CardTitle>
           </CardHeader>
           <CardContent>
-              <p className="text-muted-foreground">Zukünftige Funktionen wie CSV-Export, detaillierte Kundenübersichten mit Projekten und Zeiten werden hier verfügbar sein.</p>
+              <p className="text-muted-foreground">Zukünftige Funktionen wie detaillierte Kundenübersichten mit Projekten und Zeiten werden hier verfügbar sein.</p>
                 <img 
                     src="https://picsum.photos/seed/contactsAdvanced/1200/300" 
                     data-ai-hint="data export graph"

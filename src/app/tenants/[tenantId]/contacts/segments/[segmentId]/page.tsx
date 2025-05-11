@@ -4,21 +4,25 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Tag, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Tag, AlertCircle, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useGetSegmentById } from "@/hooks/useSegments";
+import { useGetSegmentById, useGetSegments } from "@/hooks/useSegments"; // useGetSegments to get all segments for mapping
 import { useGetContacts } from "@/hooks/useContacts";
 import type { Contact, Segment } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { exportContactsToCSV, downloadCSV } from "@/lib/csvExport";
+import { useToast } from "@/hooks/use-toast";
+
 
 export default function SegmentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const tenantId = params.tenantId as string;
   const segmentId = params.segmentId as string;
+  const { toast } = useToast();
 
   const [clientLoaded, setClientLoaded] = useState(false);
   useEffect(() => {
@@ -27,14 +31,29 @@ export default function SegmentDetailPage() {
 
   const { data: segment, isLoading: isLoadingSegment, error: segmentError } = useGetSegmentById(segmentId);
   const { data: allContacts, isLoading: isLoadingContacts, error: contactsError } = useGetContacts(tenantId);
+  const { data: allTenantSegments, isLoading: isLoadingAllSegments, error: allSegmentsError } = useGetSegments(tenantId);
+
 
   const filteredContacts = useMemo(() => {
     if (!allContacts || !segmentId) return [];
     return allContacts.filter(contact => contact.segmentIds?.includes(segmentId));
   }, [allContacts, segmentId]);
 
-  const isLoading = (isLoadingSegment || isLoadingContacts) && !clientLoaded;
-  const combinedError = segmentError || contactsError;
+  const handleExportSegmentContacts = () => {
+    if (filteredContacts.length > 0 && allTenantSegments && segment) {
+      const csvString = exportContactsToCSV(filteredContacts, allTenantSegments);
+      downloadCSV(csvString, `kontakte_segment_${segment.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Erfolg", description: `Kontakte für Segment "${segment.name}" wurden exportiert.` });
+    } else if (filteredContacts.length === 0) {
+       toast({ title: "Info", description: "Keine Kontakte in diesem Segment zum Exportieren vorhanden.", variant: "default" });
+    }
+    else {
+      toast({ title: "Fehler", description: "Kontaktdaten oder Segmentdaten nicht vollständig geladen.", variant: "destructive" });
+    }
+  };
+
+  const isLoading = (isLoadingSegment || isLoadingContacts || isLoadingAllSegments) && !clientLoaded;
+  const combinedError = segmentError || contactsError || allSegmentsError;
 
   if (isLoading) {
     return (
@@ -79,16 +98,22 @@ export default function SegmentDetailPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-      <div>
-        <Button variant="outline" size="sm" onClick={() => router.push(`/tenants/${tenantId}/contacts`)} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zur Kontaktübersicht
-        </Button>
-        <div className="flex items-center mb-2">
-          <Tag className="h-8 w-8 mr-3 text-primary" />
-          <h1 className="text-3xl font-bold">Segment: {segment?.name}</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <Button variant="outline" size="sm" onClick={() => router.push(`/tenants/${tenantId}/contacts`)} className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zur Kontaktübersicht
+          </Button>
+          <div className="flex items-center mb-2">
+            <Tag className="h-8 w-8 mr-3 text-primary" />
+            <h1 className="text-3xl font-bold">Segment: {segment?.name}</h1>
+          </div>
+          {segment?.description && <p className="text-muted-foreground">{segment.description}</p>}
         </div>
-        {segment?.description && <p className="text-muted-foreground">{segment.description}</p>}
+        <Button variant="outline" onClick={handleExportSegmentContacts} disabled={isLoadingContacts || isLoadingAllSegments || filteredContacts.length === 0 || !allTenantSegments}>
+          <Download className="mr-2 h-4 w-4" /> Kontakte exportieren (CSV)
+        </Button>
       </div>
+
 
       <Card className="shadow-xl">
         <CardHeader>
