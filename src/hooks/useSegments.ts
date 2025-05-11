@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSegments,
+  getSegmentById, // Import the new service function
   addSegment,
   updateSegment,
   deleteSegment,
@@ -11,17 +12,29 @@ import {
 import type { Segment, NewSegmentPayload } from "@/types";
 
 const segmentQueryKeys = {
-  all: (tenantId: string) => ["segments", tenantId] as const,
-  lists: (tenantId: string) => [...segmentQueryKeys.all(tenantId), "list"] as const,
-  details: (tenantId: string) => [...segmentQueryKeys.all(tenantId), "detail"] as const,
-  detail: (segmentId: string) => [...segmentQueryKeys.details(""), segmentId] as const,
+  // Keys for lists of segments scoped to a tenant
+  forTenant: (tenantId: string) => ["segments", "byTenant", tenantId] as const,
+  lists: (tenantId: string) => [...segmentQueryKeys.forTenant(tenantId), "list"] as const,
+  
+  // Keys for individual segment details (globally unique by ID)
+  detailsRoot: () => ["segments", "details"] as const, // General prefix for segment details
+  detail: (segmentId: string) => [...segmentQueryKeys.detailsRoot(), segmentId] as const,
 };
+
 
 export function useGetSegments(tenantId: string | null) {
   return useQuery<Segment[], Error>({
     queryKey: segmentQueryKeys.lists(tenantId!),
     queryFn: () => (tenantId ? getSegments(tenantId) : Promise.resolve([])),
     enabled: !!tenantId,
+  });
+}
+
+export function useGetSegmentById(segmentId: string | null) {
+  return useQuery<Segment | undefined, Error>({
+    queryKey: segmentQueryKeys.detail(segmentId!),
+    queryFn: () => (segmentId ? getSegmentById(segmentId) : Promise.resolve(undefined)),
+    enabled: !!segmentId,
   });
 }
 
@@ -54,8 +67,11 @@ export function useDeleteSegment(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, string>({
     mutationFn: deleteSegment,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: segmentQueryKeys.lists(tenantId) });
+    onSuccess: (success, deletedSegmentId) => {
+      if (success) {
+        queryClient.invalidateQueries({ queryKey: segmentQueryKeys.lists(tenantId) });
+        queryClient.removeQueries({queryKey: segmentQueryKeys.detail(deletedSegmentId)});
+      }
     },
   });
 }

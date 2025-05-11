@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link"; // Import Link
 import { Users, PlusCircle, Edit, Trash2, Tag, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -331,11 +332,11 @@ export default function TenantContactsPage() {
           ) : segments && segments.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {segments.map(segment => (
-                <Card key={segment.id} className="flex flex-col justify-between p-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">{segment.name}</h3>
+                <Card key={segment.id} className="flex flex-col justify-between p-4 hover:shadow-md transition-shadow">
+                  <Link href={`/tenants/${tenantId}/contacts/segments/${segment.id}`} className="flex-grow cursor-pointer">
+                    <h3 className="font-semibold text-lg hover:text-primary">{segment.name}</h3>
                     <p className="text-sm text-muted-foreground truncate" title={segment.description}>{segment.description || "Keine Beschreibung"}</p>
-                  </div>
+                  </Link>
                   <div className="mt-3 flex justify-end space-x-2">
                     <Button variant="outline" size="icon" onClick={() => handleEditSegment(segment)} title="Segment bearbeiten">
                         <Edit className="h-4 w-4" />
@@ -370,7 +371,6 @@ export default function TenantContactsPage() {
         </CardContent>
       </Card>
       
-      {/* Placeholder for CSV Export and other advanced features */}
       <Card className="shadow-lg">
           <CardHeader>
               <CardTitle>Weitere Funktionen</CardTitle>

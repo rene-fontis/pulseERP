@@ -40,6 +40,15 @@ export const getSegments = async (tenantId: string): Promise<Segment[]> => {
   return querySnapshot.docs.map(mapDocToSegment);
 };
 
+export const getSegmentById = async (segmentId: string): Promise<Segment | undefined> => {
+  const segmentDocRef = doc(db, "segments", segmentId);
+  const docSnapshot = await getDoc(segmentDocRef);
+  if (docSnapshot.exists()) {
+    return mapDocToSegment(docSnapshot);
+  }
+  return undefined;
+};
+
 export const addSegment = async (
   tenantId: string,
   segmentData: NewSegmentPayload
