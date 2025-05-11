@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChartBig, BookOpen } from 'lucide-react';
+import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChartBig, BookOpen, LayoutDashboard } from 'lucide-react';
 import type { Tenant, FinancialSummary, BudgetReportData, AccountGroup } from '@/types';
 import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
