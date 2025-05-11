@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { BudgetEntryForm } from '@/components/budget/BudgetEntryForm';
 import { useGetBudgetById } from '@/hooks/useBudgets';
 import { useGetBudgetEntries, useAddBudgetEntry, useUpdateBudgetEntry, useDeleteBudgetEntry } from '@/hooks/useBudgetEntries';
-import type { BudgetEntry, NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
+import { type BudgetEntry, type NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
