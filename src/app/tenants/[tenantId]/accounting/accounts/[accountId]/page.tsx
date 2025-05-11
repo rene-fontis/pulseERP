@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, ReferenceLine, LabelList
 } from 'recharts';
-import { ChartContainer, ChartTooltipContent, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
@@ -25,7 +26,7 @@ import {
   eachMonthOfInterval, eachWeekOfInterval, eachDayOfInterval, 
   getISOWeekYear, getISOWeek, addMonths, addWeeks, addDays, 
   isEqual, isBefore, getYear, getMonth, 
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek, isAfter // Added missing import: isAfter
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek, isAfter 
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -386,3 +387,4 @@ export default function AccountDetailPage() {
     </div>
   );
 }
+
