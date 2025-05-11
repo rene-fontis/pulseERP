@@ -1,4 +1,3 @@
-
 import {
   collection,
   getDocs,
@@ -30,7 +29,7 @@ const mapDocToContact = (docSnapshot: any): Contact => {
     phone: data.phone,
     email: data.email,
     segmentIds: data.segmentIds || [],
-    hourlyRate: data.hourlyRate,
+    hourlyRate: data.hourlyRate === undefined ? null : data.hourlyRate, // Ensure undefined from DB becomes null
     isClient: data.isClient || false,
     isSupplier: data.isSupplier || false,
     isPartner: data.isPartner || false,
@@ -65,7 +64,7 @@ export const addContact = async (
   contactData: NewContactPayload
 ): Promise<Contact> => {
   const now = serverTimestamp();
-  const newContact = {
+  const newContact: any = { // Use any temporarily for Firestore compatibility
     ...contactData,
     address: contactData.address || {},
     isClient: contactData.isClient || false,
@@ -75,6 +74,11 @@ export const addContact = async (
     createdAt: now,
     updatedAt: now,
   };
+
+  // Ensure hourlyRate is null if undefined, or the number value
+  newContact.hourlyRate = (contactData.hourlyRate === undefined || contactData.hourlyRate === null) ? null : contactData.hourlyRate;
+
+
   const docRef = await addDoc(contactsCollectionRef, newContact);
   const newDocSnapshot = await getDoc(docRef);
   if (newDocSnapshot.exists()) {
@@ -97,6 +101,12 @@ export const updateContact = async (
       updateData.address = { ...existingContact.address, ...contactData.address };
     }
   }
+  
+  // Ensure hourlyRate is null if undefined, or the number value
+  if (contactData.hasOwnProperty('hourlyRate')) { // Check if hourlyRate key is present in the partial update
+    updateData.hourlyRate = (contactData.hourlyRate === undefined || contactData.hourlyRate === null) ? null : contactData.hourlyRate;
+  }
+
 
   await updateDoc(contactDocRef, updateData);
   const updatedDocSnapshot = await getDoc(contactDocRef);

@@ -315,7 +315,7 @@ export interface Contact {
   phone?: string;
   email?: string;
   segmentIds?: string[];
-  hourlyRate?: number;
+  hourlyRate?: number | null; // Changed to allow null for Firestore
   isClient: boolean; // Changed to non-optional
   isSupplier: boolean; // Changed to non-optional
   isPartner: boolean; // Changed to non-optional

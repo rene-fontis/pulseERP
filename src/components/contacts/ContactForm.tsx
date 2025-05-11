@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect } from "react";
@@ -108,7 +107,8 @@ export function ContactForm({
     const payload: NewContactPayload = {
       ...values,
       tenantId,
-      hourlyRate: values.hourlyRate === null ? undefined : values.hourlyRate, // Ensure undefined if null
+      // Ensure hourlyRate is null if undefined or null from form, otherwise use the number value.
+      hourlyRate: (values.hourlyRate === undefined || values.hourlyRate === null) ? null : values.hourlyRate,
     };
     await onSubmit(payload);
     if (!initialData) {
