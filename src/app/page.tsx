@@ -18,7 +18,7 @@ export default function HomePage() {
           <Skeleton className="h-10 w-1/2 mb-2" />
           <Skeleton className="h-6 w-3/4" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-6"> {/* Changed from grid to space-y for vertical stacking */}
           {[...Array(3)].map((_, i) => (
             <Card key={i}>
               <CardHeader>
@@ -86,7 +86,7 @@ export default function HomePage() {
           Ein schneller Überblick über Ihre Mandanten.
         </p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-6"> {/* Changed from grid to space-y for vertical stacking */}
         {tenants.map(tenant => (
           <HomePageTenantCard key={tenant.id} tenant={tenant} />
         ))}
