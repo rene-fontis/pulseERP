@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { BudgetEntryForm } from '@/components/budget/BudgetEntryForm';
 import { useGetBudgetById } from '@/hooks/useBudgets';
 import { useGetBudgetEntries, useAddBudgetEntry, useUpdateBudgetEntry, useDeleteBudgetEntry } from '@/hooks/useBudgetEntries';
-import type { BudgetEntry, NewBudgetEntryPayload } from '@/types';
+import type { BudgetEntry, NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -208,8 +208,12 @@ export default function BudgetEntriesPage() {
                       <TableCell className="text-right">{entry.amountBestCase != null ? formatCurrency(entry.amountBestCase) : '-'}</TableCell>
                       <TableCell className="text-right">{entry.amountWorstCase != null ? formatCurrency(entry.amountWorstCase) : '-'}</TableCell>
                       <TableCell>
-                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${entry.type === 'Income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {entry.type === 'Income' ? 'Einnahme' : 'Ausgabe'}
+                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                            entry.type === 'Income' ? 'bg-green-100 text-green-700' : 
+                            entry.type === 'Expense' ? 'bg-red-100 text-red-700' :
+                            'bg-blue-100 text-blue-700' // For 'Transfer'
+                          }`}>
+                            {BudgetEntryTypeLabels[entry.type]}
                         </span>
                       </TableCell>
                       <TableCell>{formatDateRange(entry.startDate, entry.endDate)}</TableCell>
