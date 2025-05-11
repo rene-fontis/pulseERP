@@ -5,14 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowLeft, CalendarDays, BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, Info } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, Info, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, ReferenceLine, LabelList
 } from 'recharts';
-import { ChartContainer, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
@@ -153,17 +154,13 @@ export default function AccountDetailPage() {
 
   const chartData = useMemo(() => {
     if (!clientLoaded || !selectedFiscalYearDetails || !accountDetails || !allJournalEntries || !allBudgetEntries || !chartOfAccounts) {
-      // console.log("ChartData: Prerequisites not met", { clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, chartOfAccounts });
       return [];
     }
-
-    // console.log("ChartData: Calculating with", { selectedFiscalYearDetails, accountDetails });
-
 
     const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
     const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
     const isBSAccount = accountDetails.groupMainType === 'Asset' || accountDetails.groupMainType === 'Liability' || accountDetails.groupMainType === 'Equity';
-    const openingBalance = accountDetails.balance || 0; // This is the CoA opening balance, not FY specific opening balance if not first FY.
+    const openingBalance = accountDetails.balance || 0; 
 
     let periods: { periodStart: Date; periodEnd: Date; periodLabel: string; sortKey: string }[] = [];
     switch (aggregationPeriod) {
@@ -244,15 +241,12 @@ export default function AccountDetailPage() {
         dataPoint.actual = (accountDetails.groupMainType === 'Revenue' || accountDetails.groupMainType === 'Equity') ? -actualFlow : actualFlow; 
         dataPoint.budget = (accountDetails.groupMainType === 'Revenue' || accountDetails.groupMainType === 'Equity') ? -budgetFlow : budgetFlow;
       }
-      // console.log(`DataPoint for ${periodLabel}:`, dataPoint, "ActualFlow:", actualFlow, "BudgetFlow:", budgetFlow);
       return dataPoint;
     }).sort((a,b) => a.sortKey.localeCompare(b.sortKey));
     
-    // console.log("Final ChartData:", result);
     return result;
 
   }, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId]);
-
 
   const isLoadingData = isLoadingTenant || isLoadingCoA || isLoadingFiscalYears || (selectedFiscalYearId && isLoadingSelectedFY) || isLoadingJournal || isLoadingBudget || !clientLoaded;
 
@@ -260,7 +254,6 @@ export default function AccountDetailPage() {
     if (!accountDetails || !allJournalEntries || !clientLoaded) return accountDetails?.balance || 0;
     let balance = accountDetails.balance || 0; // Start with CoA opening balance
     
-    // Filter entries up to the end of the selected fiscal year if one is selected, otherwise all entries
     const entriesToConsider = selectedFiscalYearDetails ?
       allJournalEntries.filter(je => isBefore(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))) || isEqual(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))))
       : allJournalEntries;
@@ -284,6 +277,20 @@ export default function AccountDetailPage() {
         }));
     }
   };
+
+  const journalEntriesForAccountAndPeriod = useMemo(() => {
+    if (!allJournalEntries || !selectedFiscalYearDetails || !accountId) return [];
+    const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
+    const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
+
+    return allJournalEntries
+      .filter(je => {
+        const entryDate = parseISO(je.date);
+        return isWithinInterval(entryDate, { start: fyStartDate, end: fyEndDate }) &&
+               je.lines.some(line => line.accountId === accountId);
+      })
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()); // Sort by date ascending
+  }, [allJournalEntries, selectedFiscalYearDetails, accountId]);
 
 
   if (isLoadingData && clientLoaded) {
@@ -417,6 +424,61 @@ export default function AccountDetailPage() {
             <div className="h-[400px] flex items-center justify-center">
                <p className="text-muted-foreground">Keine Daten für die Kontoentwicklung im gewählten Zeitraum verfügbar.</p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center">
+            <BookOpen className="h-6 w-6 mr-3 text-primary" />
+            <CardTitle className="text-2xl font-bold">Journal-Einträge für {accountDetails?.name}</CardTitle>
+          </div>
+          {selectedFiscalYearDetails && (
+            <CardDescription>
+              Anzeige aller Buchungen für dieses Konto im Geschäftsjahr: {selectedFiscalYearDetails.name}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!selectedFiscalYearDetails ? (
+            <p className="text-muted-foreground text-center py-4">Bitte wählen Sie ein Geschäftsjahr, um die Journaleinträge anzuzeigen.</p>
+          ) : journalEntriesForAccountAndPeriod.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Datum</TableHead>
+                    <TableHead>Beleg-Nr.</TableHead>
+                    <TableHead>Beschreibung</TableHead>
+                    <TableHead className="text-right">Soll</TableHead>
+                    <TableHead className="text-right">Haben</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {journalEntriesForAccountAndPeriod.map(entry => {
+                    const relevantLine = entry.lines.find(line => line.accountId === accountId);
+                    if (!relevantLine) return null; // Should not happen if filtering is correct
+
+                    return (
+                      <TableRow key={entry.id}>
+                        <TableCell>{format(parseISO(entry.date), "dd.MM.yyyy", { locale: de })}</TableCell>
+                        <TableCell>{entry.entryNumber}</TableCell>
+                        <TableCell>{entry.description}</TableCell>
+                        <TableCell className="text-right">
+                          {relevantLine.debit && relevantLine.debit !== 0 ? formatCurrency(relevantLine.debit) : ''}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {relevantLine.credit && relevantLine.credit !== 0 ? formatCurrency(relevantLine.credit) : ''}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-4">Keine Journaleinträge für dieses Konto im ausgewählten Geschäftsjahr.</p>
           )}
         </CardContent>
       </Card>
