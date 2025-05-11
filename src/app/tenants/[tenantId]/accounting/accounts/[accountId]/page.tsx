@@ -297,7 +297,7 @@ export default function AccountDetailPage() {
                 dataPoint.actualExpenseBar = 0;
             } else if (accountDetails.groupMainType === 'Expense') {
                 actualPeriodicPnlImpact = actualPeriodicFlowThisAccount; // Expense increases with debits (D-C)
-                dataPoint.actualExpenseBar = actualPeriodicPnlImpact > 0 ? actualPeriodicPnlImpact : 0; // Store positive, render negative
+                dataPoint.actualExpenseBar = actualPeriodicPnlImpact > 0 ? -actualPeriodicPnlImpact : 0; // Store negative, render as downward bar
                 dataPoint.actualRevenueBar = 0;
             }
             cumulativeActual += actualPeriodicPnlImpact; // Cumulative P&L impact of this account
@@ -633,5 +633,3 @@ export default function AccountDetailPage() {
     </div>
   );
 }
-
-```

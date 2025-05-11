@@ -26,7 +26,7 @@ const budgetEntryTypes: BudgetEntryType[] = ["Income", "Expense", "Transfer"];
 const budgetRecurrences: BudgetRecurrence[] = ["None", "Weekly", "Monthly", "Bimonthly", "Quarterly", "EveryFourMonths", "Semiannually", "Yearly"];
 
 const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
-  ...globalBudgetRecurrenceLabels, // Import global labels
+  ...globalBudgetRecurrenceLabels, 
 };
 
 
@@ -513,5 +513,3 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
     </Popover>
   );
 }
-
-```

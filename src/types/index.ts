@@ -294,6 +294,7 @@ export interface BudgetReportAccountEntry {
 
 export interface BudgetReportChartDataItem {
   periodLabel: string;
+  sortKey: string; // Added for reliable sorting, e.g., "2024-01"
   periodActualBudgetProfitLoss: number;
   periodBestCaseBudgetProfitLoss: number;
   periodWorstCaseBudgetProfitLoss: number;
@@ -461,5 +462,3 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
 }
-
-```
