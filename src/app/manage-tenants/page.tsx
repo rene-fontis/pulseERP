@@ -1,11 +1,12 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Edit, Trash2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // CardDescription removed
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'; // DialogFooter removed
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { TenantForm, type TenantFormValues } from '@/components/tenants/TenantForm';
 import { useGetTenants, useAddTenant, useUpdateTenant, useDeleteTenant } from '@/hooks/useTenants';
 import { useGetChartOfAccountsTemplates } from '@/hooks/useChartOfAccountsTemplates';
@@ -52,8 +53,6 @@ export default function ManageTenantsPage() {
         try {
           const dateToFormat = new Date(tenant.createdAt);
           if (isNaN(dateToFormat.getTime())) {
-            // Try parsing as Firestore Timestamp-like object if direct Date parsing fails
-            // This scenario might occur if `formatFirestoreTimestamp` didn't fully convert it.
             let parsedDate;
             if (typeof tenant.createdAt === 'object' && tenant.createdAt && 'seconds' in tenant.createdAt && 'nanoseconds' in tenant.createdAt) {
                 parsedDate = new Date((tenant.createdAt as any).seconds * 1000 + (tenant.createdAt as any).nanoseconds / 1000000);
@@ -99,8 +98,7 @@ export default function ManageTenantsPage() {
   const handleUpdateTenant = async (values: TenantFormValues) => { 
     if (!selectedTenant) return;
     try {
-      // Currently only name is updated via this form. Template selection is on create only.
-      await updateTenantMutation.mutateAsync({ id: selectedTenant.id, name: values.name });
+      await updateTenantMutation.mutateAsync({ id: selectedTenant.id, data: { name: values.name } });
       toast({ title: "Erfolg", description: "Mandant erfolgreich aktualisiert.", variant: "default" });
       setIsEditModalOpen(false);
       setSelectedTenant(null);
@@ -169,15 +167,16 @@ export default function ManageTenantsPage() {
           {isLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4 p-4 border rounded-md">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
+                 <TableRow key={`skeleton-${i}`}>
+                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-2/3" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Skeleton className="h-8 w-8 inline-block" />
+                    <Skeleton className="h-8 w-8 inline-block" />
+                  </TableCell>
+                </TableRow>
               ))}
             </div>
           ) : (
@@ -258,7 +257,6 @@ export default function ManageTenantsPage() {
               Die Kontenplan-Vorlage kann nach der Erstellung nicht mehr geändert werden.
             </DialogDescription>
           </DialogHeader>
-          {/* TenantForm for edit mode might need to disable template selection or handle it differently */}
           <TenantForm 
             onSubmit={handleUpdateTenant} 
             initialData={selectedTenant} 
@@ -269,5 +267,3 @@ export default function ManageTenantsPage() {
     </div>
   );
 }
-
-
