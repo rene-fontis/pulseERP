@@ -201,7 +201,14 @@ export interface CarryForwardBalancesPayload {
 }
 
 // --- Budgeting Types ---
-export type BudgetEntryType = "Income" | "Expense";
+export type BudgetEntryType = "Income" | "Expense" | "Transfer";
+
+export const BudgetEntryTypeLabels: Record<BudgetEntryType, string> = {
+  Income: "Einnahme",
+  Expense: "Ausgabe",
+  Transfer: "Kontoübertrag"
+};
+
 export type BudgetRecurrence = 
   | "None" 
   | "Monthly" 

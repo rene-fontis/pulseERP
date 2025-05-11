@@ -1,4 +1,3 @@
-
 import type {
   TenantChartOfAccounts,
   Budget,
@@ -111,6 +110,8 @@ export function calculateBudgetReportData(
   const accountAggregates = new Map<string, BudgetReportAccountEntry>();
 
   allTenantBudgetEntries.forEach(entry => {
+    if (entry.type === 'Transfer') return; // Ignore transfers for P&L focused table data
+
     const occurrences = countOccurrencesInPeriod(entry, reportStartDate, reportEndDate);
     if (occurrences === 0) return;
 
@@ -179,6 +180,8 @@ export function calculateBudgetReportData(
     };
 
     allTenantBudgetEntries.forEach(entry => {
+      if (entry.type === 'Transfer') return; // Ignore transfers for P&L focused chart data
+
       const occurrences = countOccurrencesInPeriod(entry, periodStart, periodEnd);
       if (occurrences === 0) return;
 
@@ -200,5 +203,3 @@ export function calculateBudgetReportData(
 
   return reportData;
 }
-
-    

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,12 +16,12 @@ import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Account, BudgetEntry, BudgetEntryFormValues, BudgetEntryType, BudgetRecurrence, NewBudgetEntryPayload } from '@/types';
+import type { Account, BudgetEntry, BudgetEntryType, BudgetRecurrence, NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetTenantById } from '@/hooks/useTenants';
 
-const budgetEntryTypes: BudgetEntryType[] = ["Income", "Expense"];
+const budgetEntryTypes: BudgetEntryType[] = ["Income", "Expense", "Transfer"];
 const budgetRecurrences: BudgetRecurrence[] = ["None", "Monthly", "Bimonthly", "Quarterly", "EveryFourMonths", "Semiannually", "Yearly"];
 
 const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
@@ -38,7 +37,7 @@ const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
 
 const createBudgetEntryFormSchema = () => z.object({
   description: z.string().min(1, "Beschreibung ist erforderlich."),
-  accountId: z.string().min(1, "Budgetkonto ist erforderlich."),
+  accountId: z.string().min(1, "Konto ist erforderlich."),
   counterAccountId: z.string().optional(),
   amountActual: z.preprocess(
     (val) => (typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val),
@@ -81,6 +80,15 @@ const createBudgetEntryFormSchema = () => z.object({
 }, {
     message: "Startdatum ist für wiederkehrende Einträge erforderlich.",
     path: ["startDate"],
+}).refine(data => {
+    // For transfers, counterAccountId is required.
+    if (data.type === 'Transfer' && (!data.counterAccountId || data.counterAccountId.trim() === '')) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Bei Kontoüberträgen ist ein Zielkonto erforderlich.",
+    path: ["counterAccountId"],
 });
 
 type FormValues = z.infer<ReturnType<typeof createBudgetEntryFormSchema>>;
@@ -111,7 +119,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       ? {
           description: initialData.description,
           accountId: initialData.accountId,
-          counterAccountId: initialData.counterAccountId || '',
+          counterAccountId: initialData.counterAccountId || undefined, // Ensure undefined if falsy
           amountActual: initialData.amountActual,
           amountBestCase: initialData.amountBestCase,
           amountWorstCase: initialData.amountWorstCase,
@@ -124,7 +132,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       : {
           description: '',
           accountId: '',
-          counterAccountId: '',
+          counterAccountId: undefined,
           amountActual: 0,
           amountBestCase: undefined,
           amountWorstCase: undefined,
@@ -141,7 +149,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       form.reset({
         description: initialData.description,
         accountId: initialData.accountId,
-        counterAccountId: initialData.counterAccountId || '',
+        counterAccountId: initialData.counterAccountId || undefined,
         amountActual: initialData.amountActual,
         amountBestCase: initialData.amountBestCase,
         amountWorstCase: initialData.amountWorstCase,
@@ -170,10 +178,35 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
       .sort((a,b) => a.label.localeCompare(b.label));
   }, [chartOfAccounts]);
 
+  const watchedType = form.watch("type");
+
+  const getAccountOptionsForType = (isSourceAccount: boolean) => {
+    if (watchedType === 'Transfer') {
+      return balanceSheetAccounts;
+    }
+    return isSourceAccount ? pnlAccounts : balanceSheetAccounts;
+  };
+
+  const getAccountLabelForType = (isSourceAccount: boolean) => {
+    if (watchedType === 'Transfer') {
+      return isSourceAccount ? "Von Konto (Bilanz)" : "Nach Konto (Bilanz)";
+    }
+    return isSourceAccount ? "Budgetkonto (Erfolgsrechnung)" : "Gegenkonto (Bilanz, optional)";
+  };
+  const getAccountDescriptionForType = (isSourceAccount: boolean) => {
+     if (watchedType === 'Transfer') {
+      return isSourceAccount ? "Das Konto, von dem der Betrag abgeht." : "Das Konto, auf das der Betrag überwiesen wird.";
+    }
+    return isSourceAccount ? "Das Hauptkonto für diesen Budgetposten (z.B. Miete, Lohn)." : "Woher das Geld kommt / wohin es fliesst (z.B. Bank).";
+  }
+
 
   const handleSubmitInternal = async (values: FormValues) => {
-    const selectedAccount = pnlAccounts.find(opt => opt.value === values.accountId)?.account;
-    const selectedCounterAccount = balanceSheetAccounts.find(opt => opt.value === values.counterAccountId)?.account;
+    const sourceAccountOptions = getAccountOptionsForType(true);
+    const targetAccountOptions = getAccountOptionsForType(false);
+
+    const selectedAccount = sourceAccountOptions.find(opt => opt.value === values.accountId)?.account;
+    const selectedCounterAccount = values.counterAccountId ? targetAccountOptions.find(opt => opt.value === values.counterAccountId)?.account : undefined;
 
     const payload: NewBudgetEntryPayload = {
       budgetId,
@@ -198,7 +231,7 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
        form.reset({
           description: '',
           accountId: '',
-          counterAccountId: '',
+          counterAccountId: undefined,
           amountActual: 0,
           amountBestCase: undefined,
           amountWorstCase: undefined,
@@ -227,15 +260,49 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             </FormItem>
           )}
         />
+        
+        <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Typ</FormLabel>
+                <Select 
+                    onValueChange={(value) => {
+                        field.onChange(value);
+                        // Reset dependent fields if type changes to avoid invalid combinations
+                        form.setValue('accountId', ''); 
+                        form.setValue('counterAccountId', undefined);
+                    }} 
+                    defaultValue={field.value}
+                >
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                    {budgetEntryTypes.map(type => (
+                        <SelectItem key={type} value={type}>{BudgetEntryTypeLabels[type]}</SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
             name="accountId"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Budgetkonto (Erfolgsrechnung)</FormLabel>
-                    <AccountAutocomplete options={pnlAccounts} value={field.value} onChange={field.onChange} placeholder="Konto wählen..." isLoading={isLoadingCoA}/>
-                <FormDescription className="text-xs">Das Hauptkonto für diesen Budgetposten (z.B. Miete, Lohn).</FormDescription>
+                <FormLabel>{getAccountLabelForType(true)}</FormLabel>
+                    <AccountAutocomplete 
+                        options={getAccountOptionsForType(true)} 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                        placeholder="Konto wählen..." 
+                        isLoading={isLoadingCoA}
+                    />
+                <FormDescription className="text-xs">{getAccountDescriptionForType(true)}</FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
@@ -245,9 +312,15 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             name="counterAccountId"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Gegenkonto (Bilanz, optional)</FormLabel>
-                    <AccountAutocomplete options={balanceSheetAccounts} value={field.value} onChange={field.onChange} placeholder="Gegenkonto wählen..." isLoading={isLoadingCoA}/>
-                <FormDescription className="text-xs">Woher das Geld kommt / wohin es fliesst (z.B. Bank).</FormDescription>
+                <FormLabel>{getAccountLabelForType(false)}</FormLabel>
+                    <AccountAutocomplete 
+                        options={getAccountOptionsForType(false)} 
+                        value={field.value || ''} // Pass empty string if undefined for Autocomplete
+                        onChange={field.onChange} 
+                        placeholder="Konto wählen..." 
+                        isLoading={isLoadingCoA}
+                    />
+                <FormDescription className="text-xs">{getAccountDescriptionForType(false)}</FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
@@ -290,25 +363,6 @@ export function BudgetEntryForm({ budgetId, tenantId, onSubmit, isSubmitting, in
             />
         </div>
         
-        <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Typ</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                    {budgetEntryTypes.map(type => (
-                        <SelectItem key={type} value={type}>{type === "Income" ? "Einnahme" : "Ausgabe"}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                <FormMessage />
-                </FormItem>
-            )}
-            />
-
         <FormField
             control={form.control}
             name="isRecurring"
@@ -464,5 +518,3 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
     </Popover>
   );
 }
-
-    
