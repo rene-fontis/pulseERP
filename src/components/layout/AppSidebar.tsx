@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, BarChart2 as BarChartIconLucide, Briefcase, Clock, Package, Receipt } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, BarChart2 as BarChartIconLucide, Briefcase, Clock, Package, Receipt, ListChecks } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -76,7 +75,7 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled // Keep disabled as per previous state unless explicitly requested otherwise
+            disabled 
         >
             <Link href="/admin/import">
                 <Users /> 
@@ -162,6 +161,11 @@ export function AppSidebar() {
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname.startsWith(`/tenants/${currentTenantId}/accounting/accounts`)}>
+                                        <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Konten</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`}>
                                         <Link href={`/tenants/${currentTenantId}/accounting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
@@ -187,7 +191,7 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports'))}>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/[budgetId]/entries`) }>
                                       <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>

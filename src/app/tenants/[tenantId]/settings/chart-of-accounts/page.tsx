@@ -1,16 +1,16 @@
 "use client";
 
-import { useParams } from 'next/navigation';
+import React, { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText as FileTextIcon, AlertCircle, Edit, Loader2 } from 'lucide-react'; 
+import { FileText as FileTextIcon, AlertCircle, Edit, Loader2, ChevronRight } from 'lucide-react'; 
 import { useGetTenantById } from '@/hooks/useTenants'; 
 import { useGetTenantChartOfAccountsById, useUpdateTenantChartOfAccounts } from '@/hooks/useTenantChartOfAccounts'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TenantChartOfAccountsForm, type TenantChartOfAccountsFormValues } from '@/components/tenants/TenantChartOfAccountsForm';
 import { useToast } from '@/hooks/use-toast';
 import type { TenantChartOfAccounts, AccountGroup } from '@/types';
@@ -19,21 +19,21 @@ import { formatCurrency } from '@/lib/utils';
 
 interface GroupDisplayProps {
   group: AccountGroup;
-  allGroups: AccountGroup[]; // Pass all groups for subgroup lookup
+  allGroups: AccountGroup[]; 
   level: number;
+  tenantId: string;
 }
 
-const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) => {
-  // Find subgroups specifically for *this* group from the complete list
+const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level, tenantId }) => {
   const subgroups = allGroups.filter(g => g.parentId === group.id && !g.isFixed);
-  const cardPadding = level === 0 ? "p-4" : "p-3"; // Less padding for subgroups
+  const cardPadding = level === 0 ? "p-4" : "p-3"; 
   const titleSize = level === 0 ? "text-lg" : "text-md";
 
   return (
     <Card className={cn("bg-background/50", cardPadding, level > 0 && "ml-0")}>
       <CardHeader className="p-0 pb-2">
         <CardTitle className={titleSize}>
-          {group.name} {/* Removed: <span className="text-sm font-normal text-muted-foreground">({group.mainType})</span> */}
+          {group.name}
           {group.isFixed && <span className="ml-2 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">Fixe Hauptgruppe</span>}
         </CardTitle>
       </CardHeader>
@@ -47,15 +47,27 @@ const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) 
                   <TableHead className="h-8">Name</TableHead>
                   <TableHead className="h-8">Beschreibung</TableHead>
                   <TableHead className="text-right h-8">Anfangsbestand</TableHead>
+                  <TableHead className="text-right h-8 w-[50px]">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {group.accounts.map((account) => (
                   <TableRow key={account.id}>
-                    <TableCell className="font-medium py-2">{account.number}</TableCell>
+                    <TableCell className="font-medium py-2">
+                       <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} className="hover:underline text-primary">
+                        {account.number}
+                      </Link>
+                    </TableCell>
                     <TableCell className="py-2">{account.name}</TableCell>
                     <TableCell className="py-2">{account.description || '-'}</TableCell>
                     <TableCell className="text-right py-2">{formatCurrency(account.balance)}</TableCell>
+                    <TableCell className="text-right py-2">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} title={`Details zu Konto ${account.number}`}>
+                           <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -66,11 +78,10 @@ const GroupDisplay: React.FC<GroupDisplayProps> = ({ group, allGroups, level }) 
            <p className="text-sm text-muted-foreground py-2">Keine Konten oder Untergruppen in dieser Gruppe.</p>
         )}
 
-        {/* Render Subgroups */}
         {subgroups.length > 0 && (
-          <div className="mt-3 space-y-3 pl-4 border-l"> {/* Indentation for subgroups */}
+          <div className="mt-3 space-y-3 pl-4 border-l"> 
             {subgroups.map(subG => (
-              <GroupDisplay key={subG.id} group={subG} allGroups={allGroups} level={level + 1} />
+              <GroupDisplay key={subG.id} group={subG} allGroups={allGroups} level={level + 1} tenantId={tenantId} />
             ))}
           </div>
         )}
@@ -230,9 +241,8 @@ export default function TenantChartOfAccountsPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Render top-level fixed groups. GroupDisplay will handle rendering their subgroups. */}
                   {topLevelFixedGroups.map((group) => (
-                    <GroupDisplay key={group.id} group={group} allGroups={chartOfAccounts.groups} level={0} />
+                    <GroupDisplay key={group.id} group={group} allGroups={chartOfAccounts.groups} level={0} tenantId={tenantId} />
                   ))}
                 </div>
                 <div className="mt-6 border-t pt-6 flex justify-end">
@@ -265,4 +275,3 @@ export default function TenantChartOfAccountsPage() {
     </div>
   );
 }
-

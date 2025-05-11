@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BookOpen, AlertCircle, PlusCircle, Edit, Trash2, Loader2, CalendarOff } from 'lucide-react';
@@ -166,7 +166,7 @@ export default function TenantJournalPage() {
         <p>Für diesen Mandanten wurde kein Kontenplan zugewiesen.</p>
         <p>Bitte überprüfen Sie die Mandanteneinstellungen und weisen Sie einen Kontenplan zu.</p>
          <Button asChild variant="link" className="mt-4">
-            <a href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</a>
+            <Link href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</Link>
         </Button>
       </div>
     );
@@ -180,7 +180,7 @@ export default function TenantJournalPage() {
         <p>Der zugewiesene Kontenplan konnte nicht geladen werden.</p>
         <p>Bitte überprüfen Sie die Mandanteneinstellungen.</p>
          <Button asChild variant="link" className="mt-4">
-            <a href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</a>
+            <Link href={`/tenants/${tenantId}/settings/chart-of-accounts`}>Zu Kontenplan Einstellungen</Link>
         </Button>
       </div>
     );
@@ -192,7 +192,7 @@ export default function TenantJournalPage() {
         <CalendarOff className="w-16 h-16 mb-4 mx-auto text-primary" />
         <h2 className="text-2xl font-semibold mb-2">Kein aktives Geschäftsjahr</h2>
         <p className="text-muted-foreground">Für diesen Mandanten ist kein Geschäftsjahr als aktiv markiert.</p>
-        <p className="text-sm text-muted-foreground">Bitte wählen Sie ein aktives Geschäftsjahr in den <a href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</a>, um Buchungen zu erfassen.</p>
+        <p className="text-sm text-muted-foreground">Bitte wählen Sie ein aktives Geschäftsjahr in den <Link href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</Link>, um Buchungen zu erfassen.</p>
       </div>
     );
   }
@@ -202,7 +202,7 @@ export default function TenantJournalPage() {
         <AlertCircle className="w-16 h-16 mb-4 mx-auto text-destructive" />
         <h2 className="text-2xl font-semibold mb-2">Aktives Geschäftsjahr nicht gefunden</h2>
         <p className="text-muted-foreground">Das als aktiv markierte Geschäftsjahr konnte nicht geladen werden.</p>
-         <p className="text-sm text-muted-foreground">Bitte überprüfen Sie die <a href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</a>.</p>
+         <p className="text-sm text-muted-foreground">Bitte überprüfen Sie die <Link href={`/tenants/${tenantId}/settings/fiscal-years`} className="underline hover:text-primary">Geschäftsjahr-Einstellungen</Link>.</p>
       </div>
     );
   }
@@ -305,7 +305,11 @@ export default function TenantJournalPage() {
                             </TableCell>
                           </>
                         )}
-                        <TableCell>{line.accountNumber}</TableCell>
+                        <TableCell>
+                           <Link href={`/tenants/${tenantId}/accounting/accounts/${line.accountId}`} className="hover:underline text-primary">
+                            {line.accountNumber}
+                          </Link>
+                        </TableCell>
                         <TableCell>{line.accountName}</TableCell>
                         <TableCell className="text-right">
                           {line.debit && line.debit !== 0 ? formatCurrency(line.debit) : ''}
@@ -405,5 +409,3 @@ export default function TenantJournalPage() {
     </div>
   );
 }
-
-    
