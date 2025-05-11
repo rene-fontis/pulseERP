@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -36,9 +37,9 @@ const chartConfig: ChartConfig = {
   actualNetChangeBar: { label: "Ist Fluss (Periode)", color: "hsl(var(--chart-0))" }, 
 
   lineActual: { label: "Ist Saldo/G&V", color: "hsl(var(--chart-0))" },
-  lineBudgetActual: { label: "Budget Saldo/G&V Standard", color: "hsl(var(--chart-1))" },
+  lineBudgetActual: { label: "Budget Saldo/G&V Standard", color: "hsl(var(--foreground))" }, // Changed to foreground (black)
   lineBudgetBest: { label: "Budget Saldo/G&V Best-Case", color: "hsl(var(--chart-2))" },
-  lineBudgetWorst: { label: "Budget Saldo/G&V Worst-Case", color: "hsl(var(--chart-3))" },
+  lineBudgetWorst: { label: "Budget Saldo/G&V Worst-Case", color: "hsl(var(--destructive))" }, // Changed to destructive (red)
 };
 
 
@@ -632,3 +633,4 @@ export default function AccountDetailPage() {
     </div>
   );
 }
+
