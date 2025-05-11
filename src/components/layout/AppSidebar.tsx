@@ -161,11 +161,6 @@ export function AppSidebar() {
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname.startsWith(`/tenants/${currentTenantId}/accounting/accounts`)}>
-                                        <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Konten</Link>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`}>
                                         <Link href={`/tenants/${currentTenantId}/accounting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
@@ -506,3 +501,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

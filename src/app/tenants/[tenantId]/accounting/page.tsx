@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -275,6 +274,7 @@ export default function TenantAccountingPage() {
                     isLoading={isLoadingCoA || isLoadingEntries || !clientLoaded || isLoadingSelectedFiscalYear} 
                     chartOfAccounts={chartOfAccounts}
                     selectedFiscalYear={selectedFiscalYearDetails}
+                    tenantId={tenantId}
                 />
             )}
             

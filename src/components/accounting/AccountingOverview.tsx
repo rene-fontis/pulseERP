@@ -1,7 +1,7 @@
-
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -17,6 +17,7 @@ interface AccountingOverviewProps {
   isLoading: boolean;
   chartOfAccounts: TenantChartOfAccounts | undefined;
   selectedFiscalYear: FiscalYear | undefined;
+  tenantId: string; // Added tenantId prop
 }
 
 const bilanzCategories: Array<{ type: AccountGroup['mainType'], displayName: string, id: string }> = [
@@ -30,7 +31,7 @@ const erfolgsrechnungCategories: Array<{ type: AccountGroup['mainType'], display
   { type: 'Expense', displayName: 'Aufwand', id: 'overview-expenses' },
 ];
 
-export function AccountingOverview({ summary, isLoading, chartOfAccounts, selectedFiscalYear }: AccountingOverviewProps) {
+export function AccountingOverview({ summary, isLoading, chartOfAccounts, selectedFiscalYear, tenantId }: AccountingOverviewProps) {
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -104,19 +105,28 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .sort((a,b) => (a.isFixed ? -1 : 1)) // Fixed groups first, then sort by name or number if needed
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
-                                        const closingBalance = summary.accountBalances[account.id] || 0;
-                                        const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
-                                        let periodChange = closingBalance - openingBalance;
-
+                                        const periodChange = summary.accountBalances[account.id] || 0;
                                         let displayBalanceForBilanz = periodChange; 
+                                        
+                                        // Assets: positive for increase, negative for decrease
+                                        // Liabilities & Equity: positive for increase (credit), negative for decrease (debit)
+                                        // To show them as "positive" numbers for balance sheet display:
                                         if (category.type === 'Liability' || category.type === 'Equity') {
                                           displayBalanceForBilanz = -periodChange; 
                                         }
 
                                         return (
                                             <TableRow key={account.id}>
-                                            <TableCell className="font-medium">{account.number}</TableCell>
-                                            <TableCell>{account.name}</TableCell>
+                                            <TableCell className="font-medium">
+                                               <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} className="hover:underline text-primary">
+                                                    {account.number}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} className="hover:underline text-primary">
+                                                    {account.name}
+                                                </Link>
+                                            </TableCell>
                                             <TableCell className="text-right">{formatCurrency(displayBalanceForBilanz)}</TableCell>
                                             </TableRow>
                                         );
@@ -173,16 +183,24 @@ export function AccountingOverview({ summary, isLoading, chartOfAccounts, select
                                     .sort((a,b) => (a.isFixed ? -1 : 1))
                                     .flatMap(g => g.accounts.sort((accA, accB) => accA.number.localeCompare(accB.number)))
                                     .map((account) => {
-                                        const closingBalance = summary.accountBalances[account.id] || 0;
-                                        const openingBalance = chartOfAccounts.groups.flatMap(g => g.accounts).find(a => a.id === account.id)?.balance || 0;
-                                        let periodChange = closingBalance - openingBalance;
-
+                                        const periodChange = summary.accountBalances[account.id] || 0;
+                                        
+                                        // Revenue increases with credits (negative netChange in our debit-credit system for P&L)
+                                        // Expense increases with debits (positive netChange)
                                         const displayAmount = (category.type === 'Revenue') ? -periodChange : periodChange;
 
                                         return (
                                             <TableRow key={account.id}>
-                                            <TableCell className="font-medium">{account.number}</TableCell>
-                                            <TableCell>{account.name}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} className="hover:underline text-primary">
+                                                    {account.number}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                 <Link href={`/tenants/${tenantId}/accounting/accounts/${account.id}`} className="hover:underline text-primary">
+                                                    {account.name}
+                                                 </Link>
+                                            </TableCell>
                                             <TableCell className="text-right">{formatCurrency(displayAmount)}</TableCell>
                                             </TableRow>
                                         );
