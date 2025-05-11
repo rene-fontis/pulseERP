@@ -1,3 +1,4 @@
+// src/types/index.ts
 
 export interface Tenant {
   id: string;
@@ -6,9 +7,6 @@ export interface Tenant {
   chartOfAccountsTemplateId?: string; // ID of the template used during creation
   chartOfAccountsId?: string; // ID of the tenant's specific Chart of Accounts document
   activeFiscalYearId?: string; // ID of the currently active fiscal year for this tenant
-  // Add other tenant-specific settings like timezone, notification preferences if needed
-  // timezone?: string;
-  // notificationsEnabled?: boolean;
 }
 
 // --- Chart of Accounts Template Types ---
@@ -203,7 +201,6 @@ export interface Budget {
   tenantId: string;
   name: string;
   description: string; 
-  // scenario: BudgetScenario; // Removed: Scenario is now per entry
   createdAt: string;
   updatedAt: string;
 }
@@ -220,9 +217,9 @@ export interface BudgetEntry {
   counterAccountNumber?: string; 
   counterAccountName?: string;   
   description: string;
-  amountActual: number; // Renamed from 'amount'
-  amountBestCase?: number | null; // Optional
-  amountWorstCase?: number | null; // Optional
+  amountActual: number; 
+  amountBestCase?: number | null; 
+  amountWorstCase?: number | null; 
   type: BudgetEntryType; 
   startDate?: string; 
   endDate?: string; 
