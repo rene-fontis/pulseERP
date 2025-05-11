@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +17,7 @@ import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Account, BudgetEntry, BudgetEntryType, BudgetRecurrence, NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
+import { BudgetEntryTypeLabels, type Account, type BudgetEntry, type BudgetEntryType, type BudgetRecurrence, type NewBudgetEntryPayload } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetTenantById } from '@/hooks/useTenants';
@@ -518,3 +519,4 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
     </Popover>
   );
 }
+
