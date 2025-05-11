@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, ReferenceLine, LabelList
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
@@ -46,8 +45,14 @@ function getAccountDetailsFromCoA(chartOfAccounts: TenantChartOfAccounts | undef
     if (account) {
       let effectiveMainType: AccountGroup['mainType'] | undefined = group.mainType;
       if (!group.isFixed && group.parentId) {
-        const parentGroup = chartOfAccounts.groups.find(pg => pg.id === group.parentId);
-        if (parentGroup) effectiveMainType = parentGroup.mainType;
+        // Find the ultimate fixed parent group to determine the mainType
+        let currentGroup: AccountGroup | undefined = group;
+        while(currentGroup && !currentGroup.isFixed && currentGroup.parentId) {
+            currentGroup = chartOfAccounts.groups.find(pg => pg.id === currentGroup!.parentId);
+        }
+        if (currentGroup?.isFixed) {
+            effectiveMainType = currentGroup.mainType;
+        }
       }
       return { ...account, groupMainType: effectiveMainType, groupName: group.name };
     }
@@ -74,17 +79,29 @@ function countBudgetEntryOccurrencesInPeriod(
 
   let occurrences = 0;
   let currentDate = entryStartDate;
-  while (isBefore(currentDate, periodStart)) { // Fast-forward to the period
+  
+  // Fast-forward to the period start or the first occurrence within/after periodStart
+  // This loop ensures currentDate is at least at the beginning of an interval that might overlap periodStart
+  while (isBefore(currentDate, periodStart)) { 
+    let nextDate = currentDate;
     switch (entry.recurrence) {
-      case 'Monthly': currentDate = addMonths(currentDate, 1); break;
-      case 'Bimonthly': currentDate = addMonths(currentDate, 2); break;
-      case 'Quarterly': currentDate = addMonths(currentDate, 3); break;
-      case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
-      case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
-      case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return 0;
+      case 'Monthly': nextDate = addMonths(currentDate, 1); break;
+      case 'Bimonthly': nextDate = addMonths(currentDate, 2); break;
+      case 'Quarterly': nextDate = addMonths(currentDate, 3); break;
+      case 'EveryFourMonths': nextDate = addMonths(currentDate, 4); break;
+      case 'Semiannually': nextDate = addMonths(currentDate, 6); break;
+      case 'Yearly': nextDate = addMonths(currentDate, 12); break;
+      default: return 0; // Should not happen with proper types
     }
+    if (isAfter(nextDate, periodStart) && !isEqual(nextDate, periodStart) && isBefore(currentDate, periodStart)) {
+      // Current date is before periodStart, next occurrence is after. current date might be the one.
+      break; 
+    }
+    currentDate = nextDate;
+    if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break; // Don't go past entry's own end date
   }
+
+
   while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break;
     if (isWithinInterval(currentDate, { start: periodStart, end: periodEnd })) {
@@ -97,7 +114,7 @@ function countBudgetEntryOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return occurrences;
+      default: return occurrences; // Should not happen
     }
   }
   return occurrences;
@@ -135,12 +152,18 @@ export default function AccountDetailPage() {
   }, [tenant, fiscalYears, selectedFiscalYearId]);
 
   const chartData = useMemo(() => {
-    if (!clientLoaded || !selectedFiscalYearDetails || !accountDetails || !allJournalEntries || !allBudgetEntries || !chartOfAccounts) return [];
+    if (!clientLoaded || !selectedFiscalYearDetails || !accountDetails || !allJournalEntries || !allBudgetEntries || !chartOfAccounts) {
+      // console.log("ChartData: Prerequisites not met", { clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, chartOfAccounts });
+      return [];
+    }
+
+    // console.log("ChartData: Calculating with", { selectedFiscalYearDetails, accountDetails });
+
 
     const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
     const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
     const isBSAccount = accountDetails.groupMainType === 'Asset' || accountDetails.groupMainType === 'Liability' || accountDetails.groupMainType === 'Equity';
-    const openingBalance = accountDetails.balance || 0;
+    const openingBalance = accountDetails.balance || 0; // This is the CoA opening balance, not FY specific opening balance if not first FY.
 
     let periods: { periodStart: Date; periodEnd: Date; periodLabel: string; sortKey: string }[] = [];
     switch (aggregationPeriod) {
@@ -170,7 +193,7 @@ export default function AccountDetailPage() {
     let cumulativeActualBalance = openingBalance;
     let cumulativeBudgetBalance = openingBalance;
 
-    return periods.map(({ periodStart, periodEnd, periodLabel, sortKey }) => {
+    const result = periods.map(({ periodStart, periodEnd, periodLabel, sortKey }) => {
       let actualFlow = 0;
       let budgetFlow = 0;
 
@@ -194,14 +217,14 @@ export default function AccountDetailPage() {
         const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
         if (occurrences > 0) {
           const amount = be.amountActual * occurrences;
-          if (isBSAccount) { // Cashflow for BS accounts
+          if (isBSAccount) { 
             if (be.type === 'Transfer') {
-              if (be.accountId === accountId) budgetFlow -= amount; // Outflow
-              if (be.counterAccountId === accountId) budgetFlow += amount; // Inflow
-            } else if (be.counterAccountId === accountId) { // Income/Expense affecting this BS account
+              if (be.accountId === accountId) budgetFlow -= amount; 
+              if (be.counterAccountId === accountId) budgetFlow += amount; 
+            } else if (be.counterAccountId === accountId) { 
               budgetFlow += (be.type === 'Income' ? amount : -amount);
             }
-          } else { // P&L account flow
+          } else { 
             if (be.accountId === accountId) {
               budgetFlow += (be.type === 'Income' ? amount : -amount);
             }
@@ -217,12 +240,16 @@ export default function AccountDetailPage() {
       if (isBSAccount) {
         dataPoint.actual = cumulativeActualBalance;
         dataPoint.budget = cumulativeBudgetBalance;
-      } else { // P&L account: show flow
-        dataPoint.actual = (accountDetails.groupMainType === 'Revenue' || accountDetails.groupMainType === 'Equity') ? -actualFlow : actualFlow; // Revenue is credit positive
+      } else { 
+        dataPoint.actual = (accountDetails.groupMainType === 'Revenue' || accountDetails.groupMainType === 'Equity') ? -actualFlow : actualFlow; 
         dataPoint.budget = (accountDetails.groupMainType === 'Revenue' || accountDetails.groupMainType === 'Equity') ? -budgetFlow : budgetFlow;
       }
+      // console.log(`DataPoint for ${periodLabel}:`, dataPoint, "ActualFlow:", actualFlow, "BudgetFlow:", budgetFlow);
       return dataPoint;
     }).sort((a,b) => a.sortKey.localeCompare(b.sortKey));
+    
+    // console.log("Final ChartData:", result);
+    return result;
 
   }, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId]);
 
@@ -231,10 +258,14 @@ export default function AccountDetailPage() {
 
   const currentActualBalance = useMemo(() => {
     if (!accountDetails || !allJournalEntries || !clientLoaded) return accountDetails?.balance || 0;
-    let balance = accountDetails.balance || 0;
-    allJournalEntries.forEach(je => {
-      // Optionally filter by selectedFiscalYearDetails if you only want balance for that FY
-      // For now, using all entries to get "current overall balance"
+    let balance = accountDetails.balance || 0; // Start with CoA opening balance
+    
+    // Filter entries up to the end of the selected fiscal year if one is selected, otherwise all entries
+    const entriesToConsider = selectedFiscalYearDetails ?
+      allJournalEntries.filter(je => isBefore(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))) || isEqual(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))))
+      : allJournalEntries;
+
+    entriesToConsider.forEach(je => {
       je.lines.forEach(line => {
         if (line.accountId === accountId) {
           balance += (line.debit || 0) - (line.credit || 0);
@@ -242,7 +273,7 @@ export default function AccountDetailPage() {
       });
     });
     return balance;
-  }, [accountDetails, allJournalEntries, clientLoaded, accountId]);
+  }, [accountDetails, allJournalEntries, clientLoaded, accountId, selectedFiscalYearDetails]);
   
   const handleLegendClick = (data: any) => {
     const { dataKey } = data;
@@ -301,8 +332,13 @@ export default function AccountDetailPage() {
           <div><span className="font-semibold">Kontoname:</span> {accountDetails?.name}</div>
           <div><span className="font-semibold">Gruppe:</span> {accountDetails?.groupName || 'N/A'}</div>
           <div><span className="font-semibold">Haupttyp:</span> {accountDetails?.groupMainType || 'N/A'}</div>
-          <div><span className="font-semibold">Eröffnungsbilanz (GJ-Beginn):</span> {formatCurrency(accountDetails?.balance)}</div>
-          <div><span className="font-semibold">Aktueller Saldo (Gesamt):</span> {formatCurrency(currentActualBalance)}</div>
+          <div><span className="font-semibold">Eröffnungsbilanz (gem. Kontenplan):</span> {formatCurrency(accountDetails?.balance)}</div>
+          <div>
+            <span className="font-semibold">Saldo per Ende 
+                {selectedFiscalYearDetails ? ` ${selectedFiscalYearDetails.name}` : ' aktueller Periode'}
+                :
+            </span> {formatCurrency(currentActualBalance)}
+            </div>
           {accountDetails?.description && <div className="md:col-span-2"><span className="font-semibold">Beschreibung:</span> {accountDetails.description}</div>}
         </CardContent>
       </Card>
@@ -315,7 +351,7 @@ export default function AccountDetailPage() {
               <CardDescription className="flex items-center">
                 <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
                 {selectedFiscalYearDetails ? 
-                    `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${format(parseISO(selectedFiscalYearDetails.startDate), "dd.MM.yy")} - ${format(parseISO(selectedFiscalYearDetails.endDate), "dd.MM.yy")})` 
+                    `Geschäftsjahr: ${selectedFiscalYearDetails.name} (${format(parseISO(selectedFiscalYearDetails.startDate), "dd.MM.yy", {locale:de})} - ${format(parseISO(selectedFiscalYearDetails.endDate), "dd.MM.yy", {locale:de})})` 
                     : "Bitte Geschäftsjahr wählen"}
               </CardDescription>
             </div>
@@ -356,8 +392,8 @@ export default function AccountDetailPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="periodLabel" tickLine={false} axisLine={{strokeDasharray:"3 3"}} tickMargin={8} />
                 <YAxis tickFormatter={value => formatCurrency(value, 'CHF', 'de-CH').replace('CHF', '').trim()} tickLine={false} axisLine={false} tickMargin={8}/>
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
-                <ChartLegend content={<ChartLegendContent onClick={handleLegendClick} />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} />
+                <Tooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+                <Legend content={<ChartLegendContent onClick={handleLegendClick} />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} />
                 <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.5} />
 
                 {accountDetails?.groupMainType === 'Asset' || accountDetails?.groupMainType === 'Liability' || accountDetails?.groupMainType === 'Equity' ? (
@@ -387,4 +423,3 @@ export default function AccountDetailPage() {
     </div>
   );
 }
-
