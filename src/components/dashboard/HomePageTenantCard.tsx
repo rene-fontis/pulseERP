@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChartBig, BookOpen, LayoutDashboard } from 'lucide-react';
+import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, LayoutDashboard, BookOpen, BarChartBig } from 'lucide-react';
 import type { Tenant, FinancialSummary, BudgetReportData, FiscalYear } from '@/types';
 import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
@@ -50,54 +50,78 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
     if (!activeFiscalYear) return undefined;
     return {
       ...activeFiscalYear,
-      endDate: reportEndDateForComparison.toISOString(), // Override endDate for "to-date" calculation
+      endDate: reportEndDateForComparison.toISOString(), 
     };
   }, [activeFiscalYear, reportEndDateForComparison]);
 
   const financialSummaryForComparison: FinancialSummary | null = useMemo(() => {
     if (!clientLoaded || !chartOfAccounts || !allJournalEntries || !fiscalYearDetailsForComparison) return null;
-    // Pass the fiscalYearDetailsForComparison which has the potentially modified endDate
     return calculateFinancialSummary(chartOfAccounts, allJournalEntries, fiscalYearDetailsForComparison);
   }, [clientLoaded, chartOfAccounts, allJournalEntries, fiscalYearDetailsForComparison]);
 
   const budgetReportDataForComparison: BudgetReportData | null = useMemo(() => {
     if (!clientLoaded || !chartOfAccounts || !budgets || !allBudgetEntries || !activeFiscalYear) return null;
     const fyStartDate = parseISO(activeFiscalYear.startDate);
-    // Use reportEndDateForComparison as the end date for budget calculation
     return calculateBudgetReportData(chartOfAccounts, budgets, allBudgetEntries, fyStartDate, reportEndDateForComparison, 'monthly');
   }, [clientLoaded, chartOfAccounts, budgets, allBudgetEntries, activeFiscalYear, reportEndDateForComparison]);
 
 
   const budgetStatus = useMemo(() => {
-    if (!financialSummaryForComparison || !budgetReportDataForComparison || !activeFiscalYear) return { message: 'Budgetdaten nicht verfügbar.', type: 'info' as const };
+    if (!financialSummaryForComparison || !budgetReportDataForComparison || !activeFiscalYear) {
+      return { message: 'Budgetdaten nicht verfügbar.', type: 'info' as const };
+    }
+
+    const actualNetProfitLoss = financialSummaryForComparison.netProfitLoss;
 
     const budgetedRevenue = budgetReportDataForComparison.tableData
       .filter(item => item.mainType === 'Revenue')
-      .reduce((sum, item) => sum + item.actualAmount, 0);
-    
-    const budgetedExpenses = budgetReportDataForComparison.tableData
+      .reduce((sum, item) => sum + item.actualAmount, 0); // Positive
+
+    const budgetedExpensesPnlImpact = budgetReportDataForComparison.tableData
       .filter(item => item.mainType === 'Expense')
-      .reduce((sum, item) => sum + item.actualAmount, 0); 
+      .reduce((sum, item) => sum + item.actualAmount, 0); // Negative (P/L impact)
 
-    const actualRevenue = financialSummaryForComparison.totalRevenue;
-    const actualExpenses = financialSummaryForComparison.totalExpenses;
+    const budgetedNetProfitLoss = budgetedRevenue + budgetedExpensesPnlImpact; // P/L
 
-    const warnings = [];
+    const actualRevenue = financialSummaryForComparison.totalRevenue; // Positive
+    const actualExpenses = financialSummaryForComparison.totalExpenses; // Positive (absolute value of expenses)
+    const positiveBudgetedExpenses = -budgetedExpensesPnlImpact; // Make it positive for direct comparison
 
-    if (actualRevenue < budgetedRevenue * 0.9) { 
-      warnings.push(`Einnahmen (${formatCurrency(actualRevenue)}) liegen unter Budget (${formatCurrency(budgetedRevenue)}).`);
+    const warnings: string[] = [];
+    let overallStatusType: 'success' | 'warning' | 'info' = 'info';
+    let overallMessage = '';
+
+    if (actualNetProfitLoss >= budgetedNetProfitLoss) {
+      overallStatusType = 'success';
+      if (actualNetProfitLoss > budgetedNetProfitLoss) {
+        overallMessage = `Budget übertroffen! Aktueller G/V: ${formatCurrency(actualNetProfitLoss)} vs. Budget: ${formatCurrency(budgetedNetProfitLoss)}.`;
+      } else {
+        overallMessage = `Budget im Plan. Aktueller G/V: ${formatCurrency(actualNetProfitLoss)}.`;
+      }
+    } else { // actualNetProfitLoss < budgetedNetProfitLoss
+      overallStatusType = 'warning';
+      overallMessage = `Budget nicht erreicht. Aktueller G/V: ${formatCurrency(actualNetProfitLoss)} vs. Budget: ${formatCurrency(budgetedNetProfitLoss)}.`;
+
+      // Detailed warnings for revenue and expenses if overall budget is not met
+      if (actualRevenue < budgetedRevenue * 0.9) { // 10% tolerance
+        warnings.push(`Einnahmen (${formatCurrency(actualRevenue)}) signifikant unter Budget (${formatCurrency(budgetedRevenue)}).`);
+      } else if (actualRevenue < budgetedRevenue) {
+         warnings.push(`Einnahmen (${formatCurrency(actualRevenue)}) unter Budget (${formatCurrency(budgetedRevenue)}).`);
+      }
+
+      if (actualExpenses > positiveBudgetedExpenses * 1.1) { // 10% tolerance
+        warnings.push(`Ausgaben (${formatCurrency(actualExpenses)}) signifikant über Budget (${formatCurrency(positiveBudgetedExpenses)}).`);
+      } else if (actualExpenses > positiveBudgetedExpenses) {
+         warnings.push(`Ausgaben (${formatCurrency(actualExpenses)}) über Budget (${formatCurrency(positiveBudgetedExpenses)}).`);
+      }
     }
 
-    if (actualExpenses > budgetedExpenses * 1.1) { 
-      warnings.push(`Ausgaben (${formatCurrency(actualExpenses)}) überschreiten Budget (${formatCurrency(budgetedExpenses)}).`);
+    if (warnings.length > 0 && overallStatusType === 'warning') {
+      return { message: `${overallMessage} ${warnings.join(' ')}`, type: overallStatusType };
     }
-    
-    if (warnings.length > 0) {
-      return { message: warnings.join(' '), type: 'warning' as const };
-    }
-    return { message: 'Budget im Plan.', type: 'success' as const };
+    return { message: overallMessage, type: overallStatusType };
 
-  }, [financialSummaryForComparison, budgetReportDataForComparison, activeFiscalYear]);
+  }, [financialSummaryForComparison, budgetReportDataForComparison, activeFiscalYear, clientLoaded]);
 
 
   if (isLoading && clientLoaded) {
@@ -184,7 +208,7 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
       <CardHeader>
         <CardTitle className="text-xl font-semibold">{tenant.name}</CardTitle>
         <CardDescription>
-          {activeFiscalYear ? `Aktuelles Geschäftsjahr: ${activeFiscalYear.name}` : 'Kein aktives Geschäftsjahr'}
+          {activeFiscalYear ? `Aktives Geschäftsjahr: ${activeFiscalYear.name}` : 'Kein aktives Geschäftsjahr'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -234,3 +258,4 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
     </Card>
   );
 }
+
