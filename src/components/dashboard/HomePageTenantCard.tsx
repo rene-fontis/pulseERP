@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChartBig, BookOpen, LayoutDashboard } from 'lucide-react';
-import type { Tenant, FinancialSummary, BudgetReportData, AccountGroup } from '@/types';
+import type { Tenant, FinancialSummary, BudgetReportData, AccountGroup, FiscalYear } from '@/types';
 import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetAllJournalEntriesForTenant } from '@/hooks/useJournalEntries';
@@ -16,6 +16,7 @@ import { calculateFinancialSummary } from '@/lib/accounting';
 import { calculateBudgetReportData } from '@/lib/budgetReporting';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '../ui/button';
+import { min, parseISO } from 'date-fns';
 
 interface HomePageTenantCardProps {
   tenant: Tenant;
@@ -37,39 +38,57 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
   const isLoading = isLoadingFY || isLoadingCoA || isLoadingJournal || isLoadingBudgets || isLoadingBudgetEntries || !clientLoaded;
   const combinedError = errorFY || errorCoA || errorJournal || errorBudgets || errorBudgetEntries;
 
-  const financialSummary: FinancialSummary | null = useMemo(() => {
-    if (!clientLoaded || !chartOfAccounts || !allJournalEntries || !activeFiscalYear) return null;
-    return calculateFinancialSummary(chartOfAccounts, allJournalEntries, activeFiscalYear);
-  }, [clientLoaded, chartOfAccounts, allJournalEntries, activeFiscalYear]);
+  const currentDate = useMemo(() => new Date(), []);
 
-  const budgetReportData: BudgetReportData | null = useMemo(() => {
+  const reportEndDateForComparison = useMemo(() => {
+    if (!activeFiscalYear) return currentDate;
+    const fyEndDate = parseISO(activeFiscalYear.endDate);
+    return min([currentDate, fyEndDate]);
+  }, [activeFiscalYear, currentDate]);
+
+  const fiscalYearDetailsForComparison = useMemo<FiscalYear | undefined>(() => {
+    if (!activeFiscalYear) return undefined;
+    return {
+      ...activeFiscalYear,
+      endDate: reportEndDateForComparison.toISOString(), // Override endDate for "to-date" calculation
+    };
+  }, [activeFiscalYear, reportEndDateForComparison]);
+
+  const financialSummaryForComparison: FinancialSummary | null = useMemo(() => {
+    if (!clientLoaded || !chartOfAccounts || !allJournalEntries || !fiscalYearDetailsForComparison) return null;
+    // Pass the fiscalYearDetailsForComparison which has the potentially modified endDate
+    return calculateFinancialSummary(chartOfAccounts, allJournalEntries, fiscalYearDetailsForComparison);
+  }, [clientLoaded, chartOfAccounts, allJournalEntries, fiscalYearDetailsForComparison]);
+
+  const budgetReportDataForComparison: BudgetReportData | null = useMemo(() => {
     if (!clientLoaded || !chartOfAccounts || !budgets || !allBudgetEntries || !activeFiscalYear) return null;
-    return calculateBudgetReportData(chartOfAccounts, budgets, allBudgetEntries, new Date(activeFiscalYear.startDate), new Date(activeFiscalYear.endDate), 'monthly');
-  }, [clientLoaded, chartOfAccounts, budgets, allBudgetEntries, activeFiscalYear]);
+    const fyStartDate = parseISO(activeFiscalYear.startDate);
+    // Use reportEndDateForComparison as the end date for budget calculation
+    return calculateBudgetReportData(chartOfAccounts, budgets, allBudgetEntries, fyStartDate, reportEndDateForComparison, 'monthly');
+  }, [clientLoaded, chartOfAccounts, budgets, allBudgetEntries, activeFiscalYear, reportEndDateForComparison]);
+
 
   const budgetStatus = useMemo(() => {
-    if (!financialSummary || !budgetReportData || !activeFiscalYear) return { message: 'Budgetdaten nicht verfügbar.', type: 'info' as const };
+    if (!financialSummaryForComparison || !budgetReportDataForComparison || !activeFiscalYear) return { message: 'Budgetdaten nicht verfügbar.', type: 'info' as const };
 
-    const budgetedRevenue = budgetReportData.tableData
+    const budgetedRevenue = budgetReportDataForComparison.tableData
       .filter(item => item.mainType === 'Revenue')
       .reduce((sum, item) => sum + item.actualAmount, 0);
     
-    const budgetedExpenses = budgetReportData.tableData
+    const budgetedExpenses = budgetReportDataForComparison.tableData
       .filter(item => item.mainType === 'Expense')
-      .reduce((sum, item) => sum + item.actualAmount, 0); // Expenses are positive here, P/L impact is negative
+      .reduce((sum, item) => sum + item.actualAmount, 0); 
 
-    const actualRevenue = financialSummary.totalRevenue;
-    const actualExpenses = financialSummary.totalExpenses; // Expenses are positive here
+    const actualRevenue = financialSummaryForComparison.totalRevenue;
+    const actualExpenses = financialSummaryForComparison.totalExpenses;
 
     const warnings = [];
 
-    // For revenue, underspending (actual < budget) is bad
-    if (actualRevenue < budgetedRevenue * 0.9) { // Example: Warn if actual revenue is less than 90% of budget
+    if (actualRevenue < budgetedRevenue * 0.9) { 
       warnings.push(`Einnahmen (${formatCurrency(actualRevenue)}) liegen unter Budget (${formatCurrency(budgetedRevenue)}).`);
     }
 
-    // For expenses, overspending (actual > budget) is bad
-    if (actualExpenses > budgetedExpenses * 1.1) { // Example: Warn if actual expenses are more than 110% of budget
+    if (actualExpenses > budgetedExpenses * 1.1) { 
       warnings.push(`Ausgaben (${formatCurrency(actualExpenses)}) überschreiten Budget (${formatCurrency(budgetedExpenses)}).`);
     }
     
@@ -78,7 +97,7 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
     }
     return { message: 'Budget im Plan.', type: 'success' as const };
 
-  }, [financialSummary, budgetReportData, activeFiscalYear]);
+  }, [financialSummaryForComparison, budgetReportDataForComparison, activeFiscalYear]);
 
 
   if (isLoading && clientLoaded) {
@@ -156,7 +175,7 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
   }
 
 
-  const profitLoss = financialSummary?.netProfitLoss;
+  const profitLoss = financialSummaryForComparison?.netProfitLoss;
   const profitLossColor = profitLoss && profitLoss > 0 ? 'text-green-600' : profitLoss && profitLoss < 0 ? 'text-red-600' : 'text-foreground';
   const profitLossIcon = profitLoss && profitLoss >= 0 ? TrendingUp : TrendingDown;
 
@@ -165,15 +184,15 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
       <CardHeader>
         <CardTitle className="text-xl font-semibold">{tenant.name}</CardTitle>
         <CardDescription>
-          {activeFiscalYear ? `Geschäftsjahr: ${activeFiscalYear.name}` : 'Kein aktives Geschäftsjahr'}
+          {activeFiscalYear ? `Aktuelles Geschäftsjahr: ${activeFiscalYear.name}` : 'Kein aktives Geschäftsjahr'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {financialSummary && profitLoss !== undefined ? (
+        {financialSummaryForComparison && profitLoss !== undefined ? (
           <div className="flex items-center">
             <profitLossIcon className={`mr-2 h-5 w-5 ${profitLossColor}`} />
             <p className={`text-lg font-medium ${profitLossColor}`}>
-              {formatCurrency(profitLoss)} <span className="text-sm text-muted-foreground">G/V</span>
+              {formatCurrency(profitLoss)} <span className="text-sm text-muted-foreground">G/V (bis heute)</span>
             </p>
           </div>
         ) : (
