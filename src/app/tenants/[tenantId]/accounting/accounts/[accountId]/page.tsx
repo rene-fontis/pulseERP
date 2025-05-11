@@ -20,7 +20,13 @@ import { useGetAllJournalEntriesForTenant } from '@/hooks/useJournalEntries';
 import { useGetAllBudgetEntriesForTenant } from '@/hooks/useBudgetEntries';
 import type { Account, AccountGroup, AggregationPeriod, BudgetEntry, FiscalYear, JournalEntry, JournalEntryLine, TenantChartOfAccounts } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { format, parseISO, isWithinInterval, startOfDay, endOfDay, eachMonthOfInterval, eachWeekOfInterval, eachDayOfInterval, getISOWeekYear, getISOWeek, addMonths, addWeeks, addDays, isEqual, isBefore, getYear, getMonth } from 'date-fns';
+import { 
+  format, parseISO, isWithinInterval, startOfDay, endOfDay, 
+  eachMonthOfInterval, eachWeekOfInterval, eachDayOfInterval, 
+  getISOWeekYear, getISOWeek, addMonths, addWeeks, addDays, 
+  isEqual, isBefore, getYear, getMonth, 
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek // Added missing imports
+} from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const chartConfigBase = {
