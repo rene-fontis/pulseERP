@@ -25,9 +25,6 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
-      accounts: [
-         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      ],
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -144,9 +141,6 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
-      accounts: [
-        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      ],
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -206,9 +200,6 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Nettovermögen (Eigenkapital)",
       mainType: "Equity",
-      accounts: [
-         { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      ],
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Einnahmen (Ertrag)", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -279,9 +270,6 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
-      accounts: [
-        { id: crypto.randomUUID(), number: "2970", name: "Gewinnvortrag / Verlustvortrag", description: "Vorjahresergebnis", isSystemAccount: false, isRetainedEarningsAccount: true },
-      ],
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
