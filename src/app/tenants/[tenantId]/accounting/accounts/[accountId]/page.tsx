@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -85,6 +86,7 @@ function countBudgetEntryOccurrencesInPeriod(
   while (isBefore(currentDate, periodStart)) { 
     let nextDate = currentDate;
     switch (entry.recurrence) {
+      case 'Weekly': nextDate = addWeeks(currentDate, 1); break;
       case 'Monthly': nextDate = addMonths(currentDate, 1); break;
       case 'Bimonthly': nextDate = addMonths(currentDate, 2); break;
       case 'Quarterly': nextDate = addMonths(currentDate, 3); break;
@@ -106,6 +108,7 @@ function countBudgetEntryOccurrencesInPeriod(
       occurrences++;
     }
     switch (entry.recurrence) {
+      case 'Weekly': currentDate = addWeeks(currentDate, 1); break;
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
       case 'Bimonthly': currentDate = addMonths(currentDate, 2); break;
       case 'Quarterly': currentDate = addMonths(currentDate, 3); break;
@@ -630,3 +633,5 @@ export default function AccountDetailPage() {
     </div>
   );
 }
+
+```

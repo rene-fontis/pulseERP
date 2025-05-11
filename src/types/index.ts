@@ -211,12 +211,25 @@ export const BudgetEntryTypeLabels: Record<BudgetEntryType, string> = {
 
 export type BudgetRecurrence = 
   | "None" 
+  | "Weekly" // Added Weekly
   | "Monthly" 
   | "Bimonthly" // Alle zwei Monate
   | "Quarterly" // Drei Monate / Quartalsweise
   | "EveryFourMonths" // Alle vier Monate
   | "Semiannually" // Halbjährlich
   | "Yearly"; // Jährlich
+
+export const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
+  None: "Einmalig / Keine",
+  Weekly: "Wöchentlich", // Added Weekly label
+  Monthly: "Monatlich",
+  Bimonthly: "Alle zwei Monate",
+  Quarterly: "Quartalsweise (alle 3 Monate)",
+  EveryFourMonths: "Alle vier Monate",
+  Semiannually: "Halbjährlich",
+  Yearly: "Jährlich",
+};
+
 
 export interface Budget {
   id: string;
@@ -449,3 +462,4 @@ export interface Invoice {
   updatedAt: string;
 }
 
+```

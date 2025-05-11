@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { BudgetEntryForm } from '@/components/budget/BudgetEntryForm';
 import { useGetBudgetById } from '@/hooks/useBudgets';
 import { useGetBudgetEntries, useAddBudgetEntry, useUpdateBudgetEntry, useDeleteBudgetEntry } from '@/hooks/useBudgetEntries';
-import { type BudgetEntry, type NewBudgetEntryPayload, BudgetEntryTypeLabels } from '@/types';
+import { type BudgetEntry, type NewBudgetEntryPayload, BudgetEntryTypeLabels, budgetRecurrenceLabels as globalBudgetRecurrenceLabels } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -21,13 +21,7 @@ import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 
 const budgetRecurrenceLabels: Record<BudgetEntry['recurrence'], string> = {
-  None: "Einmalig",
-  Monthly: "Monatlich",
-  Bimonthly: "Alle 2 Monate",
-  Quarterly: "Quartalsweise",
-  EveryFourMonths: "Alle 4 Monate",
-  Semiannually: "Halbjährlich",
-  Yearly: "Jährlich",
+  ...globalBudgetRecurrenceLabels,
 };
 
 export default function BudgetEntriesPage() {
@@ -288,5 +282,4 @@ export default function BudgetEntriesPage() {
     </div>
   );
 }
-
     

@@ -17,22 +17,16 @@ import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { BudgetEntryTypeLabels, type Account, type BudgetEntry, type BudgetEntryType, type BudgetRecurrence, type NewBudgetEntryPayload } from '@/types';
+import { BudgetEntryTypeLabels, type Account, type BudgetEntry, type BudgetEntryType, type BudgetRecurrence, type NewBudgetEntryPayload, budgetRecurrenceLabels as globalBudgetRecurrenceLabels } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetTenantById } from '@/hooks/useTenants';
 
 const budgetEntryTypes: BudgetEntryType[] = ["Income", "Expense", "Transfer"];
-const budgetRecurrences: BudgetRecurrence[] = ["None", "Monthly", "Bimonthly", "Quarterly", "EveryFourMonths", "Semiannually", "Yearly"];
+const budgetRecurrences: BudgetRecurrence[] = ["None", "Weekly", "Monthly", "Bimonthly", "Quarterly", "EveryFourMonths", "Semiannually", "Yearly"];
 
 const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
-  None: "Einmalig / Keine",
-  Monthly: "Monatlich",
-  Bimonthly: "Alle zwei Monate",
-  Quarterly: "Quartalsweise (alle 3 Monate)",
-  EveryFourMonths: "Alle vier Monate",
-  Semiannually: "Halbjährlich",
-  Yearly: "Jährlich",
+  ...globalBudgetRecurrenceLabels, // Import global labels
 };
 
 
@@ -520,3 +514,4 @@ function AccountAutocomplete({ options, value, onChange, placeholder, isLoading 
   );
 }
 
+```
