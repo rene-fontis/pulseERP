@@ -46,18 +46,36 @@ function countOccurrencesInPeriod(
   const entryStartDate = startOfDay(parseISO(entry.startDate));
   const entryOwnEndDate = entry.endDate ? endOfDay(parseISO(entry.endDate)) : null;
 
-  if (entryOwnEndDate && isBefore(entryOwnEndDate, periodStart)) return 0;
-  if (isAfter(entryStartDate, periodEnd)) return 0;
+  if (entry.recurrence === 'Weekly') {
+    console.log(`[countOccurrencesInPeriod DEBUG WEEKLY] Entry: ${entry.description}, ID: ${entry.id}`);
+    console.log(`  - Period: ${format(periodStart, 'P')} to ${format(periodEnd, 'P')}`);
+    console.log(`  - Entry Dates: Start=${format(entryStartDate, 'P')}, End=${entryOwnEndDate ? format(entryOwnEndDate, 'P') : 'None'}`);
+  }
+
+  if (entryOwnEndDate && isBefore(entryOwnEndDate, periodStart)) {
+    if (entry.recurrence === 'Weekly') console.log(`  - Ended before period start. Occurrences: 0`);
+    return 0;
+  }
+  if (isAfter(entryStartDate, periodEnd)) {
+    if (entry.recurrence === 'Weekly') console.log(`  - Starts after period end. Occurrences: 0`);
+    return 0;
+  }
 
   if (!entry.isRecurring || entry.recurrence === 'None') {
-    return isWithinInterval(entryStartDate, { start: periodStart, end: periodEnd }) ? 1 : 0;
+    const singleOccurrence = isWithinInterval(entryStartDate, { start: periodStart, end: periodEnd }) ? 1 : 0;
+    if (entry.recurrence === 'Weekly') console.log(`  - Non-recurring or 'None'. Occurrences: ${singleOccurrence}`);
+    return singleOccurrence;
   }
 
   let occurrences = 0;
   let currentDate = entryStartDate;
+  if (entry.recurrence === 'Weekly') console.log(`  - Initial currentDate: ${format(currentDate, 'P')}`);
 
   // Advance currentDate to be at or after periodStart for recurring entries
+  let advanceLoopCount = 0;
   while (isBefore(currentDate, periodStart)) {
+    advanceLoopCount++;
+    const prevDate = currentDate;
     switch (entry.recurrence) {
       case 'Weekly': currentDate = addWeeks(currentDate, 1); break;
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
@@ -66,22 +84,42 @@ function countOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return 0; // Should not happen if type is correct
+      default:
+        if (entry.recurrence === 'Weekly') console.log(`  - Unknown recurrence in advance loop: ${entry.recurrence}. Returning 0.`);
+        return 0;
     }
-     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break; // Stop if entry's own end date is reached before period start
-  }
-  
-  // Count occurrences within the period
-  while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
+    if (entry.recurrence === 'Weekly') console.log(`  - Advancing: ${format(prevDate, 'P')} -> ${format(currentDate, 'P')}`);
     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) {
-      break; // Stop if entry's own end date is reached
+      if (entry.recurrence === 'Weekly') console.log(`  - Ended during advance loop (own end date). Current: ${format(currentDate, 'P')}`);
+      break;
     }
+    if (advanceLoopCount > 1000) { // Safety break
+        if (entry.recurrence === 'Weekly') console.error(`  - Advance loop seems infinite for entry ${entry.id}`);
+        return occurrences; // or throw error
+    }
+  }
+  if (entry.recurrence === 'Weekly') console.log(`  - After advance loop, currentDate: ${format(currentDate, 'P')}`);
+
+  // Count occurrences within the period
+  let countLoopCount = 0;
+  while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
+    countLoopCount++;
+    if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) {
+      if (entry.recurrence === 'Weekly') console.log(`  - Ended during count loop (own end date). Current: ${format(currentDate, 'P')}`);
+      break;
+    }
+
     // Check if the current occurrence is within the report period
     if (isWithinInterval(currentDate, { start: periodStart, end: periodEnd })) {
       occurrences++;
+      if (entry.recurrence === 'Weekly') console.log(`  - COUNTED (${occurrences}): ${format(currentDate, 'P')}`);
+    } else {
+      // This case should ideally not be hit if currentDate is already advanced past periodEnd by the while condition,
+      // but could happen if currentDate aligns with periodStart but is not technically "within" due to time parts (startOfDay helps).
+      if (entry.recurrence === 'Weekly') console.log(`  - SKIPPED (not in interval): ${format(currentDate, 'P')}`);
     }
-
-    // Advance to next occurrence
+    
+    const prevDate = currentDate;
     switch (entry.recurrence) {
       case 'Weekly': currentDate = addWeeks(currentDate, 1); break;
       case 'Monthly': currentDate = addMonths(currentDate, 1); break;
@@ -90,15 +128,27 @@ function countOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return occurrences; // Should not happen
+      default:
+        if (entry.recurrence === 'Weekly') console.log(`  - Unknown recurrence in count loop: ${entry.recurrence}. Returning current occurrences: ${occurrences}.`);
+        return occurrences;
+    }
+    if (entry.recurrence === 'Weekly') console.log(`  - Iterating: ${format(prevDate, 'P')} -> ${format(currentDate, 'P')}`);
+     if (isEqual(currentDate, prevDate)) { // Safety break for non-advancing dates
+        if (entry.recurrence === 'Weekly') console.error(`  - Date did not advance in count loop for entry ${entry.id}. Current: ${format(currentDate, 'P')}`);
+        break;
+    }
+    if (countLoopCount > 1000) { // Safety break
+        if (entry.recurrence === 'Weekly') console.error(`  - Count loop seems infinite for entry ${entry.id}`);
+        return occurrences; // or throw error
     }
   }
+  if (entry.recurrence === 'Weekly') console.log(`  - Final occurrences for ${entry.description}: ${occurrences}`);
   return occurrences;
 }
 
 export function calculateBudgetReportData(
   chartOfAccounts: TenantChartOfAccounts,
-  _allTenantBudgets: Budget[], 
+  _allTenantBudgets: Budget[],
   allTenantBudgetEntries: BudgetEntry[],
   reportStartDate: Date,
   reportEndDate: Date,
@@ -122,15 +172,23 @@ export function calculateBudgetReportData(
   });
 
   const accountAggregates = new Map<string, BudgetReportAccountEntry>();
-
+  
+  console.log(`[calculateBudgetReportData] Calculating tableData for report period: ${format(reportStartDate, 'P')} to ${format(reportEndDate, 'P')}`);
   allTenantBudgetEntries.forEach(entry => {
-    if (entry.type === 'Transfer') return; 
+    if (entry.type === 'Transfer') return;
 
+    if (entry.recurrence === 'Weekly') { // Added specific logging for weekly entries here as well
+      console.log(`[calculateBudgetReportData - tableData loop] Processing weekly entry: ${entry.description}, Amount: ${entry.amountActual}`);
+    }
     const occurrences = countOccurrencesInPeriod(entry, reportStartDate, reportEndDate);
+    if (entry.recurrence === 'Weekly') {
+        console.log(`[calculateBudgetReportData - tableData loop] Occurrences for weekly entry "${entry.description}" over FULL report period: ${occurrences}`);
+    }
+
     if (occurrences === 0) return;
 
     const account = accountMap.get(entry.accountId);
-    if (!account || (account.mainType !== 'Revenue' && account.mainType !== 'Expense') ) return; // Only aggregate P&L accounts for table
+    if (!account || (account.mainType !== 'Revenue' && account.mainType !== 'Expense') ) return;
     
     let aggregate = accountAggregates.get(entry.accountId);
     if (!aggregate) {
@@ -190,6 +248,7 @@ export function calculateBudgetReportData(
   periodsForChart.forEach(({ periodStart, periodEnd, periodLabel, sortKey }) => {
     let currentPeriodStart = periodStart;
     let currentPeriodEnd = periodEnd;
+    // Ensure the aggregated period does not exceed the overall report boundaries
     if (isAfter(currentPeriodEnd, reportEndDate)) currentPeriodEnd = reportEndDate;
     if (isBefore(currentPeriodStart, reportStartDate)) currentPeriodStart = reportStartDate;
 
@@ -202,7 +261,7 @@ export function calculateBudgetReportData(
     };
 
     allTenantBudgetEntries.forEach(entry => {
-      if (entry.type === 'Transfer') return; 
+      if (entry.type === 'Transfer') return;
 
       const occurrences = countOccurrencesInPeriod(entry, currentPeriodStart, currentPeriodEnd);
       if (occurrences === 0) return;
