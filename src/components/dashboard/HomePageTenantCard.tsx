@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChartBig, BookOpen, LayoutDashboard } from 'lucide-react';
-import type { Tenant, FinancialSummary, BudgetReportData, AccountGroup, FiscalYear } from '@/types';
+import type { Tenant, FinancialSummary, BudgetReportData, FiscalYear } from '@/types';
 import { useGetFiscalYearById } from '@/hooks/useFiscalYears';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetAllJournalEntriesForTenant } from '@/hooks/useJournalEntries';
@@ -177,7 +177,7 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
 
   const profitLoss = financialSummaryForComparison?.netProfitLoss;
   const profitLossColor = profitLoss && profitLoss > 0 ? 'text-green-600' : profitLoss && profitLoss < 0 ? 'text-red-600' : 'text-foreground';
-  const profitLossIcon = profitLoss && profitLoss >= 0 ? TrendingUp : TrendingDown;
+  const ProfitLossIcon = profitLoss && profitLoss >= 0 ? TrendingUp : TrendingDown;
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow">
@@ -188,9 +188,9 @@ export function HomePageTenantCard({ tenant }: HomePageTenantCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {financialSummaryForComparison && profitLoss !== undefined ? (
+        {financialSummaryForComparison && profitLoss !== undefined && ProfitLossIcon ? (
           <div className="flex items-center">
-            <profitLossIcon className={`mr-2 h-5 w-5 ${profitLossColor}`} />
+            <ProfitLossIcon className={`mr-2 h-5 w-5 ${profitLossColor}`} />
             <p className={`text-lg font-medium ${profitLossColor}`}>
               {formatCurrency(profitLoss)} <span className="text-sm text-muted-foreground">G/V (bis heute)</span>
             </p>
