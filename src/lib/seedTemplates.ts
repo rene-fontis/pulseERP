@@ -1,4 +1,3 @@
-
 'use server';
 
 import { addChartOfAccountsTemplate, getChartOfAccountsTemplates } from '@/services/chartOfAccountsTemplateService';
@@ -25,6 +24,7 @@ const kmuTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
+      accounts: [], // Ensure accounts property exists
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -141,6 +141,7 @@ const vereinTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
+      accounts: [], // Ensure accounts property exists
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -200,6 +201,7 @@ const privatTemplate: ChartOfAccountsTemplateFormValues = {
       id: fixedGroupIds.equity,
       name: "Nettovermögen (Eigenkapital)",
       mainType: "Equity",
+      accounts: [], // Ensure accounts property exists
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Einnahmen (Ertrag)", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -270,6 +272,7 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
       id: fixedGroupIds.equity,
       name: "Eigenkapital",
       mainType: "Equity",
+      accounts: [], // Ensure accounts array exists
       isFixed: true, parentId: null, level: 0
     },
     { id: fixedGroupIds.revenue, name: "Ertrag", mainType: "Revenue", accounts: [], isFixed: true, parentId: null, level: 0 },
@@ -286,8 +289,9 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
       existingFixedGroup.name = fixedDef.name;
       existingFixedGroup.parentId = null;
       existingFixedGroup.level = 0;
+      existingFixedGroup.accounts = existingFixedGroup.accounts || []; // Ensure accounts array exists
       // Ensure essential accounts (like Retained Earnings) are present
-      fixedDef.accounts.forEach(defAcc => {
+      (fixedDef.accounts || []).forEach(defAcc => {
         if (!existingFixedGroup!.accounts.some(acc => acc.number === defAcc.number && acc.isRetainedEarningsAccount === defAcc.isRetainedEarningsAccount)) {
           existingFixedGroup!.accounts.push({...defAcc, id: defAcc.id || crypto.randomUUID()});
         }
@@ -301,7 +305,8 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
         fallbackFixedGroup.name = fixedDef.name;
         fallbackFixedGroup.parentId = null;
         fallbackFixedGroup.level = 0;
-         fixedDef.accounts.forEach(defAcc => {
+        fallbackFixedGroup.accounts = fallbackFixedGroup.accounts || []; // Ensure accounts array exists
+         (fixedDef.accounts || []).forEach(defAcc => {
             if (!fallbackFixedGroup!.accounts.some(acc => acc.number === defAcc.number && acc.isRetainedEarningsAccount === defAcc.isRetainedEarningsAccount)) {
               fallbackFixedGroup!.accounts.push({...defAcc, id: defAcc.id || crypto.randomUUID()});
             }
@@ -309,7 +314,7 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
         resultGroups.push(fallbackFixedGroup);
       } else {
         // If truly missing, add the default definition
-        resultGroups.push({ ...fixedDef, accounts: fixedDef.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID() })) });
+        resultGroups.push({ ...fixedDef, accounts: (fixedDef.accounts || []).map(acc => ({...acc, id: acc.id || crypto.randomUUID() })) });
       }
     }
   }
@@ -326,14 +331,14 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
         }
         // Add only if not already added (e.g., if it was incorrectly marked as fixed before)
         if (!resultGroups.some(rg => rg.id === group.id)) {
-            resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
+            resultGroups.push({...group, accounts: (group.accounts || []).map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
         }
       } else if (!group.parentId && !group.isFixed){
          // This handles groups that were not fixed and didn't have a parentId,
          // potentially misconfigured. For safety, add them if they don't clash with existing IDs.
          // These might need manual correction in the template definition if they are intended to be subgroups.
          if (!resultGroups.some(rg => rg.id === group.id)) {
-            resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
+            resultGroups.push({...group, accounts: (group.accounts || []).map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
          }
       }
       // Note: Deeper level subgroups (level > 1) are not explicitly handled here for parentId correction to canonical IDs,
@@ -341,7 +346,7 @@ function ensureFixedGroups(groups: AccountGroupTemplate[]): AccountGroupTemplate
       // This simplification might need refinement if templates have very complex/deep non-standard hierarchies.
       else if (group.parentId && !parentIsCanonicalFixed && !resultGroups.some(rg => rg.id === group.id)) {
          // Add subgroups whose parent is not a fixed group, if they are not already there.
-         resultGroups.push({...group, accounts: group.accounts.map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
+         resultGroups.push({...group, accounts: (group.accounts || []).map(acc => ({...acc, id: acc.id || crypto.randomUUID()}))});
       }
     }
   });
@@ -367,10 +372,10 @@ export async function seedDefaultChartOfAccountsTemplates() {
     for (const template of defaultTemplates) {
       if (!existingTemplateNames.includes(template.name)) {
 
-        const groupsWithIds = template.groups.map(g => ({
+        const groupsWithIds = (template.groups || []).map(g => ({
           ...g,
           id: g.id || crypto.randomUUID(),
-          accounts: g.accounts.map(a => ({
+          accounts: (g.accounts || []).map(a => ({ // Added fallback for g.accounts
             ...a,
             id: a.id || crypto.randomUUID(),
             description: a.description || '',
@@ -399,3 +404,4 @@ export async function seedDefaultChartOfAccountsTemplates() {
     throw error;
   }
 }
+

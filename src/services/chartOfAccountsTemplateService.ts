@@ -1,4 +1,3 @@
-
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, query, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { ChartOfAccountsTemplate, ChartOfAccountsTemplateFormValues, AccountGroupTemplate } from '@/types';
@@ -78,7 +77,7 @@ const processGroupData = (group: AccountGroupTemplate): AccountGroupTemplate => 
   return {
   ...group,
   id: groupId,
-  accounts: group.accounts.map(account => ({
+  accounts: (group.accounts || []).map(account => ({ // Added fallback for group.accounts
     ...account,
     id: account.id || crypto.randomUUID(),
     description: account.description || '',
@@ -97,7 +96,7 @@ export const addChartOfAccountsTemplate = async (templateData: ChartOfAccountsTe
   const newTemplate = {
     ...templateData,
     description: templateData.description || '',
-    groups: templateData.groups.map(processGroupData),
+    groups: (templateData.groups || []).map(processGroupData), // Added fallback for templateData.groups
     createdAt: now,
     updatedAt: now,
   };
@@ -119,7 +118,7 @@ export const updateChartOfAccountsTemplate = async (id: string, templateData: Pa
 
 
    if (templateData.groups) {
-    updateData.groups = templateData.groups.map(processGroupData);
+    updateData.groups = (templateData.groups || []).map(processGroupData); // Added fallback for templateData.groups
    }
 
   await updateDoc(docRef, updateData);
