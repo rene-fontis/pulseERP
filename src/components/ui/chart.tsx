@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -262,13 +261,13 @@ const ChartLegend = RechartsPrimitive.Legend
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> &
-    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign" | "onClick"> & { // Added onClick
       hideIcon?: boolean
       nameKey?: string
     }
 >(
   (
-    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
+    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey, onClick }, // Added onClick
     ref
   ) => {
     const { config } = useChart()
@@ -295,8 +294,9 @@ const ChartLegendContent = React.forwardRef<
               key={item.value}
               className={cn(
                 "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground cursor-pointer",
-                item.inactive && "opacity-50" // Style for inactive items
+                item.inactive && "opacity-50" 
               )}
+              onClick={() => onClick?.(item)} // Call onClick prop
             >
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
@@ -304,11 +304,11 @@ const ChartLegendContent = React.forwardRef<
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.inactive ? "hsl(var(--muted-foreground))" : item.color, // Grey out color if inactive
+                    backgroundColor: item.inactive ? "hsl(var(--muted-foreground))" : item.color, 
                   }}
                 />
               )}
-              <span className={cn(item.inactive && "line-through")}>{itemConfig?.label || item.value}</span>
+              <span className={cn(item.inactive && "line-through text-muted-foreground")}>{itemConfig?.label || item.value}</span>
             </div>
           )
         })}

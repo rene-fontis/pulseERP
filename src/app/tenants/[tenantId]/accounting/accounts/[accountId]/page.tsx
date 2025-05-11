@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -31,10 +30,16 @@ import {
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 
-const chartConfigBase = {
-  actual: { label: "Ist-Saldo/Fluss", color: "hsl(var(--chart-1))" },
-  budget: { label: "Budget-Saldo/Fluss", color: "hsl(var(--chart-2))" },
-} satisfies ChartConfig;
+const chartConfig: ChartConfig = {
+  actualRevenueBar: { label: "Ist Ertrag (Periode)", color: "hsl(var(--chart-4))" },
+  actualExpenseBar: { label: "Ist Aufwand (Periode)", color: "hsl(var(--chart-5))" },
+  actualNetChangeBar: { label: "Ist Fluss (Periode)", color: "hsl(var(--chart-0))" }, 
+
+  lineActual: { label: "Ist Saldo/G&V", color: "hsl(var(--chart-0))" },
+  lineBudgetActual: { label: "Budget Saldo/G&V Standard", color: "hsl(var(--chart-1))" },
+  lineBudgetBest: { label: "Budget Saldo/G&V Best-Case", color: "hsl(var(--chart-2))" },
+  lineBudgetWorst: { label: "Budget Saldo/G&V Worst-Case", color: "hsl(var(--chart-3))" },
+};
 
 
 function getAccountDetailsFromCoA(chartOfAccounts: TenantChartOfAccounts | undefined, accountId: string): (Account & { groupMainType?: AccountGroup['mainType'], groupName?: string }) | null {
@@ -43,16 +48,14 @@ function getAccountDetailsFromCoA(chartOfAccounts: TenantChartOfAccounts | undef
     const account = group.accounts.find(acc => acc.id === accountId);
     if (account) {
       let effectiveMainType: AccountGroup['mainType'] | undefined = group.mainType;
-      if (!group.isFixed && group.parentId) {
-        let currentGroup: AccountGroup | undefined = group;
-        while(currentGroup && !currentGroup.isFixed && currentGroup.parentId) {
-            const parentGroup = chartOfAccounts.groups.find(pg => pg.id === currentGroup!.parentId);
-             if (parentGroup?.isFixed) { 
-                effectiveMainType = parentGroup.mainType;
-                break; 
-            }
-            currentGroup = parentGroup;
-        }
+      let currentGroup: AccountGroup | undefined = group;
+      while(currentGroup && !currentGroup.isFixed && currentGroup.parentId) {
+          const parentGroup = chartOfAccounts.groups.find(pg => pg.id === currentGroup!.parentId);
+            if (parentGroup?.isFixed) { 
+              effectiveMainType = parentGroup.mainType;
+              break; 
+          }
+          currentGroup = parentGroup;
       }
       return { ...account, groupMainType: effectiveMainType, groupName: group.name };
     }
@@ -79,7 +82,6 @@ function countBudgetEntryOccurrencesInPeriod(
   let occurrences = 0;
   let currentDate = entryStartDate;
   
-  // Fast-forward to the first occurrence within or after periodStart
   while (isBefore(currentDate, periodStart)) { 
     let nextDate = currentDate;
     switch (entry.recurrence) {
@@ -92,13 +94,12 @@ function countBudgetEntryOccurrencesInPeriod(
       default: return 0; 
     }
     if (isAfter(nextDate, periodStart) && !isEqual(nextDate, periodStart) && isBefore(currentDate, periodStart)) {
-      break; // Next jump would overshoot periodStart, current is before
+      break; 
     }
     currentDate = nextDate;
     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break; 
   }
 
-  // Count occurrences within the period
   while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break;
     if (isWithinInterval(currentDate, { start: periodStart, end: periodEnd })) {
@@ -127,7 +128,15 @@ export default function AccountDetailPage() {
   const [clientLoaded, setClientLoaded] = useState(false);
   const [selectedFiscalYearId, setSelectedFiscalYearId] = useState<string | undefined>(undefined);
   const [aggregationPeriod, setAggregationPeriod] = useState<AggregationPeriod>('monthly');
-  const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({ actual: true, budget: true });
+  const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({
+    actualRevenueBar: true,
+    actualExpenseBar: true,
+    actualNetChangeBar: true,
+    lineActual: true,
+    lineBudgetActual: true,
+    lineBudgetBest: false, // Initially hidden
+    lineBudgetWorst: false, // Initially hidden
+  });
 
   useEffect(() => setClientLoaded(true), []);
 
@@ -179,106 +188,157 @@ export default function AccountDetailPage() {
 
   const chartData = useMemo(() => {
     if (!clientLoaded || !selectedFiscalYearDetails || !accountDetails || !allJournalEntries || !allBudgetEntries || !chartOfAccounts) {
-      return [];
+        return [];
     }
-  
+
     const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
     const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
     const isBSAccount = accountDetails.groupMainType === 'Asset' || accountDetails.groupMainType === 'Liability' || accountDetails.groupMainType === 'Equity';
-    
-    const openingBalanceForChart = accountDetails.balance || 0; 
-  
+    const openingBalanceForChart = accountDetails.balance || 0;
+
     let periods: { periodStart: Date; periodEnd: Date; periodLabel: string; sortKey: string }[] = [];
     switch (aggregationPeriod) {
-      case 'monthly':
-        periods = eachMonthOfInterval({ start: fyStartDate, end: fyEndDate }).map(d => ({
-          periodStart: startOfMonth(d), periodEnd: endOfMonth(d),
-          periodLabel: format(d, "MMM yy", { locale: de }),
-          sortKey: format(d, "yyyy-MM")
-        }));
-        break;
-      case 'weekly':
-        periods = eachWeekOfInterval({ start: fyStartDate, end: fyEndDate }, { weekStartsOn: 1 }).map(d => ({
-          periodStart: startOfWeek(d, { weekStartsOn: 1 }), periodEnd: endOfWeek(d, { weekStartsOn: 1 }),
-          periodLabel: `KW${getISOWeek(d)} '${String(getISOWeekYear(d)).slice(-2)}`,
-          sortKey: `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
-        }));
-        break;
-      case 'daily':
-        periods = eachDayOfInterval({ start: fyStartDate, end: fyEndDate }).map(d => ({
-          periodStart: startOfDay(d), periodEnd: endOfDay(d),
-          periodLabel: format(d, "dd.MM.yy", { locale: de }),
-          sortKey: format(d, "yyyy-MM-dd")
-        }));
-        break;
+        case 'monthly':
+            periods = eachMonthOfInterval({ start: fyStartDate, end: fyEndDate }).map(d => ({
+                periodStart: startOfMonth(d), periodEnd: endOfMonth(d),
+                periodLabel: format(d, "MMM yy", { locale: de }),
+                sortKey: format(d, "yyyy-MM")
+            }));
+            break;
+        case 'weekly':
+            periods = eachWeekOfInterval({ start: fyStartDate, end: fyEndDate }, { weekStartsOn: 1 }).map(d => ({
+                periodStart: startOfWeek(d, { weekStartsOn: 1 }), periodEnd: endOfWeek(d, { weekStartsOn: 1 }),
+                periodLabel: `KW${getISOWeek(d)} '${String(getISOWeekYear(d)).slice(-2)}`,
+                sortKey: `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
+            }));
+            break;
+        case 'daily':
+            periods = eachDayOfInterval({ start: fyStartDate, end: fyEndDate }).map(d => ({
+                periodStart: startOfDay(d), periodEnd: endOfDay(d),
+                periodLabel: format(d, "dd.MM.yy", { locale: de }),
+                sortKey: format(d, "yyyy-MM-dd")
+            }));
+            break;
     }
-  
-    let cumulativeActualBalance = openingBalanceForChart;
-    let cumulativeBudgetBalance = openingBalanceForChart;
-  
+
+    let cumulativeActual = openingBalanceForChart;
+    let cumulativeBudgetActual = openingBalanceForChart;
+    let cumulativeBudgetBest = openingBalanceForChart;
+    let cumulativeBudgetWorst = openingBalanceForChart;
+
     const result = periods.map(({ periodStart, periodEnd, periodLabel, sortKey }) => {
-      let actualPeriodicFlow = 0;
-      allJournalEntries
-        .filter(je => isWithinInterval(parseISO(je.date), { start: periodStart, end: periodEnd }))
-        .forEach(je => {
-          je.lines.forEach(line => {
-            if (line.accountId === accountId) {
-              actualPeriodicFlow += (line.debit || 0) - (line.credit || 0);
-            }
-          });
-        });
-      
-      const dataPoint: any = { periodLabel, sortKey };
-  
-      if (isBSAccount) {
-        cumulativeActualBalance += actualPeriodicFlow;
-        dataPoint.actual = cumulativeActualBalance;
-  
-        let budgetFlowForBSPeriod = 0;
+        const dataPoint: any = { periodLabel, sortKey };
+
+        // Actual Journal Data for the period
+        let actualPeriodicFlowThisAccount = 0;
+        allJournalEntries
+            .filter(je => isWithinInterval(parseISO(je.date), { start: periodStart, end: periodEnd }))
+            .forEach(je => {
+                je.lines.forEach(line => {
+                    if (line.accountId === accountId) {
+                        actualPeriodicFlowThisAccount += (line.debit || 0) - (line.credit || 0);
+                    }
+                });
+            });
+
+        // Budget Data for the period for this account
+        let budgetPeriodicFlowActualScenario = 0;
+        let budgetPeriodicFlowBestCaseScenario = 0;
+        let budgetPeriodicFlowWorstCaseScenario = 0;
+
         allBudgetEntries.forEach(be => {
-          const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
-          if (occurrences > 0) {
-            const amount = be.amountActual * occurrences;
-            if (be.type === 'Transfer') {
-              if (be.accountId === accountId) budgetFlowForBSPeriod -= amount;
-              if (be.counterAccountId === accountId) budgetFlowForBSPeriod += amount;
-            } else if (be.counterAccountId === accountId) { 
-              budgetFlowForBSPeriod += (be.type === 'Income' ? amount : -amount);
+            const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
+            if (occurrences > 0) {
+                const actualAmount = be.amountActual * occurrences;
+                const bestAmount = (be.amountBestCase ?? be.amountActual) * occurrences;
+                const worstAmount = (be.amountWorstCase ?? be.amountActual) * occurrences;
+                
+                let flowDirection = 0; // 1 for positive flow to account, -1 for negative
+
+                if (be.type === 'Transfer') {
+                    if (be.accountId === accountId) flowDirection = -1; // Transfer out
+                    else if (be.counterAccountId === accountId) flowDirection = 1; // Transfer in
+                } else { // Income or Expense
+                    if (be.accountId === accountId) { // P&L account is primary
+                        flowDirection = (be.type === 'Income' ? 1 : -1);
+                         // For P&L account, this means income (credit) or expense (debit)
+                        // This will be handled by the P&L specific logic below for bar values
+                    } else if (be.counterAccountId === accountId) { // B/S account is counter-account
+                        flowDirection = (be.type === 'Income' ? 1 : -1);
+                         // Income to P&L -> money comes into B/S (e.g. Bank) => positive flow for B/S
+                         // Expense from P&L -> money goes out of B/S (e.g. Bank) => negative flow for B/S
+                    }
+                }
+                budgetPeriodicFlowActualScenario += actualAmount * flowDirection;
+                budgetPeriodicFlowBestCaseScenario += bestAmount * flowDirection;
+                budgetPeriodicFlowWorstCaseScenario += worstAmount * flowDirection;
             }
-          }
         });
-        cumulativeBudgetBalance += budgetFlowForBSPeriod;
-        dataPoint.budget = cumulativeBudgetBalance;
-  
-      } else { // P&L Account
-        if (accountDetails.groupMainType === 'Revenue') {
-          dataPoint.actual = -actualPeriodicFlow; // Revenue increases with credits (C-D)
-        } else if (accountDetails.groupMainType === 'Expense') {
-          dataPoint.actual = -actualPeriodicFlow; // Expense increases with debits (D-C), make negative for chart
-        } else { // Should ideally not happen for P&L (e.g. direct equity changes classified as P&L group)
-          dataPoint.actual = -actualPeriodicFlow; 
+
+        if (isBSAccount) {
+            cumulativeActual += actualPeriodicFlowThisAccount;
+            cumulativeBudgetActual += budgetPeriodicFlowActualScenario;
+            cumulativeBudgetBest += budgetPeriodicFlowBestCaseScenario;
+            cumulativeBudgetWorst += budgetPeriodicFlowWorstCaseScenario;
+
+            dataPoint.actualNetChangeBar = actualPeriodicFlowThisAccount;
+            dataPoint.lineActual = cumulativeActual;
+            dataPoint.lineBudgetActual = cumulativeBudgetActual;
+            if (seriesVisibility.lineBudgetBest) dataPoint.lineBudgetBest = cumulativeBudgetBest;
+            if (seriesVisibility.lineBudgetWorst) dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
+        } else { // P&L Account
+            let actualPeriodicPnlImpact = 0;
+            if (accountDetails.groupMainType === 'Revenue') {
+                actualPeriodicPnlImpact = -actualPeriodicFlowThisAccount; // Revenue increases with credits (C-D)
+                dataPoint.actualRevenueBar = actualPeriodicPnlImpact > 0 ? actualPeriodicPnlImpact : 0;
+                dataPoint.actualExpenseBar = 0;
+            } else if (accountDetails.groupMainType === 'Expense') {
+                actualPeriodicPnlImpact = actualPeriodicFlowThisAccount; // Expense increases with debits (D-C)
+                dataPoint.actualExpenseBar = actualPeriodicPnlImpact > 0 ? actualPeriodicPnlImpact : 0; // Store positive, render negative
+                dataPoint.actualRevenueBar = 0;
+            }
+            cumulativeActual += actualPeriodicPnlImpact; // Cumulative P&L impact of this account
+
+            // P&L Budget impact for this specific account
+            let budgetPnlImpactActual = 0;
+            let budgetPnlImpactBest = 0;
+            let budgetPnlImpactWorst = 0;
+            allBudgetEntries.forEach(be => {
+                if (be.accountId === accountId) { // Only consider if this P&L account is the primary budget account
+                    const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
+                    if (occurrences > 0) {
+                        const actualAmount = be.amountActual * occurrences;
+                        const bestAmount = (be.amountBestCase ?? be.amountActual) * occurrences;
+                        const worstAmount = (be.amountWorstCase ?? be.amountActual) * occurrences;
+                        
+                        if (be.type === 'Income') {
+                            budgetPnlImpactActual += actualAmount;
+                            budgetPnlImpactBest += bestAmount;
+                            budgetPnlImpactWorst += worstAmount;
+                        } else if (be.type === 'Expense') {
+                            budgetPnlImpactActual -= actualAmount;
+                            budgetPnlImpactBest -= bestAmount;
+                            budgetPnlImpactWorst -= worstAmount;
+                        }
+                    }
+                }
+            });
+            cumulativeBudgetActual += budgetPnlImpactActual;
+            cumulativeBudgetBest += budgetPnlImpactBest;
+            cumulativeBudgetWorst += budgetPnlImpactWorst;
+
+            dataPoint.lineActual = cumulativeActual;
+            dataPoint.lineBudgetActual = cumulativeBudgetActual;
+            if (seriesVisibility.lineBudgetBest) dataPoint.lineBudgetBest = cumulativeBudgetBest;
+            if (seriesVisibility.lineBudgetWorst) dataPoint.lineBudgetWorst = cumulativeBudgetWorst;
         }
-        
-        let pnlBudgetInPeriod = 0;
-        allBudgetEntries.forEach(be => {
-          const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
-          if (occurrences > 0 && be.accountId === accountId) {
-            const amount = be.amountActual * occurrences;
-            if (be.type === 'Income' && accountDetails.groupMainType === 'Revenue') {
-              pnlBudgetInPeriod += amount; // Positive for income
-            } else if (be.type === 'Expense' && accountDetails.groupMainType === 'Expense') {
-              pnlBudgetInPeriod -= amount; // Negative for expense
-            }
-          }
-        });
-        dataPoint.budget = pnlBudgetInPeriod;
-      }
-      return dataPoint;
-    }).sort((a,b) => a.sortKey.localeCompare(b.sortKey));
-    
+        return dataPoint;
+    }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
     return result;
-  
-  }, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId]);
+
+}, [clientLoaded, selectedFiscalYearDetails, accountDetails, allJournalEntries, allBudgetEntries, aggregationPeriod, chartOfAccounts, accountId, seriesVisibility]);
+
 
   const isLoadingData = isLoadingTenant || isLoadingCoA || isLoadingFiscalYears || (selectedFiscalYearId && isLoadingSelectedFY) || isLoadingJournal || isLoadingBudget || !clientLoaded;
 
@@ -299,7 +359,7 @@ export default function AccountDetailPage() {
   
   const handleLegendClick = (data: any) => {
     const { dataKey } = data;
-    if (dataKey && typeof dataKey === 'string' && chartConfigBase.hasOwnProperty(dataKey)) {
+    if (dataKey && typeof dataKey === 'string' && chartConfig.hasOwnProperty(dataKey)) {
         setSeriesVisibility(prev => ({
             ...prev,
             [dataKey]: !prev[dataKey]
@@ -371,10 +431,9 @@ export default function AccountDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
       {selectedFiscalYearDetails && accountDetails && (
         <div className="grid md:grid-cols-3 gap-4">
-          {!isPNLAccount ? ( // Balance Sheet Account
+          {!isPNLAccount ? ( 
             <>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -407,7 +466,7 @@ export default function AccountDetailPage() {
                 </CardContent>
               </Card>
             </>
-          ) : ( // P&L Account
+          ) : ( 
             <>
               <Card className="md:col-span-3">
                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -474,31 +533,36 @@ export default function AccountDetailPage() {
              <div className="h-[400px] flex items-center justify-center">
                 <p className="text-muted-foreground flex items-center"><Info className="w-5 h-5 mr-2"/>Bitte wählen Sie ein Geschäftsjahr, um die Entwicklung anzuzeigen.</p>
             </div>
-          ) : chartData.length > 0 ? (
-            <ChartContainer config={chartConfigBase} className="h-[400px] w-full">
+          ) : chartData.length > 0 && accountDetails ? (
+            <ChartContainer config={chartConfig} className="h-[400px] w-full">
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="periodLabel" tickLine={false} axisLine={{strokeDasharray:"3 3"}} tickMargin={8} />
                 <YAxis tickFormatter={value => formatCurrency(value, 'CHF', 'de-CH').replace('CHF', '').trim()} tickLine={false} axisLine={false} tickMargin={8}/>
                 <Tooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
                 <Legend content={<ChartLegendContent onClick={handleLegendClick} />} verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} />
-                <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.5} />
-
-                {isPNLAccount ? (
-                  <>
-                    <Bar dataKey="actual" fill="var(--color-actual)" barSize={20} name="Ist-Fluss" hide={!seriesVisibility.actual}>
-                       <LabelList dataKey="actual" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.9} strokeWidth={1.5} />
+                
+                {accountDetails.groupMainType === 'Revenue' && (
+                    <Bar dataKey="actualRevenueBar" fill="var(--color-actualRevenueBar)" barSize={20} name={chartConfig.actualRevenueBar.label as string} hide={!seriesVisibility.actualRevenueBar} radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="actualRevenueBar" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
                     </Bar>
-                    <Bar dataKey="budget" fill="var(--color-budget)" barSize={20} name="Budget-Fluss" hide={!seriesVisibility.budget}>
-                       <LabelList dataKey="budget" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
-                    </Bar>
-                  </>
-                ) : ( // Balance Sheet Account
-                  <>
-                    <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2.5} dot={{ r: 4 }} name="Ist-Saldo" hide={!seriesVisibility.actual}/>
-                    <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} dot={{ r: 3 }} name="Budget-Saldo" hide={!seriesVisibility.budget}/>
-                  </>
                 )}
+                {accountDetails.groupMainType === 'Expense' && (
+                     <Bar dataKey="actualExpenseBar" fill="var(--color-actualExpenseBar)" barSize={20} name={chartConfig.actualExpenseBar.label as string} hide={!seriesVisibility.actualExpenseBar} radius={[0,0,4,4]}>
+                        <LabelList dataKey="actualExpenseBar" position="bottom" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                    </Bar>
+                )}
+                 {!isPNLAccount && ( // Balance Sheet Account
+                    <Bar dataKey="actualNetChangeBar" fill="var(--color-actualNetChangeBar)" barSize={20} name={chartConfig.actualNetChangeBar.label as string} hide={!seriesVisibility.actualNetChangeBar}>
+                        <LabelList dataKey="actualNetChangeBar" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
+                    </Bar>
+                 )}
+
+                <Line type="monotone" dataKey="lineActual" stroke="var(--color-lineActual)" strokeWidth={2.5} dot={{ r: 4 }} name={chartConfig.lineActual.label as string} hide={!seriesVisibility.lineActual}/>
+                <Line type="monotone" dataKey="lineBudgetActual" stroke="var(--color-lineBudgetActual)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetActual.label as string} hide={!seriesVisibility.lineBudgetActual}/>
+                {seriesVisibility.lineBudgetBest && <Line type="monotone" dataKey="lineBudgetBest" stroke="var(--color-lineBudgetBest)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetBest.label as string} hide={!seriesVisibility.lineBudgetBest}/>}
+                {seriesVisibility.lineBudgetWorst && <Line type="monotone" dataKey="lineBudgetWorst" stroke="var(--color-lineBudgetWorst)" strokeWidth={2} dot={{ r: 3 }} name={chartConfig.lineBudgetWorst.label as string} hide={!seriesVisibility.lineBudgetWorst}/>}
               </ComposedChart>
             </ChartContainer>
           ) : (
