@@ -20,11 +20,11 @@ export function useGetTenants() {
   });
 }
 
-export function useGetTenantById(tenantId: string | null | undefined) { // Allow undefined for safer usage
+export function useGetTenantById(tenantId: string | null | undefined) { 
   return useQuery<Tenant | undefined, Error>({
-    queryKey: tenantQueryKeys.detail(tenantId!), // `!` is okay here due to `enabled` check
+    queryKey: tenantQueryKeys.detail(tenantId!), 
     queryFn: () => tenantId ? getTenantById(tenantId) : Promise.resolve(undefined),
-    enabled: !!tenantId, // Only run query if tenantId is truthy
+    enabled: !!tenantId, 
   });
 }
 
@@ -40,7 +40,7 @@ export function useAddTenant() {
 
 export function useUpdateTenant() {
   const queryClient = useQueryClient();
-  return useMutation<Tenant | undefined, Error, { id: string; data: Partial<Pick<Tenant, 'name' | 'activeFiscalYearId'>> }>({
+  return useMutation<Tenant | undefined, Error, { id: string; data: Partial<Tenant> }>({
     mutationFn: ({ id, data }) => updateTenant(id, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: tenantQueryKeys.lists() });

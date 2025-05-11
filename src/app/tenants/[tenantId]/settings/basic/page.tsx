@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, AlertCircle } from 'lucide-react';
+import { Settings, AlertCircle, Percent } from 'lucide-react';
 import { useGetTenantById, useUpdateTenant } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import React from 'react';
 
 const basicSettingsSchema = z.object({
   name: z.string().min(2, "Mandantenname muss mindestens 2 Zeichen lang sein."),
+  vatNumber: z.string().optional(),
   timezone: z.string().optional(), 
   notificationsEnabled: z.boolean().optional(),
 });
@@ -35,8 +37,9 @@ export default function TenantBasicSettingsPage() {
     resolver: zodResolver(basicSettingsSchema),
     defaultValues: {
       name: '',
-      timezone: '', // Placeholder, load from tenant.timezone if available
-      notificationsEnabled: false, // Placeholder, load from tenant.notificationsEnabled if available
+      vatNumber: '',
+      timezone: '',
+      notificationsEnabled: false,
     }
   });
 
@@ -44,7 +47,7 @@ export default function TenantBasicSettingsPage() {
     if (tenant) {
       form.reset({
         name: tenant.name,
-        // Assuming tenant object might have these fields in the future
+        vatNumber: tenant.vatNumber || '',
         timezone: (tenant as any).timezone || '(GMT+01:00) Mitteleuropäische Zeit', 
         notificationsEnabled: (tenant as any).notificationsEnabled === undefined ? true : (tenant as any).notificationsEnabled,
       });
@@ -54,8 +57,15 @@ export default function TenantBasicSettingsPage() {
   const onSubmit = async (values: BasicSettingsFormValues) => {
     if (!tenant) return;
     try {
-      // Only update name for now, as other fields are not on Tenant type yet
-      await updateTenantMutation.mutateAsync({ id: tenant.id, name: values.name });
+      await updateTenantMutation.mutateAsync({ 
+        id: tenant.id, 
+        data: { 
+          name: values.name,
+          // Assuming 'vatNumber' can be updated. If it's on a different sub-object, adjust mutation.
+          // For now, direct update:
+          vatNumber: values.vatNumber || null, // Send null if empty to clear it
+        } as any // Cast to any to allow vatNumber if not strictly on Tenant type yet for update hook
+      });
       // TODO: Add mutation for other settings like timezone, notifications when they are added to Tenant type and service
       toast({ title: "Erfolg", description: "Basiseinstellungen erfolgreich aktualisiert." });
       refetch(); 
@@ -149,6 +159,20 @@ export default function TenantBasicSettingsPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="vatNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>MWST-Nummer (UID)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="CHE-XXX.XXX.XXX MWST" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <FormField
                 control={form.control}
@@ -157,7 +181,7 @@ export default function TenantBasicSettingsPage() {
                   <FormItem>
                     <FormLabel>Zeitzone (Platzhalter)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="z.B. Europe/Berlin" />
+                      <Input {...field} placeholder="z.B. Europe/Berlin" disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -179,7 +203,7 @@ export default function TenantBasicSettingsPage() {
                        <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        aria-readonly // if the setting is not yet saveable
+                        disabled // if the setting is not yet saveable
                       />
                     </FormControl>
                   </FormItem>
@@ -195,6 +219,20 @@ export default function TenantBasicSettingsPage() {
           </Form>
         </CardContent>
       </Card>
-    </div>
-  );
-}
+
+      <Card className="shadow-lg mx-4 md:mx-0 mt-8">
+        <CardHeader>
+          <CardTitle className="text-xl">Steuersätze</CardTitle>
+           <CardDescription>
+            Verwalten Sie die Mehrwertsteuersätze für diesen Mandanten.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="text-center py-6 text-muted-foreground">
+                <Percent className="mx-auto h-10 w-10 mb-3 text-primary" />
+                <p className="font-semibold">Funktion in Entwicklung</p>
+                <p>Hier können Sie bald die für die Schweiz gültigen Steuersätze (z.B. 8.1% Normalsatz, 2.6% Reduzierter Satz) verwalten und als Standard für Rechnungen festlegen.</p>
+            </div>
+             <Button disabled className="mt-4">Steuersätze verwalten (Demnächst)</Button>
+        </CardContent>
+      </Card

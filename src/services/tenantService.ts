@@ -22,6 +22,8 @@ export const getTenants = async (): Promise<Tenant[]> => {
       chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
       chartOfAccountsId: data.chartOfAccountsId,
       activeFiscalYearId: data.activeFiscalYearId,
+      vatNumber: data.vatNumber,
+      taxRates: data.taxRates || [],
     } as Tenant;
   });
   return tenants;
@@ -39,6 +41,8 @@ export const getTenantById = async (id: string): Promise<Tenant | undefined> => 
       chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
       chartOfAccountsId: data.chartOfAccountsId,
       activeFiscalYearId: data.activeFiscalYearId,
+      vatNumber: data.vatNumber,
+      taxRates: data.taxRates || [],
     } as Tenant;
   }
   return undefined;
@@ -52,6 +56,8 @@ interface NewTenantData {
     chartOfAccountsTemplateId?: string;
     chartOfAccountsId?: string;
     activeFiscalYearId?: string;
+    vatNumber?: string | null;
+    taxRates?: any[]; // Firestore will store array of objects
 }
 
 export const addTenant = async (name: string, chartOfAccountsTemplateId?: string): Promise<Tenant> => {
@@ -60,6 +66,8 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
     name,
     createdAt: now,
     updatedAt: now,
+    vatNumber: null,
+    taxRates: [], // Default empty array for tax rates
   };
 
   if (chartOfAccountsTemplateId) {
@@ -78,14 +86,11 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
       }
     } catch (error) {
       console.error("Error creating tenant chart of accounts from template:", error);
-      // Optionally, re-throw the error or handle it as per application requirements
-      // For now, we'll let the tenant creation proceed without a CoA if this fails
     }
   } else {
-    // Create an empty Chart of Accounts if no template is selected
     console.log(`No chart of accounts template selected for tenant ${name}. Creating an empty CoA.`);
     try {
-        const emptyGroups = [ // Define the 5 fixed groups
+        const emptyGroups = [ 
             { id: 'fixed_asset_group_global', name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0, balance: 0 },
             { id: 'fixed_liability_group_global', name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0, balance: 0 },
             { 
@@ -123,16 +128,30 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
           name: data.name,
           createdAt: formatFirestoreTimestamp(data.createdAt, newDocSnapshot.id, 'now'),
           chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
-          chartOfAccountsId: data.chartOfAccountsId, // This will be the ID of the generated CoA
+          chartOfAccountsId: data.chartOfAccountsId, 
           activeFiscalYearId: data.activeFiscalYearId,
+          vatNumber: data.vatNumber,
+          taxRates: data.taxRates || [],
       } as Tenant;
   }
   throw new Error("Could not retrieve tenant after creation.");
 };
 
-export const updateTenant = async (id: string, dataToUpdate: Partial<Pick<Tenant, 'name' | 'activeFiscalYearId'>>): Promise<Tenant | undefined> => {
+export const updateTenant = async (id: string, dataToUpdate: Partial<Tenant>): Promise<Tenant | undefined> => {
   const tenantDocRef = doc(db, 'tenants', id);
-  await updateDoc(tenantDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() }); 
+  
+  const firestoreUpdateData: any = { ...dataToUpdate, updatedAt: serverTimestamp() };
+
+  // Ensure specific fields are set to null if they are cleared, rather than undefined
+  if (dataToUpdate.hasOwnProperty('vatNumber') && (dataToUpdate.vatNumber === '' || dataToUpdate.vatNumber === undefined)) {
+    firestoreUpdateData.vatNumber = null;
+  }
+  if (dataToUpdate.hasOwnProperty('taxRates') && dataToUpdate.taxRates === undefined) {
+    firestoreUpdateData.taxRates = []; // Default to empty array if cleared
+  }
+
+
+  await updateDoc(tenantDocRef, firestoreUpdateData); 
   
   const updatedDocSnapshot = await getDoc(tenantDocRef);
   if (updatedDocSnapshot.exists()) {
@@ -144,6 +163,8 @@ export const updateTenant = async (id: string, dataToUpdate: Partial<Pick<Tenant
         chartOfAccountsTemplateId: data.chartOfAccountsTemplateId,
         chartOfAccountsId: data.chartOfAccountsId,
         activeFiscalYearId: data.activeFiscalYearId,
+        vatNumber: data.vatNumber,
+        taxRates: data.taxRates || [],
     } as Tenant;
   }
   return undefined;
@@ -161,19 +182,9 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
         console.log(`Successfully deleted chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}`);
       } catch (error) {
         console.error(`Error deleting chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}:`, error);
-        // Decide if you want to stop tenant deletion or continue
       }
     }
-    // TODO: Delete fiscal years subcollection
-    // const fiscalYearsRef = collection(db, 'tenants', id, 'fiscalYears');
-    // const fiscalYearsSnapshot = await getDocs(fiscalYearsRef);
-    // const deletePromises = fiscalYearsSnapshot.docs.map(fyDoc => deleteDoc(fyDoc.ref));
-    // await Promise.all(deletePromises);
-    // console.log(`Successfully deleted fiscal years for tenant ${id}`);
-
-    // TODO: Delete budgets and budgetEntries subcollections or related documents
-    // Query and delete budgets for the tenant, then query and delete budgetEntries for each budget
-
+    // TODO: Delete other related subcollections like fiscalYears, budgets, entries, contacts, projects etc.
     await deleteDoc(tenantDocRef);
     console.log(`Successfully deleted tenant ${id}`);
     return true; 
@@ -182,4 +193,3 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
     return false;
   }
 };
-

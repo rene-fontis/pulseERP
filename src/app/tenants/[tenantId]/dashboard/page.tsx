@@ -3,7 +3,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LayoutDashboard, AlertCircle, BookOpen, BarChartBig, Users, Briefcase, Clock, FileText, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, BookOpen, BarChartBig, Users, Briefcase, Clock, FileText, ChevronRight, Package, Receipt } from 'lucide-react';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
 import React from 'react';
@@ -72,25 +72,31 @@ export default function TenantDashboardPage() {
       title: "Kontakte",
       description: "Kunden, Lieferanten und Partner verwalten.",
       icon: Users,
-      // href: `/tenants/${tenantId}/contacts` // Placeholder
+      href: `/tenants/${tenantId}/contacts`
     },
     {
       title: "Projektverwaltung",
       description: "Projekte planen, verfolgen und abrechnen.",
       icon: Briefcase,
-      // href: `/tenants/${tenantId}/projects` // Placeholder
+      href: `/tenants/${tenantId}/projects`
     },
     {
       title: "Zeiterfassung",
       description: "Arbeitszeiten erfassen und Projekten zuordnen.",
       icon: Clock,
-      // href: `/tenants/${tenantId}/time-tracking` // Placeholder
+      href: `/tenants/${tenantId}/time-tracking`
+    },
+    {
+      title: "Warenwirtschaft",
+      description: "Artikel und Lagerbestände verwalten.",
+      icon: Package,
+      href: `/tenants/${tenantId}/inventory`
     },
     {
       title: "Kundenrechnungen",
       description: "Rechnungen erstellen und versenden.",
-      icon: FileText,
-      // href: `/tenants/${tenantId}/invoicing` // Placeholder
+      icon: Receipt, // Changed from FileText to Receipt for better distinction
+      href: `/tenants/${tenantId}/invoicing` 
     },
   ];
 
@@ -103,7 +109,7 @@ export default function TenantDashboardPage() {
           <Skeleton className="h-6 w-3/4" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
+          {[...Array(features.length)].map((_, i) => ( // Use features.length for skeleton count
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center">
@@ -173,11 +179,11 @@ export default function TenantDashboardPage() {
                 <CardTitle className="text-xl">Hinweis</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">Dieses Dashboard wird in Zukunft weitere Module und Übersichten enthalten. Die Module "Kontakte", "Projektverwaltung", "Zeiterfassung" und "Kundenrechnungen" sind als Platzhalter für zukünftige Erweiterungen gedacht.</p>
+                <p className="text-muted-foreground">Dieses Dashboard wird in Zukunft weitere Module und Übersichten enthalten. Einige Module sind als Platzhalter für zukünftige Erweiterungen gedacht und führen zu einer "Demnächst verfügbar" Seite.</p>
                  <img 
-                    src="https://picsum.photos/seed/dashboard/1200/400" 
-                    alt="Platzhalter für zukünftige Dashboard-Inhalte" 
+                    src="https://picsum.photos/seed/dashboardFuture/1200/400" 
                     data-ai-hint="office analytics"
+                    alt="Platzhalter für zukünftige Dashboard-Inhalte" 
                     className="mt-4 rounded-lg shadow-md w-full object-cover h-64"
                  />
             </CardContent>

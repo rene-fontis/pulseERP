@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, BarChart2 as BarChartIconLucide } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, BarChart2 as BarChartIconLucide, Briefcase, Clock, Package, Receipt } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +34,11 @@ export function AppSidebar() {
   const isSettingsActive = pathname.startsWith(`/tenants/${currentTenantId}/settings`);
   const isAccountingActive = pathname.startsWith(`/tenants/${currentTenantId}/accounting`);
   const isBudgetingActive = pathname.startsWith(`/tenants/${currentTenantId}/budgeting`);
+  const isContactsActive = pathname.startsWith(`/tenants/${currentTenantId}/contacts`);
+  const isProjectsActive = pathname.startsWith(`/tenants/${currentTenantId}/projects`);
+  const isTimeTrackingActive = pathname.startsWith(`/tenants/${currentTenantId}/time-tracking`);
+  const isInventoryActive = pathname.startsWith(`/tenants/${currentTenantId}/inventory`);
+  const isInvoicingActive = pathname.startsWith(`/tenants/${currentTenantId}/invoicing`);
   
   const commonMandantenVerwaltenButton = (
      <SidebarMenuItem>
@@ -85,18 +90,22 @@ export function AppSidebar() {
   const renderTenantSpecificLinks = () => {
     if (!currentTenantId) return null;
 
-    if (isLoadingActiveTenant && clientLoaded) { // Only show skeleton if client has loaded and still loading tenant
+    if (isLoadingActiveTenant && clientLoaded) { 
       return (
         <>
           <SidebarMenuSkeleton showIcon />
           <SidebarMenuSkeleton showIcon />
           <SidebarMenuSkeleton showIcon />
            <SidebarMenuSkeleton showIcon />
+           <SidebarMenuSkeleton showIcon />
+           <SidebarMenuSkeleton showIcon />
+           <SidebarMenuSkeleton showIcon />
+           <SidebarMenuSkeleton showIcon />
         </>
       );
     }
 
-    if (!activeTenant && !isLoadingActiveTenant && clientLoaded) { // If client loaded and no tenant found
+    if (!activeTenant && !isLoadingActiveTenant && clientLoaded) { 
       return (
           <SidebarMenuItem>
             <div className={cn(
@@ -109,7 +118,6 @@ export function AppSidebar() {
       );
     }
     
-    // If still loading on server or initial client, don't render tenant links yet to avoid hydration mismatch
     if (!clientLoaded && isLoadingActiveTenant) {
         return null;
     }
@@ -177,9 +185,9 @@ export function AppSidebar() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
-                            <SidebarMenuSub>
+                           <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports') }>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports'))}>
                                       <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
@@ -193,6 +201,72 @@ export function AppSidebar() {
                     </AccordionItem>
                 </Accordion>
             </SidebarMenuItem>
+
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isContactsActive}
+                    tooltip="Kontakte"
+                >
+                    <Link href={`/tenants/${currentTenantId}/contacts`}>
+                    <Users />
+                    <span>Kontakte</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isProjectsActive}
+                    tooltip="Projekte"
+                >
+                    <Link href={`/tenants/${currentTenantId}/projects`}>
+                    <Briefcase />
+                    <span>Projekte</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isTimeTrackingActive}
+                    tooltip="Zeiterfassung"
+                >
+                    <Link href={`/tenants/${currentTenantId}/time-tracking`}>
+                    <Clock />
+                    <span>Zeiterfassung</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isInventoryActive}
+                    tooltip="Warenwirtschaft"
+                >
+                    <Link href={`/tenants/${currentTenantId}/inventory`}>
+                    <Package />
+                    <span>Warenwirtschaft</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isInvoicingActive}
+                    tooltip="Kundenrechnungen"
+                >
+                    <Link href={`/tenants/${currentTenantId}/invoicing`}>
+                    <Receipt />
+                    <span>Kundenrechnungen</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+
 
             <SidebarMenuItem>
                  <Accordion type="single" collapsible className="w-full" defaultValue={isSettingsActive ? "settings-item" : undefined}>
@@ -273,6 +347,61 @@ export function AppSidebar() {
                 >
                     <Link href={`/tenants/${currentTenantId}/budgeting`}>
                         <BarChartBig />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isContactsActive}
+                    tooltip="Kontakte"
+                >
+                    <Link href={`/tenants/${currentTenantId}/contacts`}>
+                    <Users />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isProjectsActive}
+                    tooltip="Projekte"
+                >
+                    <Link href={`/tenants/${currentTenantId}/projects`}>
+                    <Briefcase />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isTimeTrackingActive}
+                    tooltip="Zeiterfassung"
+                >
+                    <Link href={`/tenants/${currentTenantId}/time-tracking`}>
+                    <Clock />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isInventoryActive}
+                    tooltip="Warenwirtschaft"
+                >
+                    <Link href={`/tenants/${currentTenantId}/inventory`}>
+                    <Package />
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isInvoicingActive}
+                    tooltip="Kundenrechnungen"
+                >
+                    <Link href={`/tenants/${currentTenantId}/invoicing`}>
+                    <Receipt />
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
@@ -373,4 +502,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
