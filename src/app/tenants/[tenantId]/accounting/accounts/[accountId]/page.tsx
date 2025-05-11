@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowLeft, CalendarDays, BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, Info, BookOpen } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, BarChart2 as BarChartIconLucide, TrendingUp, TrendingDown, DollarSign, Info, BookOpen, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, ReferenceLine, LabelList
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"; // Removed ChartTooltip import as ChartTooltipContent is used directly
 import { useGetTenantById } from '@/hooks/useTenants';
 import { useGetTenantChartOfAccountsById } from '@/hooks/useTenantChartOfAccounts';
 import { useGetFiscalYears, useGetFiscalYearById } from '@/hooks/useFiscalYears';
@@ -33,9 +33,6 @@ import { de } from 'date-fns/locale';
 const chartConfigBase = {
   actual: { label: "Ist-Saldo/Fluss", color: "hsl(var(--chart-1))" },
   budget: { label: "Budget-Saldo/Fluss", color: "hsl(var(--chart-2))" },
-  // Placeholder for best/worst case, can be enabled if data is available
-  // bestCase: { label: "Best-Case Budget", color: "hsl(var(--chart-3))" },
-  // worstCase: { label: "Worst-Case Budget", color: "hsl(var(--chart-4))" },
 } satisfies ChartConfig;
 
 
@@ -46,13 +43,14 @@ function getAccountDetailsFromCoA(chartOfAccounts: TenantChartOfAccounts | undef
     if (account) {
       let effectiveMainType: AccountGroup['mainType'] | undefined = group.mainType;
       if (!group.isFixed && group.parentId) {
-        // Find the ultimate fixed parent group to determine the mainType
         let currentGroup: AccountGroup | undefined = group;
         while(currentGroup && !currentGroup.isFixed && currentGroup.parentId) {
-            currentGroup = chartOfAccounts.groups.find(pg => pg.id === currentGroup!.parentId);
-        }
-        if (currentGroup?.isFixed) {
-            effectiveMainType = currentGroup.mainType;
+            const parentGroup = chartOfAccounts.groups.find(pg => pg.id === currentGroup!.parentId);
+             if (parentGroup?.isFixed) { // Found the ultimate fixed parent
+                effectiveMainType = parentGroup.mainType;
+                break; 
+            }
+            currentGroup = parentGroup;
         }
       }
       return { ...account, groupMainType: effectiveMainType, groupName: group.name };
@@ -61,7 +59,6 @@ function getAccountDetailsFromCoA(chartOfAccounts: TenantChartOfAccounts | undef
   return null;
 }
 
-// Helper function to count occurrences of a recurring budget entry within a specific period
 function countBudgetEntryOccurrencesInPeriod(
   entry: BudgetEntry,
   periodStart: Date,
@@ -81,8 +78,6 @@ function countBudgetEntryOccurrencesInPeriod(
   let occurrences = 0;
   let currentDate = entryStartDate;
   
-  // Fast-forward to the period start or the first occurrence within/after periodStart
-  // This loop ensures currentDate is at least at the beginning of an interval that might overlap periodStart
   while (isBefore(currentDate, periodStart)) { 
     let nextDate = currentDate;
     switch (entry.recurrence) {
@@ -92,16 +87,14 @@ function countBudgetEntryOccurrencesInPeriod(
       case 'EveryFourMonths': nextDate = addMonths(currentDate, 4); break;
       case 'Semiannually': nextDate = addMonths(currentDate, 6); break;
       case 'Yearly': nextDate = addMonths(currentDate, 12); break;
-      default: return 0; // Should not happen with proper types
+      default: return 0; 
     }
     if (isAfter(nextDate, periodStart) && !isEqual(nextDate, periodStart) && isBefore(currentDate, periodStart)) {
-      // Current date is before periodStart, next occurrence is after. current date might be the one.
       break; 
     }
     currentDate = nextDate;
-    if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break; // Don't go past entry's own end date
+    if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break; 
   }
-
 
   while (isBefore(currentDate, periodEnd) || isEqual(currentDate, periodEnd)) {
     if (entryOwnEndDate && isAfter(currentDate, entryOwnEndDate)) break;
@@ -115,7 +108,7 @@ function countBudgetEntryOccurrencesInPeriod(
       case 'EveryFourMonths': currentDate = addMonths(currentDate, 4); break;
       case 'Semiannually': currentDate = addMonths(currentDate, 6); break;
       case 'Yearly': currentDate = addMonths(currentDate, 12); break;
-      default: return occurrences; // Should not happen
+      default: return occurrences; 
     }
   }
   return occurrences;
@@ -152,6 +145,35 @@ export default function AccountDetailPage() {
     }
   }, [tenant, fiscalYears, selectedFiscalYearId]);
 
+  const journalEntriesForAccountAndPeriod = useMemo(() => {
+    if (!allJournalEntries || !selectedFiscalYearDetails || !accountId) return [];
+    const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
+    const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
+
+    return allJournalEntries
+      .filter(je => {
+        const entryDate = parseISO(je.date);
+        return isWithinInterval(entryDate, { start: fyStartDate, end: fyEndDate }) &&
+               je.lines.some(line => line.accountId === accountId);
+      })
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()); 
+  }, [allJournalEntries, selectedFiscalYearDetails, accountId]);
+
+  const periodMovement = useMemo(() => {
+    if (!journalEntriesForAccountAndPeriod) return { debit: 0, credit: 0, net: 0 };
+    let totalDebit = 0;
+    let totalCredit = 0;
+    journalEntriesForAccountAndPeriod.forEach(entry => {
+      entry.lines.forEach(line => {
+        if (line.accountId === accountId) {
+          totalDebit += line.debit || 0;
+          totalCredit += line.credit || 0;
+        }
+      });
+    });
+    return { debit: totalDebit, credit: totalCredit, net: totalDebit - totalCredit };
+  }, [journalEntriesForAccountAndPeriod, accountId]);
+
   const chartData = useMemo(() => {
     if (!clientLoaded || !selectedFiscalYearDetails || !accountDetails || !allJournalEntries || !allBudgetEntries || !chartOfAccounts) {
       return [];
@@ -160,7 +182,11 @@ export default function AccountDetailPage() {
     const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
     const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
     const isBSAccount = accountDetails.groupMainType === 'Asset' || accountDetails.groupMainType === 'Liability' || accountDetails.groupMainType === 'Equity';
-    const openingBalance = accountDetails.balance || 0; 
+    
+    // For BS accounts, the opening balance for the chart needs to be the *start* of the selected fiscal year.
+    // This is the `balance` field on the Account object within the TenantChartOfAccounts if it's correctly maintained
+    // (i.e., updated by carry-forward operations).
+    const openingBalanceForChart = accountDetails.balance || 0; 
 
     let periods: { periodStart: Date; periodEnd: Date; periodLabel: string; sortKey: string }[] = [];
     switch (aggregationPeriod) {
@@ -187,14 +213,13 @@ export default function AccountDetailPage() {
         break;
     }
 
-    let cumulativeActualBalance = openingBalance;
-    let cumulativeBudgetBalance = openingBalance;
+    let cumulativeActualBalance = openingBalanceForChart;
+    let cumulativeBudgetBalance = openingBalanceForChart;
 
     const result = periods.map(({ periodStart, periodEnd, periodLabel, sortKey }) => {
       let actualFlow = 0;
       let budgetFlow = 0;
 
-      // Calculate Actual Flow/Balance
       allJournalEntries
         .filter(je => isWithinInterval(parseISO(je.date), { start: periodStart, end: periodEnd }))
         .forEach(je => {
@@ -209,7 +234,6 @@ export default function AccountDetailPage() {
         cumulativeActualBalance += actualFlow;
       }
 
-      // Calculate Budget Flow/Balance
       allBudgetEntries.forEach(be => {
         const occurrences = countBudgetEntryOccurrencesInPeriod(be, periodStart, periodEnd);
         if (occurrences > 0) {
@@ -251,14 +275,13 @@ export default function AccountDetailPage() {
   const isLoadingData = isLoadingTenant || isLoadingCoA || isLoadingFiscalYears || (selectedFiscalYearId && isLoadingSelectedFY) || isLoadingJournal || isLoadingBudget || !clientLoaded;
 
   const currentActualBalance = useMemo(() => {
-    if (!accountDetails || !allJournalEntries || !clientLoaded) return accountDetails?.balance || 0;
-    let balance = accountDetails.balance || 0; // Start with CoA opening balance
+    if (!accountDetails || !selectedFiscalYearDetails || !clientLoaded) return accountDetails?.balance || 0;
     
-    const entriesToConsider = selectedFiscalYearDetails ?
-      allJournalEntries.filter(je => isBefore(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))) || isEqual(parseISO(je.date), endOfDay(parseISO(selectedFiscalYearDetails.endDate))))
-      : allJournalEntries;
-
-    entriesToConsider.forEach(je => {
+    // Start with the account's opening balance for the selected fiscal year
+    let balance = accountDetails.balance || 0; 
+    
+    // Add movements *within* the selected fiscal year
+    journalEntriesForAccountAndPeriod.forEach(je => {
       je.lines.forEach(line => {
         if (line.accountId === accountId) {
           balance += (line.debit || 0) - (line.credit || 0);
@@ -266,7 +289,7 @@ export default function AccountDetailPage() {
       });
     });
     return balance;
-  }, [accountDetails, allJournalEntries, clientLoaded, accountId, selectedFiscalYearDetails]);
+  }, [accountDetails, journalEntriesForAccountAndPeriod, selectedFiscalYearDetails, clientLoaded, accountId]);
   
   const handleLegendClick = (data: any) => {
     const { dataKey } = data;
@@ -278,27 +301,17 @@ export default function AccountDetailPage() {
     }
   };
 
-  const journalEntriesForAccountAndPeriod = useMemo(() => {
-    if (!allJournalEntries || !selectedFiscalYearDetails || !accountId) return [];
-    const fyStartDate = startOfDay(parseISO(selectedFiscalYearDetails.startDate));
-    const fyEndDate = endOfDay(parseISO(selectedFiscalYearDetails.endDate));
-
-    return allJournalEntries
-      .filter(je => {
-        const entryDate = parseISO(je.date);
-        return isWithinInterval(entryDate, { start: fyStartDate, end: fyEndDate }) &&
-               je.lines.some(line => line.accountId === accountId);
-      })
-      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()); // Sort by date ascending
-  }, [allJournalEntries, selectedFiscalYearDetails, accountId]);
-
-
   if (isLoadingData && clientLoaded) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
         <Skeleton className="h-8 w-1/4 mb-2" />
         <Skeleton className="h-6 w-3/4 mb-4" />
         <Skeleton className="h-10 w-1/2 mb-6" />
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+        </div>
         <Card><CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>
         <Card><CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader><CardContent><Skeleton className="h-32 w-full" /></CardContent></Card>
       </div>
@@ -317,6 +330,8 @@ export default function AccountDetailPage() {
       </div>
     );
   }
+  
+  const isBalanceSheetAccount = accountDetails?.groupMainType === 'Asset' || accountDetails?.groupMainType === 'Liability' || accountDetails?.groupMainType === 'Equity';
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -349,6 +364,66 @@ export default function AccountDetailPage() {
           {accountDetails?.description && <div className="md:col-span-2"><span className="font-semibold">Beschreibung:</span> {accountDetails.description}</div>}
         </CardContent>
       </Card>
+
+      {/* Summary Cards */}
+      {selectedFiscalYearDetails && accountDetails && (
+        <div className="grid md:grid-cols-3 gap-4">
+          {isBalanceSheetAccount ? (
+            <>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Eröffnungsbilanz ({selectedFiscalYearDetails.name})</CardTitle>
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(accountDetails.balance)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Periodenbewegung ({selectedFiscalYearDetails.name})</CardTitle>
+                  <BarChartIconLucide className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(periodMovement.net)}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Soll: {formatCurrency(periodMovement.debit)}, Haben: {formatCurrency(periodMovement.credit)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Schlussbilanz ({selectedFiscalYearDetails.name})</CardTitle>
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(currentActualBalance)}</div>
+                </CardContent>
+              </Card>
+            </>
+          ) : ( // P&L Account
+            <>
+              <Card className="md:col-span-3">
+                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                        {accountDetails.groupMainType === 'Revenue' ? 'Total Ertrag' : 'Total Aufwand'} ({selectedFiscalYearDetails.name})
+                    </CardTitle>
+                    {accountDetails.groupMainType === 'Revenue' ? <TrendingUp className="h-4 w-4 text-muted-foreground" /> : <TrendingDown className="h-4 w-4 text-muted-foreground" />}
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">
+                        {formatCurrency(accountDetails.groupMainType === 'Revenue' ? (periodMovement.credit - periodMovement.debit) : (periodMovement.debit - periodMovement.credit))}
+                    </div>
+                     <p className="text-xs text-muted-foreground">
+                        Periode: {format(parseISO(selectedFiscalYearDetails.startDate), "dd.MM.yy", {locale:de})} - {format(parseISO(selectedFiscalYearDetails.endDate), "dd.MM.yy", {locale:de})}
+                    </p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      )}
+
 
       <Card>
         <CardHeader>
@@ -408,7 +483,7 @@ export default function AccountDetailPage() {
                     <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2.5} dot={{ r: 4 }} name="Ist-Saldo" hide={!seriesVisibility.actual}/>
                     <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} dot={{ r: 3 }} name="Budget-Saldo" hide={!seriesVisibility.budget}/>
                   </>
-                ) : ( // P&L accounts
+                ) : ( 
                   <>
                     <Bar dataKey="actual" fill="var(--color-actual)" barSize={20} name="Ist-Fluss" hide={!seriesVisibility.actual}>
                        <LabelList dataKey="actual" position="top" formatter={(value: number) => value !== 0 ? formatCurrency(value) : ''} className="text-xs fill-muted-foreground" offset={5} />
@@ -458,7 +533,7 @@ export default function AccountDetailPage() {
                 <TableBody>
                   {journalEntriesForAccountAndPeriod.map(entry => {
                     const relevantLine = entry.lines.find(line => line.accountId === accountId);
-                    if (!relevantLine) return null; // Should not happen if filtering is correct
+                    if (!relevantLine) return null; 
 
                     return (
                       <TableRow key={entry.id}>
