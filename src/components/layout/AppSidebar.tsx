@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus, Warehouse as WarehouseIcon } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -163,7 +163,7 @@ export function AppSidebar() {
                                 </SidebarMenuSubItem>
                                  <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname.startsWith(`/tenants/${currentTenantId}/accounting/accounts`)}>
-                                      <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Kontenübersicht</Link>
+                                      <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Konten</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
@@ -192,8 +192,8 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.includes('/entries') && !pathname.endsWith('/reports')) }>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports')) }>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
@@ -264,16 +264,38 @@ export function AppSidebar() {
             </SidebarMenuItem>
             
             <SidebarMenuItem>
-                <SidebarMenuButton
-                    asChild
-                    isActive={isInventoryActive}
-                    tooltip="Warenwirtschaft"
-                >
-                    <Link href={`/tenants/${currentTenantId}/inventory`}>
-                    <Package />
-                    <span>Warenwirtschaft</span>
-                    </Link>
-                </SidebarMenuButton>
+                <Accordion type="single" collapsible className="w-full" defaultValue={isInventoryActive ? "inventory-item" : undefined}>
+                    <AccordionItem value="inventory-item" className="border-none">
+                        <AccordionTrigger className={cn(
+                            "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            isInventoryActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg:not(.no-override)]:text-sidebar-primary-foreground"
+                        )}>
+                           <div className="flex items-center w-full">
+                                <Package className="mr-2 h-4 w-4 shrink-0" />
+                                <span className="flex-1 text-left">Warenwirtschaft</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
+                           <SidebarMenuSub>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory` || pathname === `/tenants/${currentTenantId}/inventory/overview`}>
+                                      <Link href={`/tenants/${currentTenantId}/inventory`}>Übersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory/products`}>
+                                      <Link href={`/tenants/${currentTenantId}/inventory/products`}>Produkte</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory/warehouses`}>
+                                      <Link href={`/tenants/${currentTenantId}/inventory/warehouses`}><WarehouseIcon className="mr-1 h-3.5 w-3.5" />Lager</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             </SidebarMenuItem>
 
             <SidebarMenuItem>

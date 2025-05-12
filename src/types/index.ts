@@ -477,17 +477,50 @@ export interface CustomProductFieldDefinition {
   order?: number; // For controlling display order
 }
 
+export interface Warehouse {
+  id: string;
+  tenantId: string;
+  name: string;
+  location?: string; // e.g., "Hauptlager Zürich", "Lager A-12"
+  isDefault?: boolean; // Is this the default warehouse for new products?
+  createdAt: string;
+  updatedAt: string;
+}
+export type NewWarehousePayload = Omit<Warehouse, 'id' | 'createdAt' | 'updatedAt'>;
+
+
+export type StockMovementType = 'Purchase' | 'Sale' | 'AdjustmentIn' | 'AdjustmentOut' | 'TransferIn' | 'TransferOut';
+
+export interface StockMovement {
+  id: string;
+  tenantId: string;
+  productId: string;
+  warehouseId: string; 
+  type: StockMovementType;
+  quantityChange: number; // Positive for increase, negative for decrease
+  date: string; // ISO string
+  notes?: string;
+  relatedDocumentId?: string; // e.g., Invoice ID for sales, Purchase Order ID for purchases
+  userId: string; // User who made the stock change
+  createdAt: string;
+}
+export type NewStockMovementPayload = Omit<StockMovement, 'id' | 'createdAt' | 'userId'>;
+
+
 export interface Product {
   id: string;
   tenantId: string;
-  itemNumber: string;
+  itemNumber: string; // Artikelnummer
   name: string;
   description?: string;
-  unitPrice: number;
+  unitPrice: number; // Verkaufspreis
+  purchasePrice?: number; // Einkaufspreis (optional)
   taxRateId?: string; 
-  unit?: string; 
-  minimumQuantity?: number; // Mindestmenge
-  stock?: number; // Current stock level
+  unit?: string; // Einheit (Stk, kg, m, etc.)
+  minimumQuantity?: number; // Mindestbestellmenge oder Meldebestand
+  stockOnHand?: number; // Gesamter Lagerbestand über alle Lager (kann berechnet werden)
+  defaultWarehouseId?: string | null; // Standardlager für dieses Produkt
+  // stockPerWarehouse?: Record<string, number>; // { warehouseId: quantity } - For more granular stock
   customFields?: Record<string, any>; // Stores values for custom fields defined by tenant { [fieldDefinitionId]: value }
   createdAt: string;
   updatedAt: string;
