@@ -473,6 +473,7 @@ export interface CustomProductFieldDefinition {
   type: CustomProductFieldType;
   options?: string[]; // For 'select' type if added in future
   isRequired?: boolean;
+  inputMask?: string; // Optional input mask for 'text' or 'number' types
   order?: number; // For controlling display order
 }
 

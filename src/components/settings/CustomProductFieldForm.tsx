@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -19,7 +18,7 @@ const customProductFieldFormSchema = z.object({
   name: z.string().min(1, "Interner Name ist erforderlich.").regex(/^[a-zA-Z0-9_]+$/, "Interner Name darf nur Buchstaben, Zahlen und Unterstriche enthalten."),
   type: z.enum(fieldTypes, { required_error: "Typ ist erforderlich." }),
   isRequired: z.boolean().default(false),
-  // `options` could be added here if a 'select' type is introduced
+  inputMask: z.string().optional(),
 });
 
 export type CustomProductFieldFormValues = Omit<CustomProductFieldDefinition, 'id' | 'order'>;
@@ -39,17 +38,25 @@ export function CustomProductFieldForm({ onSubmit, initialData, isSubmitting }: 
           name: initialData.name,
           type: initialData.type,
           isRequired: initialData.isRequired || false,
+          inputMask: initialData.inputMask || '',
         }
       : {
           label: '',
           name: '',
           type: 'text',
           isRequired: false,
+          inputMask: '',
         },
   });
 
+  const watchedFieldType = form.watch("type");
+
   const handleSubmit = async (values: CustomProductFieldFormValues) => {
-    onSubmit(values);
+    const submissionValues = { ...values };
+    if (watchedFieldType !== 'text' && watchedFieldType !== 'number') {
+      submissionValues.inputMask = undefined; // Clear mask if not applicable
+    }
+    onSubmit(submissionValues);
      if (!initialData) { // Reset form only if it was a create operation
       form.reset();
     }
@@ -95,7 +102,15 @@ export function CustomProductFieldForm({ onSubmit, initialData, isSubmitting }: 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Feldtyp</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select 
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  if (value !== 'text' && value !== 'number') {
+                    form.setValue('inputMask', ''); // Clear mask if type changes away from text/number
+                  }
+                }} 
+                defaultValue={field.value}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Feldtyp auswählen" />
@@ -117,6 +132,27 @@ export function CustomProductFieldForm({ onSubmit, initialData, isSubmitting }: 
             </FormItem>
           )}
         />
+
+        {(watchedFieldType === 'text' || watchedFieldType === 'number') && (
+          <FormField
+            control={form.control}
+            name="inputMask"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Eingabemaske (optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="z.B. 999-9-99999-999-9 für ISBN-13" {...field} />
+                </FormControl>
+                <FormDescription>
+                  Definieren Sie ein Format für die Eingabe (z.B. für ISBN, Telefonnummern). 
+                  Verwenden Sie '9' für eine Ziffer, 'a' für einen Buchstaben, '*' für alphanumerisch.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="isRequired"

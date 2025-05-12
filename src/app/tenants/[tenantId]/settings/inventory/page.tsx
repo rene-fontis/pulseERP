@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -37,6 +36,7 @@ export default function TenantInventorySettingsPage() {
       ...values,
       id: crypto.randomUUID(),
       order: (tenant.productCustomFieldDefinitions?.length || 0) + 1,
+      inputMask: (values.type === 'text' || values.type === 'number') ? values.inputMask : undefined,
     };
 
     const updatedDefinitions = [...(tenant.productCustomFieldDefinitions || []), newFieldDefinition];
@@ -61,7 +61,11 @@ export default function TenantInventorySettingsPage() {
     if (!tenant || !selectedField) return;
 
     const updatedDefinitions = (tenant.productCustomFieldDefinitions || []).map(def =>
-      def.id === selectedField.id ? { ...selectedField, ...values } : def
+      def.id === selectedField.id ? { 
+        ...selectedField, 
+        ...values,
+        inputMask: (values.type === 'text' || values.type === 'number') ? values.inputMask : undefined,
+      } : def
     );
 
     try {
@@ -78,9 +82,6 @@ export default function TenantInventorySettingsPage() {
 
   const handleDeleteFieldDefinition = async (fieldId: string) => {
     if (!tenant) return;
-
-    // TODO: Consider implications - what happens to product data using this field?
-    // For now, just remove the definition. A more robust solution might archive it or warn about data loss.
 
     const updatedDefinitions = (tenant.productCustomFieldDefinitions || []).filter(def => def.id !== fieldId);
 
@@ -176,12 +177,15 @@ export default function TenantInventorySettingsPage() {
           {customFields.length > 0 ? (
             <div className="space-y-3">
               {customFields.map((field) => (
-                <Card key={field.id} className="p-4 flex justify-between items-center hover:shadow-md transition-shadow">
-                  <div>
+                <Card key={field.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md transition-shadow">
+                  <div className="flex-1 mb-2 sm:mb-0">
                     <h3 className="font-semibold">{field.label} <span className="text-xs text-muted-foreground">({field.name} - {field.type})</span></h3>
                     {field.isRequired && <Badge variant="outline" className="mt-1 text-xs">Pflichtfeld</Badge>}
+                    {(field.type === 'text' || field.type === 'number') && field.inputMask && (
+                      <p className="text-xs text-muted-foreground mt-1">Maske: {field.inputMask}</p>
+                    )}
                   </div>
-                  <div className="space-x-2">
+                  <div className="space-x-2 self-end sm:self-center">
                     <Button variant="outline" size="icon" onClick={() => handleEditFieldDefinition(field)} title="Feld bearbeiten">
                       <Edit className="h-4 w-4" />
                     </Button>
