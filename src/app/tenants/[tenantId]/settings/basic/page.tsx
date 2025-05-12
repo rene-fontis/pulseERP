@@ -1,6 +1,6 @@
-
 "use client";
 
+import React, { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings, AlertCircle, Percent } from 'lucide-react';
@@ -15,12 +15,11 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import type { Tenant } from '@/types';
-import React from 'react';
 
 const basicSettingsSchema = z.object({
   name: z.string().min(2, "Mandantenname muss mindestens 2 Zeichen lang sein."),
   vatNumber: z.string().optional(),
-  timezone: z.string().optional(), 
+  timezone: z.string().optional(),
   notificationsEnabled: z.boolean().optional(),
 });
 
@@ -43,7 +42,7 @@ export default function TenantBasicSettingsPage() {
     }
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (tenant) {
       form.reset({
         name: tenant.name,
@@ -55,20 +54,23 @@ export default function TenantBasicSettingsPage() {
   }, [tenant, form]);
 
   const onSubmit = async (values: BasicSettingsFormValues) => {
-    if (!tenant) return;
+    if (!tenant) {
+        toast({ title: "Fehler", description: "Mandant nicht geladen.", variant: "destructive" });
+        return;
+    }
     try {
-      await updateTenantMutation.mutateAsync({ 
-        id: tenant.id, 
-        data: { 
-          name: values.name,
-          // Assuming 'vatNumber' can be updated. If it's on a different sub-object, adjust mutation.
-          // For now, direct update:
-          vatNumber: values.vatNumber || null, // Send null if empty to clear it
-        } as any // Cast to any to allow vatNumber if not strictly on Tenant type yet for update hook
+      const dataToUpdate: Partial<Tenant> = {
+        name: values.name,
+        vatNumber: values.vatNumber || null,
+        // TODO: Add other fields like timezone, notifications when backend supports them
+      };
+      
+      await updateTenantMutation.mutateAsync({
+        id: tenant.id,
+        data: dataToUpdate
       });
-      // TODO: Add mutation for other settings like timezone, notifications when they are added to Tenant type and service
       toast({ title: "Erfolg", description: "Basiseinstellungen erfolgreich aktualisiert." });
-      refetch(); 
+      refetch();
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
       toast({ title: "Fehler", description: `Einstellungen konnten nicht gespeichert werden: ${errorMessage}`, variant: "destructive" });
@@ -235,4 +237,7 @@ export default function TenantBasicSettingsPage() {
             </div>
              <Button disabled className="mt-4">Steuersätze verwalten (Demnächst)</Button>
         </CardContent>
-      </Card
+      </Card>
+    </div>
+  );
+}
