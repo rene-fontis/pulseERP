@@ -4,21 +4,24 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, PlusCircle, CheckSquare, Square, CalendarDays, Briefcase, AlertCircle, Loader2, Info } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, PlusCircle, CheckSquare, Square, CalendarDays, Briefcase, AlertCircle, Loader2, Info, ClipboardList, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useGetProjectById, useUpdateProject } from "@/hooks/useProjects";
-import type { Project, Milestone, MilestoneFormValues, NewMilestonePayload } from "@/types";
-import { projectStatusLabels } from "@/types";
+import type { Project, Milestone, MilestoneFormValues, NewMilestonePayload, ProjectTask, TaskFormValues, TaskStatus } from "@/types";
+import { projectStatusLabels, taskStatusLabels } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { MilestoneForm } from "@/components/projects/MilestoneForm";
+import { TaskForm } from "@/components/projects/TaskForm"; // New form for tasks
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -31,6 +34,8 @@ export default function ProjectDetailPage() {
 
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false); // State for task modal
+  const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null); // State for selected task
   const [clientLoaded, setClientLoaded] = useState(false);
 
   useEffect(() => {
@@ -43,24 +48,24 @@ export default function ProjectDetailPage() {
     let updatedMilestones: Milestone[];
     const nowISO = new Date().toISOString();
 
-    if (selectedMilestone) { // Update existing milestone
+    if (selectedMilestone) { 
       updatedMilestones = project.milestones.map(ms =>
         ms.id === selectedMilestone.id
           ? { 
-              ...selectedMilestone, // keep original id and createdAt
-              ...values, // apply form values (name, description, completed)
+              ...selectedMilestone, 
+              ...values, 
               dueDate: values.dueDate?.toISOString() || null, 
-              updatedAt: nowISO // Set new updatedAt
+              updatedAt: nowISO 
             }
           : ms
       );
-    } else { // Add new milestone
+    } else { 
       const newMilestone: Milestone = {
         id: crypto.randomUUID(),
-        ...values, // name, description, completed from form
+        ...values, 
         dueDate: values.dueDate?.toISOString() || null,
-        createdAt: nowISO, // Set new createdAt
-        updatedAt: nowISO, // Set new updatedAt
+        createdAt: nowISO, 
+        updatedAt: nowISO, 
       };
       updatedMilestones = [...project.milestones, newMilestone];
     }
@@ -110,6 +115,75 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Task Handlers
+  const handleAddOrUpdateTask = async (values: TaskFormValues) => {
+    if (!project) return;
+    let updatedTasks: ProjectTask[];
+    const nowISO = new Date().toISOString();
+
+    if (selectedTask) { // Update existing task
+      updatedTasks = project.tasks.map(task =>
+        task.id === selectedTask.id
+          ? { ...selectedTask, ...values, dueDate: values.dueDate?.toISOString() || null, updatedAt: nowISO }
+          : task
+      );
+    } else { // Add new task
+      const newTask: ProjectTask = {
+        id: crypto.randomUUID(),
+        ...values,
+        dueDate: values.dueDate?.toISOString() || null,
+        status: values.status || 'Open',
+        createdAt: nowISO,
+        updatedAt: nowISO,
+      };
+      updatedTasks = [...(project.tasks || []), newTask];
+    }
+    try {
+      await updateProjectMutation.mutateAsync({ projectId: project.id, data: { tasks: updatedTasks } });
+      toast({ title: "Erfolg", description: `Aufgabe ${selectedTask ? 'aktualisiert' : 'erstellt'}.` });
+      setIsTaskModalOpen(false);
+      setSelectedTask(null);
+      refetchProject();
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Fehler", description: `Aufgabe konnte nicht ${selectedTask ? 'aktualisiert' : 'erstellt'} werden: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const handleEditTask = (task: ProjectTask) => {
+    setSelectedTask(task);
+    setIsTaskModalOpen(true);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!project) return;
+    const updatedTasks = (project.tasks || []).filter(task => task.id !== taskId);
+    try {
+      await updateProjectMutation.mutateAsync({ projectId: project.id, data: { tasks: updatedTasks } });
+      toast({ title: "Erfolg", description: "Aufgabe gelöscht." });
+      refetchProject();
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Fehler", description: `Aufgabe konnte nicht gelöscht werden: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const handleChangeTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+    if (!project) return;
+    const updatedTasks = (project.tasks || []).map(task =>
+      task.id === taskId ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
+    );
+    try {
+      await updateProjectMutation.mutateAsync({ projectId: project.id, data: { tasks: updatedTasks } });
+      toast({ title: "Erfolg", description: "Aufgabenstatus aktualisiert."});
+      refetchProject();
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Fehler", description: `Aufgabenstatus konnte nicht aktualisiert werden: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+
   const formatDate = (dateString?: string | null) => {
     if (!clientLoaded || !dateString) return "-";
     try {
@@ -128,6 +202,7 @@ export default function ProjectDetailPage() {
         <Skeleton className="h-6 w-1/2 mb-6" />
         <Card><CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>
         <Card><CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+        <Card><CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader><CardContent><Skeleton className="h-32 w-full" /></CardContent></Card>
       </div>
     );
   }
@@ -163,6 +238,8 @@ export default function ProjectDetailPage() {
     if (!b.dueDate) return -1;
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   }) : [];
+
+  const sortedTasks = project ? [...(project.tasks || [])].sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -278,6 +355,103 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
+      <Card className="shadow-lg">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-primary" /> Aufgaben ({sortedTasks.length})</CardTitle>
+          <Dialog
+            open={isTaskModalOpen}
+            onOpenChange={(isOpen) => {
+              setIsTaskModalOpen(isOpen);
+              if (!isOpen) setSelectedTask(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <PlusCircle className="mr-2 h-4 w-4" /> Aufgabe hinzufügen
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{selectedTask ? "Aufgabe bearbeiten" : "Neue Aufgabe"}</DialogTitle>
+              </DialogHeader>
+              <TaskForm
+                projectMilestones={project?.milestones || []}
+                onSubmit={handleAddOrUpdateTask}
+                initialData={selectedTask}
+                isSubmitting={updateProjectMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {sortedTasks.length > 0 ? (
+            <div className="space-y-2">
+              {sortedTasks.map(task => (
+                <Card key={task.id} className="p-3 hover:shadow-sm transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                       <GripVertical className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0 cursor-grab" />
+                       <div>
+                        <h5 className="font-medium">{task.name}</h5>
+                        {task.description && <p className="text-xs text-muted-foreground">{task.description}</p>}
+                        {task.milestoneId && <Badge variant="outline" className="mt-1 text-xs">Meilenstein: {project?.milestones.find(m => m.id === task.milestoneId)?.name || 'Unbekannt'}</Badge>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end space-y-1 ml-2">
+                       <Select
+                        value={task.status}
+                        onValueChange={(newStatus) => handleChangeTaskStatus(task.id, newStatus as TaskStatus)}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-[150px]">
+                          <SelectValue placeholder="Status wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(taskStatusLabels) as TaskStatus[]).map(statusKey => (
+                            <SelectItem key={statusKey} value={statusKey} className="text-xs">
+                              {taskStatusLabels[statusKey]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {task.dueDate && <p className="text-xs text-muted-foreground">Fällig: {formatDate(task.dueDate)}</p>}
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-1 mt-2">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTask(task)} title="Aufgabe bearbeiten">
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive" title="Aufgabe löschen">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  Aufgabe "{task.name}" wirklich löschen?
+                              </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteTask(task.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Löschen
+                              </AlertDialogAction>
+                              </AlertDialogFooter>
+                          </AlertDialogContent>
+                      </AlertDialog>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-6">
+              <Info className="inline-block h-5 w-5 mr-2" />Keine Aufgaben für dieses Projekt definiert.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
        <Card className="shadow-lg">
         <CardHeader>
             <CardTitle>Projekt-Timeline (Einfache Liste)</CardTitle>
@@ -304,4 +478,3 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
-

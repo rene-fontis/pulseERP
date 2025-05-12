@@ -17,7 +17,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Project, Milestone, NewProjectPayload, NewMilestonePayload, ProjectStatus } from "@/types";
+import type { Project, Milestone, NewProjectPayload, NewMilestonePayload, ProjectStatus, ProjectTask } from "@/types";
 import { formatFirestoreTimestamp } from "@/lib/utils/firestoreUtils";
 
 const projectsCollectionRef = collection(db, "projects");
@@ -40,6 +40,13 @@ const mapDocToProject = (docSnapshot: any): Project => {
       dueDate: ms.dueDate ? formatFirestoreTimestamp(ms.dueDate, ms.id, 'now') : null,
       createdAt: formatFirestoreTimestamp(ms.createdAt, ms.id, 'now'), 
       updatedAt: formatFirestoreTimestamp(ms.updatedAt, ms.id, 'now'), 
+    })),
+    tasks: (data.tasks || []).map((task: any) => ({ // Map tasks
+      ...task,
+      id: task.id || crypto.randomUUID(),
+      dueDate: task.dueDate ? formatFirestoreTimestamp(task.dueDate, task.id, 'now') : null,
+      createdAt: formatFirestoreTimestamp(task.createdAt, task.id, 'now'),
+      updatedAt: formatFirestoreTimestamp(task.updatedAt, task.id, 'now'),
     })),
     createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, "now"),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, "now"),
@@ -70,7 +77,7 @@ export const getProjectById = async (projectId: string): Promise<Project | undef
 };
 
 export const addProject = async (tenantId: string, projectData: NewProjectPayload): Promise<Project> => {
-  const clientGeneratedTimestamp = Timestamp.fromDate(new Date()); // Use client-generated date, converted to Firestore Timestamp
+  const clientGeneratedTimestamp = Timestamp.fromDate(new Date()); 
   const newProjectData: any = {
     ...projectData,
     tenantId,
@@ -82,16 +89,31 @@ export const addProject = async (tenantId: string, projectData: NewProjectPayloa
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        createdAt: clientGeneratedTimestamp, // Use client-generated timestamp
-        updatedAt: clientGeneratedTimestamp, // Use client-generated timestamp
+        createdAt: clientGeneratedTimestamp, 
+        updatedAt: clientGeneratedTimestamp, 
       };
       if (ms.description === undefined) {
           delete milestoneToAdd.description; 
       }
       return milestoneToAdd;
     }),
-    createdAt: serverTimestamp(), // Top-level can use serverTimestamp
-    updatedAt: serverTimestamp(), // Top-level can use serverTimestamp
+    tasks: (projectData.tasks || []).map(task => { // Initialize tasks array
+        const taskToAdd: any = {
+            id: crypto.randomUUID(),
+            name: task.name,
+            description: task.description === undefined ? null : task.description,
+            milestoneId: task.milestoneId === undefined ? null : task.milestoneId,
+            status: task.status || 'Open',
+            dueDate: task.dueDate ? Timestamp.fromDate(new Date(task.dueDate)) : null,
+            createdAt: clientGeneratedTimestamp,
+            updatedAt: clientGeneratedTimestamp,
+        };
+        if (task.description === undefined) delete taskToAdd.description;
+        if (task.milestoneId === undefined) delete taskToAdd.milestoneId;
+        return taskToAdd;
+    }),
+    createdAt: serverTimestamp(), 
+    updatedAt: serverTimestamp(), 
   };
   
   if (projectData.startDate) newProjectData.startDate = Timestamp.fromDate(new Date(projectData.startDate));
@@ -112,7 +134,7 @@ export const updateProject = async (
   projectData: Partial<Project> 
 ): Promise<Project | undefined> => {
   const projectDocRef = doc(db, "projects", projectId);
-  const updateData: any = { ...projectData, updatedAt: serverTimestamp() }; // Top-level updatedAt can be serverTimestamp
+  const updateData: any = { ...projectData, updatedAt: serverTimestamp() };
 
   if (projectData.hasOwnProperty('startDate')) {
     updateData.startDate = projectData.startDate ? Timestamp.fromDate(new Date(projectData.startDate)) : null;
@@ -135,8 +157,6 @@ export const updateProject = async (
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        // createdAt and updatedAt for milestones inside an array update should be concrete Timestamps
-        // The client will send ISO strings for these.
         createdAt: Timestamp.fromDate(new Date(ms.createdAt)), 
         updatedAt: Timestamp.fromDate(new Date(ms.updatedAt)), 
       };
@@ -146,6 +166,25 @@ export const updateProject = async (
       return milestoneUpdate;
     });
   }
+
+  if (projectData.tasks) { // Handle tasks update
+    updateData.tasks = projectData.tasks.map(task => {
+      const taskUpdate: any = {
+        id: task.id,
+        name: task.name,
+        description: task.description === undefined ? null : task.description,
+        milestoneId: task.milestoneId === undefined ? null : task.milestoneId,
+        status: task.status,
+        dueDate: task.dueDate ? Timestamp.fromDate(new Date(task.dueDate)) : null,
+        createdAt: Timestamp.fromDate(new Date(task.createdAt)),
+        updatedAt: Timestamp.fromDate(new Date(task.updatedAt)),
+      };
+       if (task.description === undefined && taskUpdate.description === null) delete taskUpdate.description;
+       if (task.milestoneId === undefined && taskUpdate.milestoneId === null) delete taskUpdate.milestoneId;
+      return taskUpdate;
+    });
+  }
+
 
   await updateDoc(projectDocRef, updateData);
   const updatedDocSnapshot = await getDoc(projectDocRef);
@@ -160,4 +199,3 @@ export const deleteProject = async (projectId: string): Promise<boolean> => {
   await deleteDoc(projectDocRef);
   return true;
 };
-

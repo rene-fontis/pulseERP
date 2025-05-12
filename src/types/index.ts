@@ -373,6 +373,30 @@ export interface Milestone {
   updatedAt: string;
 }
 
+export type TaskStatus = 'Open' | 'InProgress' | 'InReview' | 'Completed' | 'Blocked';
+
+export const taskStatusLabels: Record<TaskStatus, string> = {
+  Open: "Offen",
+  InProgress: "In Bearbeitung",
+  InReview: "In Prüfung",
+  Completed: "Abgeschlossen",
+  Blocked: "Blockiert"
+};
+
+export interface ProjectTask {
+  id: string;
+  name: string;
+  description?: string;
+  assigneeId?: string; // User ID
+  milestoneId?: string | null; // Link to a milestone
+  status: TaskStatus; 
+  dueDate?: string | null; // ISO Date string
+  estimatedHours?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 export interface Project {
   id: string;
   tenantId: string;
@@ -384,14 +408,17 @@ export interface Project {
   endDate?: string | null; 
   status: ProjectStatus;
   milestones: Milestone[];
+  tasks: ProjectTask[]; // Added tasks array
   createdAt: string;
   updatedAt: string;
 }
 
-export type NewProjectPayload = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'milestones' | 'contactName'> & {
+export type NewProjectPayload = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'milestones' | 'tasks' | 'contactName'> & {
   milestones?: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>[]; 
+  tasks?: Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'>[];
 };
-export type ProjectFormValues = Omit<Project, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'milestones' | 'contactName'> & {
+
+export type ProjectFormValues = Omit<Project, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'milestones' | 'tasks' | 'contactName'> & {
   startDate?: Date | null;
   endDate?: Date | null;
 };
@@ -401,24 +428,10 @@ export type MilestoneFormValues = Omit<Milestone, 'id' | 'createdAt' | 'updatedA
   dueDate?: Date | null;
 };
 
-
-export interface TaskStatusDefinition {
-  id: string;
-  name: string; 
-  order: number;
-}
-
-export interface ProjectTask {
-  id: string;
-  name: string;
-  description?: string;
-  assigneeId?: string; 
-  statusId: string; 
-  dueDate?: string; 
-  estimatedHours?: number;
-  createdAt: string;
-  updatedAt: string;
-}
+export type NewTaskPayload = Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'>;
+export type TaskFormValues = Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'> & {
+  dueDate?: Date | null;
+};
 
 
 // --- Time Tracking Types ---
