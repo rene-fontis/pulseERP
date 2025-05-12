@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,7 @@ export function AppSidebar() {
   const isAccountingActive = pathname.startsWith(`/tenants/${currentTenantId}/accounting`);
   const isBudgetingActive = pathname.startsWith(`/tenants/${currentTenantId}/budgeting`);
   const isContactsActive = pathname.startsWith(`/tenants/${currentTenantId}/contacts`);
-  const isProjectsActive = pathname.startsWith(`/tenants/${currentTenantId}/projects`);
+  const isProjectsActive = pathname.startsWith(`/tenants/${currentTenantId}/projects`) || pathname.startsWith(`/tenants/${currentTenantId}/tasks`);
   const isTimeTrackingActive = pathname.startsWith(`/tenants/${currentTenantId}/time-tracking`);
   const isInventoryActive = pathname.startsWith(`/tenants/${currentTenantId}/inventory`);
   const isInvoicingActive = pathname.startsWith(`/tenants/${currentTenantId}/invoicing`);
@@ -75,7 +75,7 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled 
+            disabled={true} // Disabled as per previous request
         >
             <Link href="/admin/import">
                 <Users /> 
@@ -191,8 +191,13 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.startsWith(`/tenants/${currentTenantId}/budgeting`) && !pathname.endsWith('/reports') }>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.includes('/entries') && !pathname.endsWith('/reports')) }>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgetübersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname.includes(`/tenants/${currentTenantId}/budgeting/`) && pathname.includes('/entries') }>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Einträge verwalten</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
@@ -220,16 +225,33 @@ export function AppSidebar() {
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-                <SidebarMenuButton
-                    asChild
-                    isActive={isProjectsActive}
-                    tooltip="Projekte"
-                >
-                    <Link href={`/tenants/${currentTenantId}/projects`}>
-                    <Briefcase />
-                    <span>Projekte</span>
-                    </Link>
-                </SidebarMenuButton>
+                <Accordion type="single" collapsible className="w-full" defaultValue={isProjectsActive ? "projects-item" : undefined}>
+                    <AccordionItem value="projects-item" className="border-none">
+                        <AccordionTrigger className={cn(
+                            "w-full justify-between p-2 h-auto font-normal text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            isProjectsActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 [&>svg:not(.no-override)]:text-sidebar-primary-foreground"
+                        )}>
+                           <div className="flex items-center w-full">
+                                <Briefcase className="mr-2 h-4 w-4 shrink-0" />
+                                <span className="flex-1 text-left">Projekte</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
+                           <SidebarMenuSub>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/projects` || pathname.startsWith(`/tenants/${currentTenantId}/projects/`) }>
+                                      <Link href={`/tenants/${currentTenantId}/projects`}>Projektübersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/tasks`}>
+                                      <Link href={`/tenants/${currentTenantId}/tasks`}><ClipboardList className="mr-1 h-3.5 w-3.5"/> Aufgabenübersicht</Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             </SidebarMenuItem>
 
             <SidebarMenuItem>
