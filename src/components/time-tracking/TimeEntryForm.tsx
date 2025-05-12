@@ -15,9 +15,9 @@ import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { TimeEntry, TimeEntryFormValues, Contact, Project, ProjectTask, NewTimeEntryPayload } from "@/types";
+import type { TimeEntry, TimeEntryFormValues, Contact, Project as ProjectType, ProjectTask, NewTimeEntryPayload } from "@/types"; // Renamed Project to ProjectType
 import { useGetContacts } from "@/hooks/useContacts";
-import { useGetProjects } from "@/hooks/useProjects";
+import { useGetProjects } from "@/hooks/useProjects"; // Assuming hook name, adjust if different
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const timeEntryFormSchema = z.object({
@@ -40,7 +40,7 @@ const timeEntryFormSchema = z.object({
 interface TimeEntryFormProps {
   tenantId: string;
   onSubmit: (values: NewTimeEntryPayload) => Promise<void>;
-  initialData?: TimeEntry | null;
+  initialData?: Partial<TimeEntry> | null; // Allow partial for timer pre-fill
   isSubmitting?: boolean;
 }
 
@@ -51,20 +51,20 @@ interface SelectOption {
 
 export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }: TimeEntryFormProps) {
   const { data: contacts, isLoading: isLoadingContacts } = useGetContacts(tenantId);
-  const { data: projects, isLoading: isLoadingProjects } = useGetProjects(tenantId, ['Active', 'OnHold']); // Fetch active/on-hold projects
+  const { data: projects, isLoading: isLoadingProjects } = useGetProjects(tenantId, ['Active', 'OnHold']);
 
   const form = useForm<TimeEntryFormValues>({
     resolver: zodResolver(timeEntryFormSchema),
     defaultValues: initialData
       ? {
-          date: parseISO(initialData.date),
-          hours: initialData.hours,
+          date: initialData.date ? (typeof initialData.date === 'string' ? parseISO(initialData.date) : initialData.date) : new Date(),
+          hours: initialData.hours || 0,
           description: initialData.description || "",
           contactId: initialData.contactId || null,
           projectId: initialData.projectId || null,
           taskId: initialData.taskId || null,
           rate: initialData.rate ?? undefined,
-          isBillable: initialData.isBillable,
+          isBillable: initialData.isBillable === undefined ? true : initialData.isBillable,
         }
       : {
           date: new Date(),
@@ -81,14 +81,14 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
   useEffect(() => {
     if (initialData) {
       form.reset({
-        date: parseISO(initialData.date),
-        hours: initialData.hours,
+        date: initialData.date ? (typeof initialData.date === 'string' ? parseISO(initialData.date) : initialData.date) : new Date(),
+        hours: initialData.hours || 0,
         description: initialData.description || "",
         contactId: initialData.contactId || null,
         projectId: initialData.projectId || null,
         taskId: initialData.taskId || null,
-        rate: initialData.rate ?? undefined,
-        isBillable: initialData.isBillable,
+        rate: initialData.rate ?? undefined, // Ensure undefined if null from initialData for the form
+        isBillable: initialData.isBillable === undefined ? true : initialData.isBillable,
       });
     }
   }, [initialData, form]);
@@ -109,10 +109,11 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
   }, [selectedProjectId, projects]);
 
 
-  // Auto-fill rate from contact if contact is selected and has an hourly rate
   const selectedContactId = form.watch("contactId");
   useEffect(() => {
-    if (selectedContactId && contacts && !initialData?.rate && !form.getValues("rate")) { // Only set if rate isn't already set
+    // Only auto-fill if rate is not already set by initialData (which could be from a timer stop)
+    // and if not explicitly set in the form by the user yet.
+    if (selectedContactId && contacts && (!initialData || initialData.rate === undefined || initialData.rate === null) && (form.getValues("rate") === undefined || form.getValues("rate") === null) ) {
       const contact = contacts.find(c => c.id === selectedContactId);
       if (contact?.hourlyRate) {
         form.setValue("rate", contact.hourlyRate);
@@ -133,7 +134,7 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
       description: values.description || undefined,
     };
     await onSubmit(payload);
-    if (!initialData) {
+    if (!initialData?.id) { // Reset form only if it was a new entry (not an edit or timer save)
       form.reset({
         date: new Date(),
         hours: 0,
@@ -261,7 +262,7 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
         </div>
 
         <Button type="submit" disabled={isSubmitting || isLoadingContacts || isLoadingProjects} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          {isSubmitting ? "Speichern..." : initialData ? "Änderungen speichern" : "Zeiteintrag erstellen"}
+          {isSubmitting ? "Speichern..." : (initialData?.id ? "Änderungen speichern" : "Zeiteintrag erstellen")}
         </Button>
       </form>
     </Form>
@@ -331,3 +332,4 @@ function AutocompleteSelect({ options, value, onChange, placeholder, isLoading, 
     </Popover>
   );
 }
+

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Clock, PlusCircle, Edit, Trash2, AlertCircle, Loader2, PlayCircle, PauseCircle, StopCircle } from "lucide-react";
+import { Clock, PlusCircle, Edit, Trash2, AlertCircle, Loader2, PlayCircle, PauseCircle, StopCircle, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,12 +12,14 @@ import { TimeEntryForm } from "@/components/time-tracking/TimeEntryForm";
 import { useGetTimeEntries, useAddTimeEntry, useUpdateTimeEntry, useDeleteTimeEntry } from "@/hooks/useTimeEntries";
 import { useGetContacts } from "@/hooks/useContacts";
 import { useGetProjects } from "@/hooks/useProjects";
-import type { TimeEntry, NewTimeEntryPayload, Contact, Project, ProjectTask } from "@/types";
+import type { TimeEntry, NewTimeEntryPayload, Contact, Project as ProjectType, ProjectTask } from "@/types"; // Renamed Project to ProjectType to avoid conflict
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, intervalToDuration, formatDuration } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 export default function TenantTimeTrackingPage() {
   const params = useParams();
@@ -28,9 +30,26 @@ export default function TenantTimeTrackingPage() {
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
+  // Timer State
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerPaused, setTimerPaused] = useState(false);
+  const [startTimeEpoch, setStartTimeEpoch] = useState<number | null>(null);
+  const [accumulatedElapsedTime, setAccumulatedElapsedTime] = useState(0); // in seconds
+  const [displayTime, setDisplayTime] = useState("00:00:00");
+  const [timerIntervalId, setTimerIntervalId] = useState<NodeJS.Timeout | null>(null);
+
+  // Timer Context State
+  const [timerContactId, setTimerContactId] = useState<string | null>(null);
+  const [timerProjectId, setTimerProjectId] = useState<string | null>(null);
+  const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
+  const [timerDescription, setTimerDescription] = useState("");
+
   useEffect(() => {
     setClientLoaded(true);
-  }, []);
+    return () => { // Cleanup interval on component unmount
+      if (timerIntervalId) clearInterval(timerIntervalId);
+    };
+  }, [timerIntervalId]);
 
   const { data: timeEntries, isLoading: isLoadingEntries, error: entriesError } = useGetTimeEntries(tenantId);
   const { data: contacts, isLoading: isLoadingContacts } = useGetContacts(tenantId);
@@ -40,12 +59,103 @@ export default function TenantTimeTrackingPage() {
   const updateEntryMutation = useUpdateTimeEntry(tenantId);
   const deleteEntryMutation = useDeleteTimeEntry(tenantId);
 
+  const formatTimerDisplay = useCallback((totalSeconds: number) => {
+    const duration = intervalToDuration({ start: 0, end: totalSeconds * 1000 });
+    return formatDuration(duration, { format: ['hours', 'minutes', 'seconds'], zero: true, locale: de, delimiter: ':' })
+      .split(' ')
+      .map(part => part.padStart(2, '0'))
+      .join(':');
+  }, []);
+
+  useEffect(() => {
+    if (timerActive && !timerPaused && startTimeEpoch) {
+      const interval = setInterval(() => {
+        const currentElapsed = (Date.now() - startTimeEpoch) / 1000;
+        setDisplayTime(formatTimerDisplay(accumulatedElapsedTime + currentElapsed));
+      }, 1000);
+      setTimerIntervalId(interval);
+      return () => clearInterval(interval);
+    } else if (timerIntervalId) {
+      clearInterval(timerIntervalId);
+      setTimerIntervalId(null);
+      // Ensure displayTime reflects accumulatedTime when paused or stopped
+      setDisplayTime(formatTimerDisplay(accumulatedElapsedTime));
+    }
+  }, [timerActive, timerPaused, startTimeEpoch, accumulatedElapsedTime, formatTimerDisplay]);
+
+
+  const handleStartTimer = () => {
+    if (!timerActive) { // Start new or resume from completely stopped state
+      setStartTimeEpoch(Date.now());
+      // accumulatedElapsedTime is already 0 if new, or preserved if resuming from a previous stop that wasn't saved
+      setTimerActive(true);
+      setTimerPaused(false);
+    } else if (timerPaused) { // Resume from paused state
+      setStartTimeEpoch(Date.now()); // Reset start time for current segment
+      setTimerPaused(false);
+    }
+  };
+
+  const handlePauseTimer = () => {
+    if (timerActive && !timerPaused && startTimeEpoch) {
+      const currentSegmentElapsed = (Date.now() - startTimeEpoch) / 1000;
+      setAccumulatedElapsedTime(prev => prev + currentSegmentElapsed);
+      setTimerPaused(true);
+      setStartTimeEpoch(null); 
+    }
+  };
+
+  const handleStopAndSaveTimer = () => {
+    let finalElapsedTime = accumulatedElapsedTime;
+    if (timerActive && !timerPaused && startTimeEpoch) { // If timer was running
+      finalElapsedTime += (Date.now() - startTimeEpoch) / 1000;
+    }
+
+    if (finalElapsedTime > 0) {
+      const hoursToSave = finalElapsedTime / 3600;
+      const initialFormData: Partial<TimeEntryFormValues> = {
+        date: new Date(),
+        hours: parseFloat(hoursToSave.toFixed(2)), // Round to 2 decimal places
+        description: timerDescription,
+        contactId: timerContactId,
+        projectId: timerProjectId,
+        taskId: timerTaskId,
+        isBillable: true, // Default to billable
+      };
+      // Pre-fill rate from contact if selected
+      if (timerContactId && contacts) {
+        const contact = contacts.find(c => c.id === timerContactId);
+        if (contact?.hourlyRate) {
+          initialFormData.rate = contact.hourlyRate;
+        }
+      }
+
+      setSelectedEntry(initialFormData as TimeEntry); // Cast for form, actual save handles NewTimeEntryPayload
+      setIsModalOpen(true);
+    } else {
+        toast({title: "Info", description: "Keine Zeit erfasst zum Speichern.", variant: "default"});
+    }
+
+    // Reset timer state
+    setTimerActive(false);
+    setTimerPaused(false);
+    setStartTimeEpoch(null);
+    setAccumulatedElapsedTime(0);
+    setDisplayTime("00:00:00");
+    setTimerDescription("");
+    // Optionally reset context selectors, or leave them for next timer
+    // setTimerContactId(null);
+    // setTimerProjectId(null);
+    // setTimerTaskId(null);
+  };
+
+
   const handleAddOrUpdateEntry = async (values: NewTimeEntryPayload) => {
     try {
-      if (selectedEntry) {
+      if (selectedEntry && selectedEntry.id) { // If it's an existing entry being edited
         await updateEntryMutation.mutateAsync({ entryId: selectedEntry.id, data: values });
         toast({ title: "Erfolg", description: "Zeiteintrag erfolgreich aktualisiert." });
-      } else {
+      } else { // New entry (either manual or from timer)
         await addEntryMutation.mutateAsync(values);
         toast({ title: "Erfolg", description: "Zeiteintrag erfolgreich erstellt." });
       }
@@ -53,7 +163,7 @@ export default function TenantTimeTrackingPage() {
       setSelectedEntry(null);
     } catch (e) {
       const error = e as Error;
-      toast({ title: "Fehler", description: `Zeiteintrag konnte nicht ${selectedEntry ? 'aktualisiert' : 'erstellt'} werden: ${error.message}`, variant: "destructive" });
+      toast({ title: "Fehler", description: `Zeiteintrag konnte nicht ${selectedEntry?.id ? 'aktualisiert' : 'erstellt'} werden: ${error.message}`, variant: "destructive" });
     }
   };
 
@@ -98,6 +208,16 @@ export default function TenantTimeTrackingPage() {
     return "-";
   };
 
+  const projectOptionsForTimer: { value: string; label: string; tasks: ProjectTask[] }[] = useMemo(() =>
+    projects?.map(p => ({ value: p.id, label: p.name, tasks: p.tasks || [] })) || [],
+  [projects]);
+
+  const taskOptionsForTimer: { value: string; label: string }[] = useMemo(() => {
+    if (!timerProjectId || !projectOptionsForTimer) return [];
+    const selectedProject = projectOptionsForTimer.find(p => p.value === timerProjectId);
+    return selectedProject?.tasks.filter(t => t.status !== 'Completed').map(t => ({ value: t.id, label: t.name })) || [];
+  }, [timerProjectId, projectOptionsForTimer]);
+
 
   const isLoading = (isLoadingEntries || isLoadingContacts || isLoadingProjects) && !clientLoaded;
 
@@ -132,41 +252,80 @@ export default function TenantTimeTrackingPage() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{selectedEntry ? "Zeiteintrag bearbeiten" : "Neuen Zeiteintrag erstellen"}</DialogTitle>
+                <DialogTitle>{selectedEntry?.id ? "Zeiteintrag bearbeiten" : "Neuen Zeiteintrag erstellen"}</DialogTitle>
               </DialogHeader>
               <TimeEntryForm
                 tenantId={tenantId}
                 onSubmit={handleAddOrUpdateEntry}
-                initialData={selectedEntry}
+                initialData={selectedEntry} // This can be a partial TimeEntry for timer saves
                 isSubmitting={addEntryMutation.isPending || updateEntryMutation.isPending}
               />
             </DialogContent>
           </Dialog>
       </div>
       
-      {/* Placeholder for Timer Functionality */}
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="text-xl">Live Zeiterfassung (Timer)</CardTitle>
             <CardDescription>Starten und stoppen Sie einen Timer für die automatische Zeiterfassung.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center sm:flex-row sm:justify-around gap-4 p-6">
-            <div className="text-center">
-                <p className="text-4xl font-bold text-primary">00:00:00</p>
-                <p className="text-sm text-muted-foreground">Aktuelle Zeit</p>
+        <CardContent className="space-y-4 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-1">
+                    <label htmlFor="timer-contact" className="text-sm font-medium">Kontakt (optional)</label>
+                    <Select value={timerContactId || undefined} onValueChange={(value) => setTimerContactId(value === "none" ? null : value)} disabled={timerActive}>
+                        <SelectTrigger id="timer-contact"><SelectValue placeholder="Kontakt wählen..." /></SelectTrigger>
+                        <SelectContent>
+                             <SelectItem value="none">(Kein Kontakt)</SelectItem>
+                            {contacts?.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName || `${c.firstName} ${c.name}`}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1">
+                    <label htmlFor="timer-project" className="text-sm font-medium">Projekt (optional)</label>
+                     <Select value={timerProjectId || undefined} onValueChange={(value) => { setTimerProjectId(value === "none" ? null : value); setTimerTaskId(null);}} disabled={timerActive}>
+                        <SelectTrigger id="timer-project"><SelectValue placeholder="Projekt wählen..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">(Kein Projekt)</SelectItem>
+                            {projectOptionsForTimer.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="space-y-1">
+                    <label htmlFor="timer-task" className="text-sm font-medium">Aufgabe (optional)</label>
+                     <Select value={timerTaskId || undefined} onValueChange={(value) => setTimerTaskId(value === "none" ? null : value)} disabled={timerActive || !timerProjectId || taskOptionsForTimer.length === 0}>
+                        <SelectTrigger id="timer-task"><SelectValue placeholder="Aufgabe wählen..." /></SelectTrigger>
+                        <SelectContent>
+                             <SelectItem value="none">(Keine Aufgabe)</SelectItem>
+                            {taskOptionsForTimer.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
-            <div className="flex gap-2">
-                <Button variant="outline" size="lg" className="bg-green-500 hover:bg-green-600 text-white" disabled>
-                    <PlayCircle className="mr-2 h-5 w-5" /> Starten
-                </Button>
-                <Button variant="outline" size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-white" disabled>
-                    <PauseCircle className="mr-2 h-5 w-5" /> Pausieren
-                </Button>
-                 <Button variant="destructive" size="lg" disabled>
-                    <StopCircle className="mr-2 h-5 w-5" /> Stoppen & Speichern
-                </Button>
+             <div className="space-y-1">
+                <label htmlFor="timer-description" className="text-sm font-medium">Notiz für Timer (optional)</label>
+                <Input id="timer-description" value={timerDescription} onChange={(e) => setTimerDescription(e.target.value)} placeholder="Kurze Notiz..." disabled={timerActive && !timerPaused} />
             </div>
-             <p className="text-xs text-muted-foreground text-center sm:text-left w-full sm:w-auto mt-4 sm:mt-0">Timer-Funktionalität ist demnächst verfügbar.</p>
+
+            <div className="flex flex-col items-center sm:flex-row sm:justify-around gap-4 pt-4 border-t">
+                <div className="text-center">
+                    <p className="text-4xl font-bold text-primary">{displayTime}</p>
+                </div>
+                <div className="flex gap-2">
+                    {!timerActive || timerPaused ? (
+                        <Button variant="outline" size="lg" className="bg-green-500 hover:bg-green-600 text-white" onClick={handleStartTimer} disabled={timerActive && !timerPaused}>
+                            <PlayCircle className="mr-2 h-5 w-5" /> Starten
+                        </Button>
+                    ) : (
+                        <Button variant="outline" size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-white" onClick={handlePauseTimer} disabled={!timerActive || timerPaused}>
+                            <PauseCircle className="mr-2 h-5 w-5" /> Pausieren
+                        </Button>
+                    )}
+                    <Button variant="destructive" size="lg" onClick={handleStopAndSaveTimer} disabled={!timerActive && accumulatedElapsedTime === 0}>
+                        <StopCircle className="mr-2 h-5 w-5" /> Stoppen & Speichern
+                    </Button>
+                </div>
+            </div>
         </CardContent>
       </Card>
 
@@ -248,3 +407,4 @@ export default function TenantTimeTrackingPage() {
     </div>
   );
 }
+
