@@ -89,7 +89,7 @@ export default function AllTasksPage() {
   useEffect(() => setClientLoaded(true), []);
 
   // Fetch all projects for the tenant, regardless of status, to get all tasks
-  const { data: projects, isLoading: isLoadingProjects, error: projectsError } = useGetProjects(tenantId);
+  const { data: projects, isLoading: isLoadingProjects, error: projectsError } = useGetProjects(tenantId, undefined);
 
   const allTasks = useMemo(() => {
     if (!projects) return [];
@@ -269,16 +269,10 @@ export default function AllTasksPage() {
       </div>
        <Card className="shadow-lg mt-8">
         <CardHeader>
-            <CardTitle>Hinweis</CardTitle>
+            <CardTitle>Aufgabenübersicht Details</CardTitle>
         </CardHeader>
         <CardContent>
             <p className="text-muted-foreground">Dies ist eine globale Aufgabenübersicht aller nicht erledigten Aufgaben. Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.</p>
-            <img 
-              src="https://picsum.photos/seed/allTasksView/1200/300" 
-              data-ai-hint="task board project"
-              alt="Symbolbild Aufgabenmanagement" 
-              className="mt-4 rounded-lg shadow-md w-full object-cover h-48"
-            />
         </CardContent>
       </Card>
     </div>
