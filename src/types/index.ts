@@ -211,17 +211,17 @@ export const BudgetEntryTypeLabels: Record<BudgetEntryType, string> = {
 
 export type BudgetRecurrence = 
   | "None" 
-  | "Weekly" // Added Weekly
+  | "Weekly"
   | "Monthly" 
-  | "Bimonthly" // Alle zwei Monate
-  | "Quarterly" // Drei Monate / Quartalsweise
-  | "EveryFourMonths" // Alle vier Monate
-  | "Semiannually" // Halbjährlich
-  | "Yearly"; // Jährlich
+  | "Bimonthly" 
+  | "Quarterly" 
+  | "EveryFourMonths"
+  | "Semiannually" 
+  | "Yearly"; 
 
 export const budgetRecurrenceLabels: Record<BudgetRecurrence, string> = {
   None: "Einmalig / Keine",
-  Weekly: "Wöchentlich", // Added Weekly label
+  Weekly: "Wöchentlich",
   Monthly: "Monatlich",
   Bimonthly: "Alle zwei Monate",
   Quarterly: "Quartalsweise (alle 3 Monate)",
@@ -252,7 +252,7 @@ export interface BudgetEntry {
   counterAccountNumber?: string; 
   counterAccountName?: string;   
   description: string;
-  amountActual: number; // Standard amount
+  amountActual: number; 
   amountBestCase?: number | null; 
   amountWorstCase?: number | null; 
   type: BudgetEntryType; 
@@ -264,12 +264,11 @@ export interface BudgetEntry {
   updatedAt: string;
 }
 
-// For form handling of BudgetEntry
 export type BudgetEntryFormValues = {
   description: string;
   accountId: string; 
   counterAccountId?: string; 
-  amountActual: number; // Standard
+  amountActual: number; 
   amountBestCase?: number | null;
   amountWorstCase?: number | null;
   type: BudgetEntryType;
@@ -281,20 +280,19 @@ export type BudgetEntryFormValues = {
 
 export type NewBudgetEntryPayload = Omit<BudgetEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
-// --- Budget Reporting Types ---
 export interface BudgetReportAccountEntry {
   accountId: string;
   accountNumber: string;
   accountName: string;
-  mainType: AccountGroup['mainType']; // From CoA
-  actualAmount: number; // Derived from entry.amountActual
-  bestCaseAmount: number; // Derived from entry.amountBestCase or entry.amountActual
-  worstCaseAmount: number; // Derived from entry.amountWorstCase or entry.amountActual
+  mainType: AccountGroup['mainType']; 
+  actualAmount: number; 
+  bestCaseAmount: number; 
+  worstCaseAmount: number; 
 }
 
 export interface BudgetReportChartDataItem {
   periodLabel: string;
-  sortKey: string; // Added for reliable sorting, e.g., "2024-01"
+  sortKey: string; 
   periodActualBudgetProfitLoss: number;
   periodBestCaseBudgetProfitLoss: number;
   periodWorstCaseBudgetProfitLoss: number;
@@ -305,17 +303,14 @@ export interface BudgetReportData {
   chartData: BudgetReportChartDataItem[];
 }
 
-// Combined data structure for the budget report chart in the page component
 export interface CombinedBudgetReportChartItem {
   periodLabel: string;
-  actualJournalRevenue?: number; // For bars - Periodical Actual Revenue from Journal
-  actualJournalExpense?: number; // For bars (positive value) - Periodical Actual Expense from Journal
-  
-  // Lines for CUMULATIVE P/L
-  cumulativeActualJournalProfitLoss: number; // From Journal
-  cumulativeActualBudgetProfitLoss: number;  // From Budget Entry amountActual
-  cumulativeBestCaseBudgetProfitLoss: number;// From Budget Entry amountBestCase (or amountActual)
-  cumulativeWorstCaseBudgetProfitLoss: number;// From Budget Entry amountWorstCase (or amountActual)
+  actualJournalRevenue?: number; 
+  actualJournalExpense?: number; 
+  cumulativeActualJournalProfitLoss: number; 
+  cumulativeActualBudgetProfitLoss: number; 
+  cumulativeBestCaseBudgetProfitLoss: number;
+  cumulativeWorstCaseBudgetProfitLoss: number;
 }
 
 // --- Contact Management Types ---
@@ -332,14 +327,14 @@ export interface Contact {
   name: string;
   firstName?: string;
   companyName?: string;
-  address: Address; // Changed to non-optional
+  address: Address; 
   phone?: string;
   email?: string;
   segmentIds?: string[];
-  hourlyRate?: number | null; // Changed to allow null for Firestore
-  isClient: boolean; // Changed to non-optional
-  isSupplier: boolean; // Changed to non-optional
-  isPartner: boolean; // Changed to non-optional
+  hourlyRate?: number | null; 
+  isClient: boolean; 
+  isSupplier: boolean; 
+  isPartner: boolean; 
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -359,27 +354,21 @@ export type NewSegmentPayload = Omit<Segment, 'id' | 'createdAt' | 'updatedAt' |
 
 
 // --- Project Management Types ---
+export type ProjectStatus = 'Active' | 'Archived' | 'Completed' | 'OnHold' | 'Cancelled';
+export const projectStatusLabels: Record<ProjectStatus, string> = {
+  Active: "Aktiv",
+  Archived: "Archiviert",
+  Completed: "Abgeschlossen",
+  OnHold: "Angehalten",
+  Cancelled: "Abgebrochen"
+};
+
 export interface Milestone {
   id: string;
   name: string;
-  dueDate?: string; // ISO Date string
-  completed: boolean;
-}
-
-export interface TaskStatusDefinition {
-  id: string;
-  name: string; // e.g., "Offen", "In Arbeit", "Erledigt"
-  order: number;
-}
-
-export interface ProjectTask {
-  id: string;
-  name: string;
   description?: string;
-  assigneeId?: string; // TenantUser ID
-  statusId: string; // TaskStatusDefinition ID
-  dueDate?: string; // ISO Date string
-  estimatedHours?: number;
+  dueDate?: string | null; // ISO Date string
+  completed: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -389,30 +378,63 @@ export interface Project {
   tenantId: string;
   name: string;
   description?: string;
-  contactId?: string; // Contact ID (client)
-  startDate?: string; // ISO Date string
-  endDate?: string; // ISO Date string
-  milestones?: Milestone[];
-  tasks?: ProjectTask[];
-  statusDefinitions?: TaskStatusDefinition[]; // Tenant-specific or project-specific task statuses
+  contactId?: string | null; 
+  contactName?: string | null; 
+  startDate?: string | null; 
+  endDate?: string | null; 
+  status: ProjectStatus;
+  milestones: Milestone[];
   createdAt: string;
   updatedAt: string;
 }
+
+export type NewProjectPayload = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'milestones' | 'contactName'> & {
+  milestones?: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>[]; 
+};
+export type ProjectFormValues = Omit<Project, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'milestones' | 'contactName'> & {
+  startDate?: Date | null;
+  endDate?: Date | null;
+};
+
+export type NewMilestonePayload = Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>;
+export type MilestoneFormValues = Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'> & {
+  dueDate?: Date | null;
+};
+
+
+export interface TaskStatusDefinition {
+  id: string;
+  name: string; 
+  order: number;
+}
+
+export interface ProjectTask {
+  id: string;
+  name: string;
+  description?: string;
+  assigneeId?: string; 
+  statusId: string; 
+  dueDate?: string; 
+  estimatedHours?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 // --- Time Tracking Types ---
 export interface TimeEntry {
   id: string;
   tenantId: string;
-  userId: string; // TenantUser ID who tracked the time
-  contactId?: string; // Optional: if time is directly for a contact
-  projectId?: string; // Optional: if time is for a project
-  taskId?: string; // Optional: if time is for a specific task
-  date: string; // ISO Date string
+  userId: string; 
+  contactId?: string; 
+  projectId?: string; 
+  taskId?: string; 
+  date: string; 
   hours: number;
   description?: string;
-  rate?: number; // Hourly rate for this specific entry (can override project/contact default)
+  rate?: number; 
   isBillable: boolean;
-  invoicedId?: string; // If this time entry has been invoiced
+  invoicedId?: string; 
   createdAt: string;
   updatedAt: string;
 }
@@ -425,9 +447,9 @@ export interface Product {
   name: string;
   description?: string;
   unitPrice: number;
-  taxRateId?: string; // Reference to a TaxRate ID defined in Tenant settings
-  unit?: string; // e.g., "Stk.", "Std.", "kg"
-  stock?: number; // Optional: for basic stock tracking
+  taxRateId?: string; 
+  unit?: string; 
+  stock?: number; 
   createdAt: string;
   updatedAt: string;
 }
@@ -438,24 +460,24 @@ export interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
-  taxRate?: number; // e.g., 7.7 (percent)
-  total: number; // quantity * unitPrice * (1 + taxRate/100)
-  productId?: string; // Optional: if the line item comes from a product
-  timeEntryId?: string; // Optional: if the line item comes from a time entry
+  taxRate?: number; 
+  total: number; 
+  productId?: string; 
+  timeEntryId?: string; 
 }
 
 export interface Invoice {
   id: string;
   tenantId: string;
-  invoiceNumber: string; // Generated or manually entered
-  contactId: string; // Client
-  projectId?: string; // Optional: if related to a specific project
-  date: string; // ISO Date string
-  dueDate: string; // ISO Date string
+  invoiceNumber: string; 
+  contactId: string; 
+  projectId?: string; 
+  date: string; 
+  dueDate: string; 
   lines: InvoiceLine[];
-  subTotal: number; // Sum of line totals before tax
-  taxAmount: number; // Total tax amount
-  totalAmount: number; // subTotal + taxAmount
+  subTotal: number; 
+  taxAmount: number; 
+  totalAmount: number; 
   notes?: string;
   status: 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
   paymentDetails?: string;

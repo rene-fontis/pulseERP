@@ -95,7 +95,7 @@ export default function TenantDashboardPage() {
     {
       title: "Kundenrechnungen",
       description: "Rechnungen erstellen und versenden.",
-      icon: Receipt, // Changed from FileText to Receipt for better distinction
+      icon: Receipt, 
       href: `/tenants/${tenantId}/invoicing` 
     },
   ];
@@ -109,7 +109,7 @@ export default function TenantDashboardPage() {
           <Skeleton className="h-6 w-3/4" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(features.length)].map((_, i) => ( // Use features.length for skeleton count
+          {[...Array(features.length)].map((_, i) => ( 
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center">
