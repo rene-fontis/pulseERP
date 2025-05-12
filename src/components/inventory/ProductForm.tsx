@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect } from "react";
@@ -109,13 +108,13 @@ export function ProductForm({
         if (def.type === 'boolean') {
           defaultCustomFields[def.name] = false;
         } else if (def.type === 'number') {
-          defaultCustomFields[def.name] = null; // Or some other sensible default for number
+          defaultCustomFields[def.name] = null; 
         } else {
           defaultCustomFields[def.name] = '';
         }
       });
       form.reset({
-        ...form.getValues(), // Keep existing default values
+        ...form.getValues(), 
         customFields: defaultCustomFields,
       });
     }
@@ -147,7 +146,54 @@ export function ProductForm({
   };
   
   const renderCustomField = (definition: CustomProductFieldDefinition) => {
-    const fieldName = `customFields.${definition.name}` as const; // Type assertion for field path
+    const fieldName = `customFields.${definition.name}` as const;
+
+    const renderActualInput = (field: any) => { // field from Controller render prop
+        if (definition.type === 'text') {
+            return <Input placeholder={definition.label} {...field} value={field.value || ''} />;
+        }
+        if (definition.type === 'textarea') {
+            return <Textarea placeholder={definition.label} {...field} value={field.value || ''} />;
+        }
+        if (definition.type === 'number') {
+            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />;
+        }
+        if (definition.type === 'boolean') {
+            return (
+            <div className="flex items-center space-x-2 pt-2">
+                <Checkbox id={fieldName} checked={field.value || false} onCheckedChange={field.onChange} />
+                <label htmlFor={fieldName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {definition.label}
+                </label>
+            </div>
+            );
+        }
+        if (definition.type === 'date') {
+            return (
+            <Popover>
+                <PopoverTrigger asChild>
+                <Button
+                    variant={"outline"}
+                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {field.value ? format(parseISO(field.value), "PPP", { locale: de }) : <span>Datum wählen</span>}
+                </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                <Calendar
+                    mode="single"
+                    selected={field.value ? parseISO(field.value) : undefined}
+                    onSelect={(date) => field.onChange(date ? date.toISOString() : null)}
+                    initialFocus
+                    locale={de}
+                />
+                </PopoverContent>
+            </Popover>
+            );
+        }
+        return null; // Fallback for unknown type
+    };
     
     return (
       <FormField
@@ -158,39 +204,7 @@ export function ProductForm({
           <FormItem>
             <FormLabel>{definition.label}{definition.isRequired && "*"}</FormLabel>
             <FormControl>
-              {definition.type === 'text' && <Input placeholder={definition.label} {...field} value={field.value || ''} />}
-              {definition.type === 'textarea' && <Textarea placeholder={definition.label} {...field} value={field.value || ''} />}
-              {definition.type === 'number' && <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />}
-              {definition.type === 'boolean' && (
-                <div className="flex items-center space-x-2 pt-2">
-                   <Checkbox id={fieldName} checked={field.value || false} onCheckedChange={field.onChange} />
-                   <label htmlFor={fieldName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    {definition.label}
-                   </label>
-                </div>
-              )}
-              {definition.type === 'date' && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(parseISO(field.value), "PPP", { locale: de }) : <span>Datum wählen</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ? parseISO(field.value) : undefined}
-                      onSelect={(date) => field.onChange(date ? date.toISOString() : null)}
-                      initialFocus
-                      locale={de}
-                    />
-                  </PopoverContent>
-                </Popover>
-              )}
+              {renderActualInput(field)}
             </FormControl>
             {definition.inputMask && (definition.type === 'text' || definition.type === 'number') && (
                 <FormDescription className="text-xs">Format: {definition.inputMask}</FormDescription>
@@ -384,3 +398,4 @@ export function ProductForm({
     </Form>
   );
 }
+
