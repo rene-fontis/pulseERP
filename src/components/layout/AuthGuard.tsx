@@ -6,6 +6,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { Header } from '@/components/layout/Header';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 const PUBLIC_PATHS = ['/auth/login', '/auth/register'];
 
@@ -34,16 +37,38 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  // If user is null and we are on a public path, or if user exists and we are NOT on an auth path, render children.
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
-  if ((!user && isPublicPath) || (user && !isPublicPath)) {
+
+  // User is not authenticated AND is on a public auth page (login/register)
+  if (!user && isPublicPath) {
+    // Render only the children (the auth page itself, e.g., Login form)
     return <>{children}</>;
   }
-  
-  // Otherwise, a redirect is likely pending, show loader to prevent content flash
-   return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
+
+  // User is authenticated AND on a protected page (not a public auth path)
+  if (user && !isPublicPath) {
+    // Render the full application layout
+    return (
+      <SidebarProvider defaultOpen={true}>
+        <div className="flex flex-col min-h-screen">
+          <Header />
+          <div className="flex flex-1">
+            <AppSidebar />
+            <main className="flex-1 p-4 lg:p-6 bg-background overflow-auto">
+              {children}
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
     );
+  }
+  
+  // Fallback / intermediate state (e.g., user logged in but on /auth/login, redirecting)
+  // Or user not logged in and on protected path, redirecting
+  // Show a loader to prevent flashing content and ensure layout consistency during transition
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    </div>
+  );
 }
