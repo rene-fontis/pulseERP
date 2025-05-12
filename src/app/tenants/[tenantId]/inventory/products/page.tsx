@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescRadix, AlertDialogFooter, AlertDialogHeader as AlertDialogHeaderRadix, AlertDialogTitle as AlertDialogTitleRadix } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProductCategoryForm, type ProductCategoryFormValues } from '@/components/inventory/ProductCategoryForm';
 import { ProductForm, type ProductFormValues as ProductFormVals } from '@/components/inventory/ProductForm'; // Renamed import to avoid conflict
 import { useGetProductCategories, useAddProductCategory, useUpdateProductCategory, useDeleteProductCategory } from '@/hooks/useProductCategories';
@@ -188,7 +189,7 @@ export default function ProductManagementPage() {
                     <AlertDialog>
                       <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5"/></Button></AlertDialogTrigger>
                       <AlertDialogContent>
-                        <AlertDialogHeaderRadix><AlertDialogTitleRadix>Kategorie "{cat.name}" löschen?</AlertDialogTitleRadix><AlertDialogDescRadix>Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescRadix></AlertDialogHeaderRadix>
+                        <AlertDialogHeader><AlertDialogTitle>Kategorie "{cat.name}" löschen?</AlertDialogTitle><AlertDialogDescription>Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescription></AlertDialogHeader>
                         <AlertDialogFooter><AlertDialogCancel>Abbrechen</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCategory(cat.id)} className="bg-destructive hover:bg-destructive/90">Löschen</AlertDialogAction></AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -233,7 +234,7 @@ export default function ProductManagementPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="destructive" size="icon" title="Produkt löschen"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeaderRadix><AlertDialogTitleRadix>Produkt "{prod.name}" löschen?</AlertDialogTitleRadix><AlertDialogDescRadix>Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescRadix></AlertDialogHeaderRadix>
+                            <AlertDialogHeader><AlertDialogTitle>Produkt "{prod.name}" löschen?</AlertDialogTitle><AlertDialogDescription>Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescription></AlertDialogHeader>
                             <AlertDialogFooter><AlertDialogCancel>Abbrechen</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteProduct(prod.id)} className="bg-destructive hover:bg-destructive/90">Löschen</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
