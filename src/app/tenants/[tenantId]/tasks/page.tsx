@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -102,15 +101,17 @@ export default function AllTasksPage() {
         milestoneMap.set(milestone.id, milestone.name);
       });
 
-      (project.tasks || []).forEach(task => {
-        taskList.push({
-          ...task,
-          projectId: project.id,
-          projectName: project.name,
-          tenantId: project.tenantId,
-          milestoneName: task.milestoneId ? milestoneMap.get(task.milestoneId) : undefined,
+      (project.tasks || [])
+        .filter(task => task.status !== 'Completed') // Filter out completed tasks
+        .forEach(task => {
+          taskList.push({
+            ...task,
+            projectId: project.id,
+            projectName: project.name,
+            tenantId: project.tenantId,
+            milestoneName: task.milestoneId ? milestoneMap.get(task.milestoneId) : undefined,
+          });
         });
-      });
     });
     return taskList;
   }, [projects]);
@@ -124,8 +125,7 @@ export default function AllTasksPage() {
     const noDueDate: EnrichedTask[] = [];
 
     allTasks.forEach(task => {
-      if (task.status === 'Completed') return;
-
+      // No need to check for 'Completed' status here as 'allTasks' is already filtered
       if (!task.dueDate) {
         noDueDate.push(task);
       } else {
@@ -206,7 +206,7 @@ export default function AllTasksPage() {
         </div>
         <Card>
           <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Für diesen Mandanten wurden keine Aufgaben in den Projekten gefunden oder alle Aufgaben sind bereits erledigt.</p>
+            <p className="text-muted-foreground">Für diesen Mandanten wurden keine offenen Aufgaben in den Projekten gefunden.</p>
             <p className="text-sm text-muted-foreground mt-2">
               Sie können Aufgaben in der <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projektverwaltung</Link> erstellen.
             </p>
@@ -220,7 +220,7 @@ export default function AllTasksPage() {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       <div className="flex items-center">
         <ClipboardList className="h-8 w-8 mr-3 text-primary" />
-        <h1 className="text-3xl font-bold">Aufgabenübersicht</h1>
+        <h1 className="text-3xl font-bold">Aufgabenübersicht (Offene Aufgaben)</h1>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -271,7 +271,7 @@ export default function AllTasksPage() {
             <CardTitle>Hinweis</CardTitle>
         </CardHeader>
         <CardContent>
-            <p className="text-muted-foreground">Dies ist eine globale Aufgabenübersicht. Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.</p>
+            <p className="text-muted-foreground">Dies ist eine globale Aufgabenübersicht aller nicht erledigten Aufgaben. Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.</p>
             <img 
               src="https://picsum.photos/seed/allTasksView/1200/300" 
               data-ai-hint="task board project"
@@ -283,4 +283,3 @@ export default function AllTasksPage() {
     </div>
   );
 }
-
