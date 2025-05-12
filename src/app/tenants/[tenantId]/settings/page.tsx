@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight, CalendarDays, PackagePlus } from 'lucide-react'; // Added PackagePlus
+import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight, CalendarDays, PackagePlus, Tag } from 'lucide-react'; // Added Tag
 import { useGetTenantById } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -50,6 +49,8 @@ export default function TenantSettingsOverviewPage() {
         <Skeleton className="h-12 w-1/2" />
         <Skeleton className="h-8 w-3/4 mb-6" />
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
           <Skeleton className="h-40 w-full rounded-lg" />
           <Skeleton className="h-40 w-full rounded-lg" />
           <Skeleton className="h-40 w-full rounded-lg" />
@@ -106,8 +107,14 @@ export default function TenantSettingsOverviewPage() {
     {
       title: "Produktfelder",
       description: "Benutzerdefinierte Felder für Produkte definieren.",
-      icon: PackagePlus, // Icon for inventory/product related settings
+      icon: PackagePlus,
       href: `/tenants/${tenantId}/settings/inventory`
+    },
+    {
+      title: "Produktkategorien",
+      description: "Produktkategorien und deren Hierarchie verwalten.",
+      icon: Tag,
+      href: `/tenants/${tenantId}/settings/product-categories`
     }
   ];
 
@@ -128,5 +135,3 @@ export default function TenantSettingsOverviewPage() {
     </div>
   );
 }
-
-    

@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus, Warehouse as WarehouseIcon } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus, Warehouse as WarehouseIcon, Tag } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -76,7 +75,7 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled={true} // Disabled as per previous request
+            disabled={true} 
         >
             <Link href="/admin/import">
                 <Users /> 
@@ -192,8 +191,8 @@ export function AppSidebar() {
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.endsWith('/reports')) }>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets</Link>
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/[budgetId]/entries`) }>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
@@ -354,6 +353,11 @@ export function AppSidebar() {
                                 <SidebarMenuSubItem>
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/inventory`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/inventory`}><PackagePlus className="mr-1 h-3.5 w-3.5"/>Produktfelder</Link>
+                                </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                 <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/product-categories`}>
+                                    <Link href={`/tenants/${currentTenantId}/settings/product-categories`}><Tag className="mr-1 h-3.5 w-3.5"/>Produktkategorien</Link>
                                 </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                             </SidebarMenuSub>
@@ -551,5 +555,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
-    
