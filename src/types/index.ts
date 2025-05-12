@@ -391,7 +391,7 @@ export interface ProjectTask {
   milestoneId?: string | null; // Link to a milestone
   status: TaskStatus; 
   dueDate?: string | null; // ISO Date string
-  estimatedHours?: number;
+  estimatedHours?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -408,7 +408,7 @@ export interface Project {
   endDate?: string | null; 
   status: ProjectStatus;
   milestones: Milestone[];
-  tasks: ProjectTask[]; // Added tasks array
+  tasks: ProjectTask[];
   createdAt: string;
   updatedAt: string;
 }
@@ -431,6 +431,7 @@ export type MilestoneFormValues = Omit<Milestone, 'id' | 'createdAt' | 'updatedA
 export type NewTaskPayload = Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'>;
 export type TaskFormValues = Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'> & {
   dueDate?: Date | null;
+  estimatedHours?: number | null;
 };
 
 
@@ -438,19 +439,27 @@ export type TaskFormValues = Omit<ProjectTask, 'id' | 'createdAt' | 'updatedAt'>
 export interface TimeEntry {
   id: string;
   tenantId: string;
-  userId: string; 
-  contactId?: string; 
-  projectId?: string; 
-  taskId?: string; 
-  date: string; 
-  hours: number;
-  description?: string;
-  rate?: number; 
-  isBillable: boolean;
-  invoicedId?: string; 
+  userId: string; // User who logged the time
+  contactId?: string | null; // Optional: Link to a contact
+  projectId?: string | null; // Optional: Link to a project
+  taskId?: string | null; // Optional: Link to a specific task within a project
+  date: string; // ISO string for the date of the time entry
+  hours: number; // Duration in hours (e.g., 1.5 for 1h 30m)
+  description?: string; // Description of the work done
+  rate?: number | null; // Hourly rate for this specific entry (can override default)
+  isBillable: boolean; // Whether this time entry is billable
+  invoicedId?: string | null; // If this entry has been invoiced, link to the invoice
   createdAt: string;
   updatedAt: string;
 }
+
+export type NewTimeEntryPayload = Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt' | 'userId'>; // userId will be set by the backend/service based on logged-in user
+
+export type TimeEntryFormValues = Omit<NewTimeEntryPayload, 'tenantId' | 'date'> & {
+  date: Date; // Use Date object for form, convert to ISO string on submit
+  // Potentially add separate fields for timer if not handled by direct hours input
+};
+
 
 // --- Inventory / Product Management Types ---
 export interface Product {
