@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect } from "react";
@@ -61,7 +60,7 @@ interface ProductFormProps {
 // Helper function to translate custom mask to regex pattern for HTML pattern attribute
 function translateMaskToPattern(mask?: string): string | undefined {
   if (!mask) return undefined;
-  let pattern = ''; // Removed ^ and $ for more flexible partial matching if desired, but for strict format, they are good. Let's keep them for strictness.
+  let pattern = ''; 
   for (const char of mask) {
     switch (char) {
       case '9':
@@ -137,9 +136,10 @@ export function ProductForm({
       customFieldDefinitions.forEach(def => {
         if (def.type === 'boolean') {
           defaultCustomFields[def.name] = false;
-        } else if (def.type === 'number') {
+        } else if (def.type === 'number' && (!def.inputMask || /^[0-9]+$/.test(def.inputMask.replace(/9/g, '')))) {
+          // Only default to null for pure numbers or digit-only masks
           defaultCustomFields[def.name] = null; 
-        } else {
+        } else { // Text, textarea, date, or number with non-digit mask literals
           defaultCustomFields[def.name] = '';
         }
       });
@@ -164,7 +164,7 @@ export function ProductForm({
         const defaultCustomFields: Record<string, any> = {};
         customFieldDefinitions.forEach(def => {
             if (def.type === 'boolean') defaultCustomFields[def.name] = false;
-            else if (def.type === 'number') defaultCustomFields[def.name] = null;
+            else if (def.type === 'number' && (!def.inputMask || /^[0-9]+$/.test(def.inputMask.replace(/9/g, '')))) defaultCustomFields[def.name] = null;
             else defaultCustomFields[def.name] = '';
         });
         form.reset({
@@ -177,53 +177,74 @@ export function ProductForm({
   
   const renderCustomField = (definition: CustomProductFieldDefinition) => {
     const fieldName = `customFields.${definition.name}` as const;
-    const htmlPattern = (definition.type === 'text' || definition.type === 'number') ? translateMaskToPattern(definition.inputMask) : undefined;
+    const htmlPattern = definition.inputMask ? translateMaskToPattern(definition.inputMask) : undefined;
 
-    const renderActualInput = (field: any) => { // field from Controller render prop
-        if (definition.type === 'text') {
-            return <Input placeholder={definition.label} {...field} value={field.value || ''} pattern={htmlPattern} title={htmlPattern ? `Format: ${definition.inputMask}`: undefined} />;
+    const renderActualInput = (field: any) => {
+      const commonProps = {
+        ...field,
+        placeholder: definition.label,
+        title: htmlPattern ? `Format: ${definition.inputMask}` : undefined,
+      };
+
+      if (definition.type === 'text') {
+        return <Input type="text" {...commonProps} value={field.value || ''} pattern={htmlPattern} />;
+      }
+      if (definition.type === 'textarea') {
+        return <Textarea {...commonProps} value={field.value || ''} />;
+      }
+      if (definition.type === 'number') {
+        if (definition.inputMask && /[^0-9]/.test(definition.inputMask.replace(/9/g, ''))) {
+          // Mask contains non-digits (e.g., hyphens for ISBN), render as text input for formatting.
+          // The value will be stored as a string. The pattern attribute handles validation.
+          return <Input type="text" {...commonProps} value={field.value || ''} pattern={htmlPattern} />;
+        } else {
+          // Pure number or number with digit-only mask (or no mask)
+          return (
+            <Input
+              type="number"
+              {...commonProps}
+              value={field.value ?? ''}
+              onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+              pattern={htmlPattern} // Still useful for digit-only masks, e.g., length constraints
+            />
+          );
         }
-        if (definition.type === 'textarea') {
-            return <Textarea placeholder={definition.label} {...field} value={field.value || ''} />;
-        }
-        if (definition.type === 'number') {
-            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} pattern={htmlPattern} title={htmlPattern ? `Format: ${definition.inputMask}`: undefined} />;
-        }
-        if (definition.type === 'boolean') {
-            return (
-            <div className="flex items-center space-x-2 pt-2">
-                <Checkbox id={fieldName} checked={field.value || false} onCheckedChange={field.onChange} />
-                <label htmlFor={fieldName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {definition.label}
-                </label>
-            </div>
-            );
-        }
-        if (definition.type === 'date') {
-            return (
-            <Popover>
-                <PopoverTrigger asChild>
-                <Button
-                    variant={"outline"}
-                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {field.value ? format(parseISO(field.value), "PPP", { locale: de }) : <span>Datum wählen</span>}
-                </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                <Calendar
-                    mode="single"
-                    selected={field.value ? parseISO(field.value) : undefined}
-                    onSelect={(date) => field.onChange(date ? date.toISOString() : null)}
-                    initialFocus
-                    locale={de}
-                />
-                </PopoverContent>
-            </Popover>
-            );
-        }
-        return null; // Fallback for unknown type
+      }
+      if (definition.type === 'boolean') {
+        return (
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox id={fieldName} checked={field.value || false} onCheckedChange={field.onChange} />
+            <label htmlFor={fieldName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              {definition.label}
+            </label>
+          </div>
+        );
+      }
+      if (definition.type === 'date') {
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {field.value ? format(parseISO(field.value), "PPP", { locale: de }) : <span>Datum wählen</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={field.value ? parseISO(field.value) : undefined}
+                onSelect={(date) => field.onChange(date ? date.toISOString() : null)}
+                initialFocus
+                locale={de}
+              />
+            </PopoverContent>
+          </Popover>
+        );
+      }
+      return null;
     };
     
     return (
@@ -238,8 +259,13 @@ export function ProductForm({
               {renderActualInput(field)}
             </FormControl>
             {definition.inputMask && (definition.type === 'text' || definition.type === 'number') && (
-                <FormDescription className="text-xs">Erwartetes Format: {definition.inputMask} (9=Ziffer, a=Buchstabe, *=Alphanumerisch).
-                Die Eingabe wird auf dieses Format beschränkt.
+                <FormDescription className="text-xs">
+                  Erwartetes Format: {definition.inputMask} (9=Ziffer, a=Buchstabe, *=Alphanumerisch).
+                  {definition.type === 'number' && definition.inputMask && /[^0-9]/.test(definition.inputMask.replace(/9/g, ''))
+                    ? " Eingabe als Text erforderlich, um Formatierung zu ermöglichen."
+                    : definition.type === 'number'
+                    ? " Eingabe als Zahl."
+                    : " Bitte beachten Sie das angegebene Format."}
                 </FormDescription>
             )}
             <FormMessage />
@@ -431,4 +457,3 @@ export function ProductForm({
     </Form>
   );
 }
-
