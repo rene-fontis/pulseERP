@@ -4,11 +4,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ClipboardList, CalendarClock, CalendarX, CalendarCheck2, Loader2, Calendar } from 'lucide-react'; // Added Calendar import
+import { AlertCircle, ClipboardList, CalendarClock, CalendarX, CalendarCheck2, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useGetProjects } from '@/hooks/useProjects';
-import type { Project, ProjectTask, TaskStatus } from '@/types';
+import type { Project, ProjectTask, TaskStatus, Milestone } from '@/types';
 import { taskStatusLabels } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, isBefore, isAfter, addDays, startOfDay, isWithinInterval } from 'date-fns';
@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 type EnrichedTask = ProjectTask & {
   projectId: string;
   projectName: string;
-  tenantId: string; // Added tenantId to EnrichedTask
+  tenantId: string;
+  milestoneName?: string;
 };
 
 const formatDate = (dateString?: string | null, relative: boolean = false) => {
@@ -35,9 +36,6 @@ const formatDate = (dateString?: string | null, relative: boolean = false) => {
     return "Ungültiges Datum";
   }
 };
-
-// Initialize projectMilestonesMap globally but populate it within useMemo or useEffect
-let projectMilestonesMap: Record<string, string> = {};
 
 const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
   const getStatusColor = (status: TaskStatus) => {
@@ -72,9 +70,9 @@ const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
         )}>
           Fällig: {formatDate(task.dueDate)}
         </p>
-        {task.milestoneId && projectMilestonesMap[task.milestoneId] && (
+        {task.milestoneId && task.milestoneName && (
           <Badge variant="outline" className="text-xs">
-            Meilenstein: {projectMilestonesMap[task.milestoneId]}
+            Meilenstein: {task.milestoneName}
           </Badge>
         )}
       </div>
@@ -97,22 +95,23 @@ export default function AllTasksPage() {
     if (!projects) return [];
     
     const taskList: EnrichedTask[] = [];
-    const tempMilestoneMap: Record<string, string> = {};
-
+    
     projects.forEach(project => {
+      const milestoneMap = new Map<string, string>();
       project.milestones.forEach(milestone => {
-        tempMilestoneMap[milestone.id] = milestone.name;
+        milestoneMap.set(milestone.id, milestone.name);
       });
+
       (project.tasks || []).forEach(task => {
         taskList.push({
           ...task,
           projectId: project.id,
           projectName: project.name,
-          tenantId: project.tenantId, 
+          tenantId: project.tenantId,
+          milestoneName: task.milestoneId ? milestoneMap.get(task.milestoneId) : undefined,
         });
       });
     });
-    projectMilestonesMap = tempMilestoneMap; // Update global map
     return taskList;
   }, [projects]);
 
@@ -123,7 +122,6 @@ export default function AllTasksPage() {
     const overdue: EnrichedTask[] = [];
     const dueSoon: EnrichedTask[] = [];
     const noDueDate: EnrichedTask[] = [];
-    // const upcoming: EnrichedTask[] = []; // Optional category
 
     allTasks.forEach(task => {
       if (task.status === 'Completed') return;
@@ -137,24 +135,20 @@ export default function AllTasksPage() {
         } else if (isWithinInterval(dueDate, { start: today, end: sevenDaysFromNow })) {
           dueSoon.push(task);
         } 
-        // else {
-        //   upcoming.push(task);
-        // }
       }
     });
     
     const sortTasks = (tasks: EnrichedTask[]) => tasks.sort((a,b) => {
         if (a.dueDate && b.dueDate) return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime();
-        if (a.dueDate) return -1; // Tasks with due dates first
+        if (a.dueDate) return -1; 
         if (b.dueDate) return 1;
-        return a.name.localeCompare(b.name); // Fallback sort by name
+        return a.name.localeCompare(b.name);
     });
 
     return {
       overdue: sortTasks(overdue),
       dueSoon: sortTasks(dueSoon),
       noDueDate: sortTasks(noDueDate),
-      // upcoming: sortTasks(upcoming),
     };
   }, [allTasks]);
 
@@ -199,6 +193,25 @@ export default function AllTasksPage() {
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Keine Projekte gefunden</h2>
         <p>Für diesen Mandanten wurden keine Projekte gefunden, um Aufgaben anzuzeigen.</p>
+      </div>
+    );
+  }
+
+  if (allTasks.length === 0 && !isLoadingProjects && clientLoaded) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
+        <div className="flex items-center">
+          <ClipboardList className="h-8 w-8 mr-3 text-primary" />
+          <h1 className="text-3xl font-bold">Aufgabenübersicht</h1>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">Für diesen Mandanten wurden keine Aufgaben in den Projekten gefunden oder alle Aufgaben sind bereits erledigt.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Sie können Aufgaben in der <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projektverwaltung</Link> erstellen.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
