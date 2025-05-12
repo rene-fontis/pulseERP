@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -13,6 +14,7 @@ import type { ProductCategory, NewProductCategoryPayload } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function ProductCategoriesSettingsPage() {
   const params = useParams();
@@ -123,7 +125,7 @@ export default function ProductCategoriesSettingsPage() {
         </CardHeader>
         <CardContent>
           {isLoadingCategories ? <Skeleton className="h-20 w-full" /> : categories && categories.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="space-y-3"> {/* Changed from grid to space-y for full-width list */}
               {categories.filter(cat => !cat.parentId).map(cat => ( // Display top-level categories
                  <RenderCategoryCard key={cat.id} category={cat} allCategories={categories} onEdit={handleEditCategory} onDelete={handleDeleteCategory} getCategoryName={getCategoryName}/>
               ))}
@@ -147,14 +149,14 @@ interface RenderCategoryCardProps {
 const RenderCategoryCard: React.FC<RenderCategoryCardProps> = ({ category, allCategories, onEdit, onDelete, getCategoryName, level = 0 }) => {
     const subCategories = allCategories.filter(sc => sc.parentId === category.id);
     return (
-        <Card className={`p-3 text-sm ${level > 0 ? 'ml-4 mt-2 border-l-2 pl-3 border-muted' : ''}`}>
+        <Card className={cn("p-3 text-sm", level > 0 ? 'ml-4 mt-2 border-l-2 pl-3 border-muted' : 'border')}>
             <div className="flex justify-between items-start">
                 <div>
                     <h4 className="font-semibold">{category.name}</h4>
                     {category.parentId && <p className="text-xs text-muted-foreground">Übergeordnet: {getCategoryName(category.parentId)}</p>}
-                    <p className="text-xs text-muted-foreground truncate mt-1" title={category.description}>{category.description || "Keine Beschreibung"}</p>
+                    <p className="text-xs text-muted-foreground mt-1" title={category.description}>{category.description || "Keine Beschreibung"}</p>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 flex-shrink-0">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(category)}><Edit className="h-3.5 w-3.5"/></Button>
                     <AlertDialog>
                         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5"/></Button></AlertDialogTrigger>
@@ -166,7 +168,7 @@ const RenderCategoryCard: React.FC<RenderCategoryCardProps> = ({ category, allCa
                 </div>
             </div>
             {subCategories.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-2 space-y-2"> {/* Added space-y for sub-categories */}
                     {subCategories.map(subCat => (
                         <RenderCategoryCard key={subCat.id} category={subCat} allCategories={allCategories} onEdit={onEdit} onDelete={onDelete} getCategoryName={getCategoryName} level={level + 1} />
                     ))}
