@@ -1,4 +1,3 @@
-
 // src/types/index.ts
 
 export interface Tenant {
@@ -89,6 +88,22 @@ export type TenantChartOfAccountsFormValues = Omit<TenantChartOfAccounts, 'id' |
 
 
 // --- User Management Types ---
+
+export interface User {
+  id: string; // Firebase Auth UID
+  email: string;
+  displayName?: string | null; // Firebase Auth can have null displayName
+  photoURL?: string | null; // Firebase Auth can have photoURL
+  createdAt: string; // ISO string from Firestore serverTimestamp or client-side new Date()
+  tenantIds?: string[]; // Array of tenant IDs this user has access to
+  // Add other roles/permissions as needed
+}
+
+// For creating new user documents in Firestore (excluding id, which is UID)
+export type NewUserPayload = Omit<User, 'id' | 'createdAt'> & {
+  createdAt?: any; // For Firestore serverTimestamp or client Date
+};
+
 export enum Module {
   ACCOUNTING_JOURNAL = "ACCOUNTING_JOURNAL",
   ACCOUNTING_REPORTS = "ACCOUNTING_REPORTS",
