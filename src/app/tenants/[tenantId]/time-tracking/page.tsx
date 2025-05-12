@@ -29,7 +29,7 @@ export default function TenantTimeTrackingPage() {
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<Partial<TimeEntry> | null>(null); // Allow partial for timer
+  const [selectedEntry, setSelectedEntry] = useState<Partial<TimeEntry> | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // Timer State
@@ -38,7 +38,7 @@ export default function TenantTimeTrackingPage() {
   const [startTimeEpoch, setStartTimeEpoch] = useState<number | null>(null);
   const [accumulatedElapsedTime, setAccumulatedElapsedTime] = useState(0); // in seconds
   const [displayTime, setDisplayTime] = useState("00:00:00");
-  const [timerIntervalId, setTimerIntervalId] = useState<NodeJS.Timeout | null>(null);
+  // Removed timerIntervalId state as it's managed within useEffect
 
   // Timer Context State
   const [timerContactId, setTimerContactId] = useState<string | null>(null);
@@ -64,10 +64,7 @@ export default function TenantTimeTrackingPage() {
 
   useEffect(() => {
     setClientLoaded(true);
-    return () => {
-      if (timerIntervalId) clearInterval(timerIntervalId);
-    };
-  }, [timerIntervalId]);
+  }, []);
 
 
   // Save to localStorage whenever relevant state changes
@@ -122,8 +119,9 @@ export default function TenantTimeTrackingPage() {
           setTimerPaused(savedState.timerPaused || false);
 
           if (!savedState.timerPaused) {
-            setStartTimeEpoch(Date.now());
+            setStartTimeEpoch(Date.now()); 
           } else {
+            setStartTimeEpoch(null); // Ensure epoch is null if paused
             setDisplayTime(formatTimerDisplay(newAccumulatedTime));
           }
         } else {
@@ -141,30 +139,38 @@ export default function TenantTimeTrackingPage() {
   }, [clientLoaded, formatTimerDisplay]);
 
 
+  // Simplified timer interval useEffect
   useEffect(() => {
+    let intervalId: NodeJS.Timeout | undefined = undefined;
+
     if (timerActive && !timerPaused && startTimeEpoch) {
-      const interval = setInterval(() => {
-        const currentElapsed = (Date.now() - startTimeEpoch) / 1000;
+      intervalId = setInterval(() => {
+        const currentElapsed = (Date.now() - startTimeEpoch!) / 1000;
         setDisplayTime(formatTimerDisplay(accumulatedElapsedTime + currentElapsed));
       }, 1000);
-      setTimerIntervalId(interval);
-      return () => clearInterval(interval);
-    } else if (timerIntervalId) {
-      clearInterval(timerIntervalId);
-      setTimerIntervalId(null);
+    } else {
+      // Timer is not running or paused, update display with accumulated time
       setDisplayTime(formatTimerDisplay(accumulatedElapsedTime));
     }
-  }, [timerActive, timerPaused, startTimeEpoch, accumulatedElapsedTime, formatTimerDisplay, timerIntervalId]);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [timerActive, timerPaused, startTimeEpoch, accumulatedElapsedTime, formatTimerDisplay]);
 
 
   const handleStartTimer = () => {
-    if (!timerActive) {
+    if (!timerActive) { // Starting fresh or from a fully stopped state
+       // setAccumulatedElapsedTime(0); // Reset accumulated time only if explicitly starting a new timer session
       setStartTimeEpoch(Date.now());
       setTimerActive(true);
       setTimerPaused(false);
-    } else if (timerPaused) {
-      setStartTimeEpoch(Date.now());
+    } else if (timerPaused) { // Resuming from pause
+      setStartTimeEpoch(Date.now()); // Set new start time for this segment
       setTimerPaused(false);
+      // timerActive is already true
     }
   };
 
@@ -173,13 +179,13 @@ export default function TenantTimeTrackingPage() {
       const currentSegmentElapsed = (Date.now() - startTimeEpoch) / 1000;
       setAccumulatedElapsedTime(prev => prev + currentSegmentElapsed);
       setTimerPaused(true);
-      setStartTimeEpoch(null); 
+      setStartTimeEpoch(null); // Indicate no active segment start
     }
   };
 
   const handleStopAndSaveTimer = () => {
     let finalElapsedTime = accumulatedElapsedTime;
-    if (timerActive && !timerPaused && startTimeEpoch) {
+    if (timerActive && !timerPaused && startTimeEpoch) { // If it was running and not paused when stopped
       finalElapsedTime += (Date.now() - startTimeEpoch) / 1000;
     }
 
@@ -209,12 +215,12 @@ export default function TenantTimeTrackingPage() {
     setTimerActive(false);
     setTimerPaused(false);
     setStartTimeEpoch(null);
-    setAccumulatedElapsedTime(0);
+    setAccumulatedElapsedTime(0); // Reset for next timer
     setDisplayTime("00:00:00");
     // Optionally keep description and context for next timer, or clear:
     // setTimerDescription(""); 
     // setTimerContactId(null); etc.
-    localStorage.removeItem(TIMER_STORAGE_KEY);
+    localStorage.removeItem(TIMER_STORAGE_KEY); // Clear stored state after stopping and attempting save
   };
 
   const handleAddOrUpdateEntry = async (values: NewTimeEntryPayload) => {
@@ -379,7 +385,7 @@ export default function TenantTimeTrackingPage() {
                 </div>
                 <div className="flex gap-2">
                     {!timerActive || timerPaused ? (
-                        <Button variant="outline" size="lg" className="bg-green-500 hover:bg-green-600 text-white" onClick={handleStartTimer} disabled={timerActive && !timerPaused}>
+                        <Button variant="outline" size="lg" className="bg-green-500 hover:bg-green-600 text-white" onClick={handleStartTimer} disabled={timerActive && !timerPaused && !!startTimeEpoch}>
                             <PlayCircle className="mr-2 h-5 w-5" /> Starten
                         </Button>
                     ) : (
