@@ -54,9 +54,12 @@ export default function ManageTenantsPage() {
           const dateToFormat = new Date(tenant.createdAt);
           if (isNaN(dateToFormat.getTime())) {
             let parsedDate;
+            // Check if createdAt is a Firestore Timestamp-like object
             if (typeof tenant.createdAt === 'object' && tenant.createdAt && 'seconds' in tenant.createdAt && 'nanoseconds' in tenant.createdAt) {
+                // Convert Firestore Timestamp-like object to Date
                 parsedDate = new Date((tenant.createdAt as any).seconds * 1000 + (tenant.createdAt as any).nanoseconds / 1000000);
             } else {
+                 // Fallback or error for unexpected date formats
                  throw new Error(`Invalid date value for tenant.createdAt: ${tenant.createdAt}`);
             }
              if (isNaN(parsedDate.getTime())) {
@@ -98,6 +101,7 @@ export default function ManageTenantsPage() {
   const handleUpdateTenant = async (values: TenantFormValues) => { 
     if (!selectedTenant) return;
     try {
+      // For now, only name is updatable in the form, CoA template is fixed after creation
       await updateTenantMutation.mutateAsync({ id: selectedTenant.id, data: { name: values.name } });
       toast({ title: "Erfolg", description: "Mandant erfolgreich aktualisiert.", variant: "default" });
       setIsEditModalOpen(false);
@@ -112,7 +116,7 @@ export default function ManageTenantsPage() {
     try {
       await deleteTenantMutation.mutateAsync(tenantId);
       toast({ title: "Erfolg", description: "Mandant erfolgreich gelöscht.", variant: "default" });
-    } catch (e)
+    } catch (e) // Explicitly type e if possible, or use instanceof Error
        {
       const errorMessage = e instanceof Error ? e.message : "Unbekannter Fehler";
       toast({ title: "Fehler", description: `Mandant konnte nicht gelöscht werden: ${errorMessage}`, variant: "destructive" });
@@ -165,19 +169,32 @@ export default function ManageTenantsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                 <TableRow key={`skeleton-${i}`}>
-                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-2/3" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Skeleton className="h-8 w-8 inline-block" />
-                    <Skeleton className="h-8 w-8 inline-block" />
-                  </TableCell>
-                </TableRow>
-              ))}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]"><Skeleton className="h-5 w-1/2" /></TableHead>
+                    <TableHead><Skeleton className="h-5 w-1/2" /></TableHead>
+                    <TableHead><Skeleton className="h-5 w-1/2" /></TableHead>
+                    <TableHead><Skeleton className="h-5 w-1/2" /></TableHead>
+                    <TableHead className="text-right"><Skeleton className="h-5 w-1/4 ml-auto" /></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...Array(3)].map((_, i) => (
+                    <TableRow key={`skeleton-${i}`}>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-2/3" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Skeleton className="h-8 w-8 inline-block" />
+                        <Skeleton className="h-8 w-8 inline-block" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <div className="overflow-x-auto">
