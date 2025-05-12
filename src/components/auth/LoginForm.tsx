@@ -1,78 +1,76 @@
-// src/components/auth/RegisterForm.tsx
+// src/components/auth/LoginForm.tsx
 "use client";
 
 import React, { useState } from 'react';
 import { 
-  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
   signInWithPopup, 
   GoogleAuthProvider,
   type UserCredential
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'; // Added getDoc
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { useForm } from 'react-hook-form';
 import { Loader2, Chrome } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // Changed from next/router
+import { useRouter } from 'next/navigation';
 import type { NewUserPayload } from '@/types';
 
-const registerFormSchema = z.object({
+const loginFormSchema = z.object({
   email: z.string().email({ message: "Ungültige E-Mail-Adresse." }),
-  password: z.string().min(6, { message: "Passwort muss mindestens 6 Zeichen lang sein." }),
-  displayName: z.string().optional(),
+  password: z.string().min(1, { message: "Passwort ist erforderlich." }),
 });
 
-type RegisterFormValues = z.infer<typeof registerFormSchema>;
+type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-export function RegisterForm() {
+export function LoginForm() {
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
-  const form = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerFormSchema),
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
     defaultValues: {
       email: "",
       password: "",
-      displayName: "",
     },
   });
 
-  const saveUserToFirestore = async (firebaseUser: UserCredential['user']) => {
+  const ensureUserInFirestore = async (firebaseUser: UserCredential['user']) => {
     const userDocRef = doc(db, "users", firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef); // Check if user already exists (e.g. from Google sign-in)
+    const userDoc = await getDoc(userDocRef);
     if (!userDoc.exists()) {
-        const userData: NewUserPayload = {
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || form.getValues("displayName") || null,
-            photoURL: firebaseUser.photoURL || null,
-            tenantIds: [],
-            createdAt: serverTimestamp(),
-        };
-        await setDoc(userDocRef, userData);
+      const userData: NewUserPayload = {
+        email: firebaseUser.email || "",
+        displayName: firebaseUser.displayName || null,
+        photoURL: firebaseUser.photoURL || null,
+        tenantIds: [],
+        createdAt: serverTimestamp(),
+      };
+      await setDoc(userDocRef, userData);
     }
   };
 
-  const handleEmailRegister = async (values: RegisterFormValues) => {
+  const handleEmailLogin = async (values: LoginFormValues) => {
     setIsLoadingEmail(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      await saveUserToFirestore(userCredential.user);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      await ensureUserInFirestore(userCredential.user);
       toast({
         title: "Erfolg",
-        description: "Benutzer erfolgreich mit E-Mail registriert.",
+        description: "Erfolgreich angemeldet.",
       });
       router.push('/'); // Redirect to dashboard
     } catch (error: any) {
       toast({
-        title: "Fehler bei E-Mail Registrierung",
-        description: error.message || "Benutzer konnte nicht registriert werden.",
+        title: "Fehler bei der Anmeldung",
+        description: error.message || "Anmeldung fehlgeschlagen.",
         variant: "destructive",
       });
     } finally {
@@ -85,10 +83,10 @@ export function RegisterForm() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      await saveUserToFirestore(result.user); // saveUserToFirestore now checks for existence
+      await ensureUserInFirestore(result.user);
       toast({
         title: "Erfolg",
-        description: "Erfolgreich mit Google angemeldet/registriert.",
+        description: "Erfolgreich mit Google angemeldet.",
       });
       router.push('/'); // Redirect to dashboard
     } catch (error: any) {
@@ -105,20 +103,7 @@ export function RegisterForm() {
   return (
     <div className="space-y-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleEmailRegister)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="displayName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Anzeigename (optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Max Mustermann" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <form onSubmit={form.handleSubmit(handleEmailLogin)} className="space-y-4">
           <FormField
             control={form.control}
             name="email"
@@ -147,7 +132,7 @@ export function RegisterForm() {
           />
           <Button type="submit" disabled={isLoadingEmail || isLoadingGoogle} className="w-full">
             {isLoadingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Mit E-Mail registrieren
+            Anmelden
           </Button>
         </form>
       </Form>
@@ -174,7 +159,7 @@ export function RegisterForm() {
         ) : (
           <Chrome className="mr-2 h-4 w-4" />
         )}
-        Mit Google registrieren
+        Mit Google anmelden
       </Button>
     </div>
   );

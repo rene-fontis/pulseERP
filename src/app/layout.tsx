@@ -6,6 +6,8 @@ import { Header } from '@/components/layout/Header';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { AppProviders } from '@/components/providers';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthGuard } from '@/components/layout/AuthGuard';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,20 +32,24 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AppProviders>
-          <SidebarProvider defaultOpen={true}>
-            <div className="flex flex-col min-h-screen">
-              <Header />
-              <div className="flex flex-1">
-                <AppSidebar />
-                <main className="flex-1 p-4 lg:p-6 bg-background overflow-auto">
-                  {children}
-                </main>
-              </div>
-            </div>
-            <Toaster />
-          </SidebarProvider>
-        </AppProviders>
+        <AuthProvider>
+          <AppProviders>
+            <AuthGuard>
+              <SidebarProvider defaultOpen={true}>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <div className="flex flex-1">
+                    <AppSidebar />
+                    <main className="flex-1 p-4 lg:p-6 bg-background overflow-auto">
+                      {children}
+                    </main>
+                  </div>
+                </div>
+                <Toaster />
+              </SidebarProvider>
+            </AuthGuard>
+          </AppProviders>
+        </AuthProvider>
       </body>
     </html>
   );
