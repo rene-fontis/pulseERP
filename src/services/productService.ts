@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -36,7 +37,7 @@ const mapDocToProduct = (docSnapshot: any): Product => {
     stockOnHand: data.stockOnHand || 0,
     defaultWarehouseId: data.defaultWarehouseId === undefined ? null : data.defaultWarehouseId,
     categoryIds: data.categoryIds || [],
-    customFields: data.customFields || {},
+    customFields: data.customFields || {}, // Ensure customFields is mapped
     createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, "now"),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, "now"),
   } as Product;
@@ -60,7 +61,7 @@ export const getProductById = async (tenantId: string, productId: string): Promi
 
 export const addProduct = async (
   tenantId: string,
-  productData: NewProductPayload
+  productData: NewProductPayload 
 ): Promise<Product> => {
   const productsCollectionRef = getProductsCollectionRef(tenantId);
   const now = serverTimestamp();
@@ -73,7 +74,7 @@ export const addProduct = async (
     defaultWarehouseId: productData.defaultWarehouseId === undefined ? null : productData.defaultWarehouseId,
     stockOnHand: productData.stockOnHand || 0,
     categoryIds: productData.categoryIds || [],
-    customFields: productData.customFields || {},
+    customFields: productData.customFields || {}, // Save customFields
     createdAt: now,
     updatedAt: now,
   };
@@ -88,7 +89,7 @@ export const addProduct = async (
 export const updateProduct = async (
   tenantId: string,
   productId: string,
-  productData: Partial<NewProductPayload>
+  productData: Partial<NewProductPayload> 
 ): Promise<Product | undefined> => {
   const productDocRef = doc(db, 'tenants', tenantId, 'products', productId);
   const updateData: any = { ...productData, updatedAt: serverTimestamp() };
@@ -97,6 +98,9 @@ export const updateProduct = async (
   if (productData.hasOwnProperty('taxRateId') && productData.taxRateId === undefined) updateData.taxRateId = null;
   if (productData.hasOwnProperty('minimumQuantity') && productData.minimumQuantity === undefined) updateData.minimumQuantity = null;
   if (productData.hasOwnProperty('defaultWarehouseId') && productData.defaultWarehouseId === undefined) updateData.defaultWarehouseId = null;
+  if (productData.hasOwnProperty('customFields')) { // Ensure customFields are updated correctly
+    updateData.customFields = productData.customFields || {};
+  }
   
   await updateDoc(productDocRef, updateData);
   const updatedDocSnapshot = await getDoc(productDocRef);

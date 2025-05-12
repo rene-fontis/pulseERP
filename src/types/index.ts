@@ -1,3 +1,4 @@
+
 // src/types/index.ts
 
 export interface Tenant {
@@ -153,13 +154,21 @@ export interface JournalEntry {
 
 // Type for submitting new journal entries to the service/mutation
 export type NewJournalEntryPayload = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
+
 export type JournalEntryFormValues = Omit<NewJournalEntryPayload, 'tenantId' | 'fiscalYearId' | 'date' | 'lines'> & {
-  date: Date;
-  lines: Array<Partial<Omit<JournalEntryLine, 'accountNumber' | 'accountName'>>>; // For form, ID might be temp, accountNumber/Name not needed
+  date: Date; // Form uses Date object
   entryType: 'single' | 'batch';
-  debitAccountId?: string; // For single entry
-  creditAccountId?: string; // For single entry
-  amount?: number; // For single entry
+  // Fields for single entry
+  debitAccountId?: string;
+  creditAccountId?: string;
+  amount?: number;
+  // Fields for batch entry
+  lines: Array<{
+    id?: string; // Optional for new lines in form
+    accountId: string;
+    debit?: number;
+    credit?: number;
+  }>;
 };
 
 
@@ -548,7 +557,9 @@ export interface Product {
   updatedAt: string;
 }
 
-export type NewProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'tenantId'> & {
+  customFields?: Record<string, any>; // Ensure customFields is part of the payload
+};
 export type ProductFormValues = Omit<NewProductPayload, 'tenantId'>;
 
 
@@ -582,5 +593,3 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
 }
-
-    

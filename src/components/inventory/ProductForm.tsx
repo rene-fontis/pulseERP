@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -7,6 +8,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -17,12 +19,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandInput, CommandEmpty, CommandItem, CommandList, CommandGroup } from "@/components/ui/command";
-import { CheckIcon, ChevronsUpDown } from "lucide-react";
+import { CheckIcon, ChevronsUpDown, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Product, ProductFormValues, ProductCategory } from "@/types";
+import { format, parseISO } from 'date-fns';
+import { de } from 'date-fns/locale';
+import type { Product, ProductFormValues, ProductCategory, CustomProductFieldDefinition, CustomProductFieldType } from "@/types";
 import { useGetProductCategories } from "@/hooks/useProductCategories";
-// Import other necessary hooks, e.g., for tax rates, warehouses when implemented
+import { useGetTenantById } from "@/hooks/useTenants"; // To fetch custom field definitions
 
 const productFormSchema = z.object({
   itemNumber: z.string().min(1, "Artikelnummer ist erforderlich."),
@@ -43,8 +48,7 @@ const productFormSchema = z.object({
     z.number().min(0, "Mindestmenge darf nicht negativ sein.").nullable().optional()
   ),
   categoryIds: z.array(z.string()).optional().default([]),
-  // defaultWarehouseId: z.string().nullable().optional(), // Add when warehouses are implemented
-  // customFields will be handled dynamically later
+  customFields: z.record(z.any()).optional().default({}), // For custom fields
 });
 
 interface ProductFormProps {
@@ -61,7 +65,8 @@ export function ProductForm({
   isSubmitting,
 }: ProductFormProps) {
   const { data: categories, isLoading: isLoadingCategories } = useGetProductCategories(tenantId);
-  // Add hooks for tax rates and warehouses here when available
+  const { data: tenant, isLoading: isLoadingTenant } = useGetTenantById(tenantId);
+  const customFieldDefinitions = tenant?.productCustomFieldDefinitions || [];
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -72,6 +77,7 @@ export function ProductForm({
           taxRateId: initialData.taxRateId ?? null,
           minimumQuantity: initialData.minimumQuantity ?? null,
           categoryIds: initialData.categoryIds || [],
+          customFields: initialData.customFields || {},
         }
       : {
           itemNumber: "",
@@ -83,6 +89,7 @@ export function ProductForm({
           unit: "Stk",
           minimumQuantity: null,
           categoryIds: [],
+          customFields: {},
         },
   });
 
@@ -94,9 +101,26 @@ export function ProductForm({
         taxRateId: initialData.taxRateId ?? null,
         minimumQuantity: initialData.minimumQuantity ?? null,
         categoryIds: initialData.categoryIds || [],
+        customFields: initialData.customFields || {},
+      });
+    } else { // Initialize custom fields with default values for new products
+      const defaultCustomFields: Record<string, any> = {};
+      customFieldDefinitions.forEach(def => {
+        if (def.type === 'boolean') {
+          defaultCustomFields[def.name] = false;
+        } else if (def.type === 'number') {
+          defaultCustomFields[def.name] = null; // Or some other sensible default for number
+        } else {
+          defaultCustomFields[def.name] = '';
+        }
+      });
+      form.reset({
+        ...form.getValues(), // Keep existing default values
+        customFields: defaultCustomFields,
       });
     }
-  }, [initialData, form]);
+  }, [initialData, form, customFieldDefinitions]);
+
 
   const handleSubmitInternal = async (values: ProductFormValues) => {
     const payload: ProductFormValues = {
@@ -104,12 +128,80 @@ export function ProductForm({
       purchasePrice: (values.purchasePrice === undefined || values.purchasePrice === null) ? null : values.purchasePrice,
       taxRateId: (values.taxRateId === undefined || values.taxRateId === null) ? null : values.taxRateId,
       minimumQuantity: (values.minimumQuantity === undefined || values.minimumQuantity === null) ? null : values.minimumQuantity,
+      customFields: values.customFields || {},
     };
     await onSubmit(payload);
     if (!initialData) {
-      form.reset(); // Reset to default for new product
+        const defaultCustomFields: Record<string, any> = {};
+        customFieldDefinitions.forEach(def => {
+            if (def.type === 'boolean') defaultCustomFields[def.name] = false;
+            else if (def.type === 'number') defaultCustomFields[def.name] = null;
+            else defaultCustomFields[def.name] = '';
+        });
+        form.reset({
+            itemNumber: "", name: "", description: "", unitPrice: 0, purchasePrice: null,
+            taxRateId: null, unit: "Stk", minimumQuantity: null, categoryIds: [],
+            customFields: defaultCustomFields,
+        });
     }
   };
+  
+  const renderCustomField = (definition: CustomProductFieldDefinition) => {
+    const fieldName = `customFields.${definition.name}` as const; // Type assertion for field path
+    
+    return (
+      <FormField
+        key={definition.id}
+        control={form.control}
+        name={fieldName}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>{definition.label}{definition.isRequired && "*"}</FormLabel>
+            <FormControl>
+              {definition.type === 'text' && <Input placeholder={definition.label} {...field} value={field.value || ''} />}
+              {definition.type === 'textarea' && <Textarea placeholder={definition.label} {...field} value={field.value || ''} />}
+              {definition.type === 'number' && <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />}
+              {definition.type === 'boolean' && (
+                <div className="flex items-center space-x-2 pt-2">
+                   <Checkbox id={fieldName} checked={field.value || false} onCheckedChange={field.onChange} />
+                   <label htmlFor={fieldName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    {definition.label}
+                   </label>
+                </div>
+              )}
+              {definition.type === 'date' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(parseISO(field.value), "PPP", { locale: de }) : <span>Datum wählen</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={field.value ? parseISO(field.value) : undefined}
+                      onSelect={(date) => field.onChange(date ? date.toISOString() : null)}
+                      initialFocus
+                      locale={de}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            </FormControl>
+            {definition.inputMask && (definition.type === 'text' || definition.type === 'number') && (
+                <FormDescription className="text-xs">Format: {definition.inputMask}</FormDescription>
+            )}
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
+  };
+
 
   return (
     <Form {...form}>
@@ -275,15 +367,17 @@ export function ProductForm({
             )}
         />
 
+        {customFieldDefinitions.length > 0 && (
+            <div className="space-y-4 rounded-md border p-4">
+                 <h3 className="text-sm font-medium">Zusätzliche Felder</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {customFieldDefinitions.sort((a,b) => (a.order || 0) - (b.order || 0)).map(renderCustomField)}
+                 </div>
+            </div>
+        )}
 
-        {/* Placeholder for dynamic custom fields */}
-        {/* <div>
-          <h3 className="text-lg font-medium mb-2">Benutzerdefinierte Felder</h3>
-          <p className="text-sm text-muted-foreground">Hier werden dynamisch die vom Mandanten definierten Felder angezeigt.</p>
-        </div> */}
 
-
-        <Button type="submit" disabled={isSubmitting || isLoadingCategories} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingTenant} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           {isSubmitting ? "Speichern..." : initialData ? "Änderungen speichern" : "Produkt erstellen"}
         </Button>
       </form>
