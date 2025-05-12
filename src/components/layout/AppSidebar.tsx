@@ -1,8 +1,9 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus } from 'lucide-react'; 
 import {
   Sidebar,
   SidebarContent,
@@ -160,9 +161,9 @@ export function AppSidebar() {
                                     <Link href={`/tenants/${currentTenantId}/accounting/journal`}>Journal</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname.startsWith(`/tenants/${currentTenantId}/accounting/accounts`)}>
-                                      <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Konten</Link>
+                                      <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Kontenübersicht</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
@@ -192,10 +193,9 @@ export function AppSidebar() {
                            <SidebarMenuSub>
                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || (pathname.startsWith(`/tenants/${currentTenantId}/budgeting/`) && !pathname.includes('/entries') && !pathname.endsWith('/reports')) }>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgetübersicht</Link>
+                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                {/* Sub-item for entries is handled by clicking on a budget from the overview */}
                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting/reports`}>
                                       <Link href={`/tenants/${currentTenantId}/budgeting/reports`}>Berichte</Link>
@@ -327,6 +327,11 @@ export function AppSidebar() {
                                 <SidebarMenuSubItem>
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/fiscal-years`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/fiscal-years`}>Geschäftsjahre</Link>
+                                </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/inventory`}>
+                                    <Link href={`/tenants/${currentTenantId}/settings/inventory`}><PackagePlus className="mr-1 h-3.5 w-3.5"/>Produktfelder</Link>
                                 </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                             </SidebarMenuSub>
@@ -524,3 +529,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    

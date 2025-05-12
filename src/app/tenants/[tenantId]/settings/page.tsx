@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight, CalendarDays } from 'lucide-react';
+import { Settings, Users, FileText as FileTextIcon, AlertCircle, ChevronRight, CalendarDays, PackagePlus } from 'lucide-react'; // Added PackagePlus
 import { useGetTenantById } from '@/hooks/useTenants';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -101,6 +102,12 @@ export default function TenantSettingsOverviewPage() {
       description: "Geschäftsjahre definieren und das aktive Jahr festlegen.",
       icon: CalendarDays,
       href: `/tenants/${tenantId}/settings/fiscal-years`
+    },
+    {
+      title: "Produktfelder",
+      description: "Benutzerdefinierte Felder für Produkte definieren.",
+      icon: PackagePlus, // Icon for inventory/product related settings
+      href: `/tenants/${tenantId}/settings/inventory`
     }
   ];
 
@@ -121,3 +128,5 @@ export default function TenantSettingsOverviewPage() {
     </div>
   );
 }
+
+    

@@ -1,7 +1,7 @@
 
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { Tenant } from '@/types';
+import type { Tenant, CustomProductFieldDefinition } from '@/types';
 import { createTenantChartOfAccountsFromTemplate, deleteTenantChartOfAccounts } from './tenantChartOfAccountsService';
 import { formatFirestoreTimestamp } from '@/lib/utils/firestoreUtils';
 
@@ -24,6 +24,7 @@ export const getTenants = async (): Promise<Tenant[]> => {
       activeFiscalYearId: data.activeFiscalYearId,
       vatNumber: data.vatNumber,
       taxRates: data.taxRates || [],
+      productCustomFieldDefinitions: data.productCustomFieldDefinitions || [],
     } as Tenant;
   });
   return tenants;
@@ -43,6 +44,7 @@ export const getTenantById = async (id: string): Promise<Tenant | undefined> => 
       activeFiscalYearId: data.activeFiscalYearId,
       vatNumber: data.vatNumber,
       taxRates: data.taxRates || [],
+      productCustomFieldDefinitions: data.productCustomFieldDefinitions || [],
     } as Tenant;
   }
   return undefined;
@@ -58,6 +60,7 @@ interface NewTenantData {
     activeFiscalYearId?: string;
     vatNumber?: string | null;
     taxRates?: any[]; // Firestore will store array of objects
+    productCustomFieldDefinitions?: CustomProductFieldDefinition[];
 }
 
 export const addTenant = async (name: string, chartOfAccountsTemplateId?: string): Promise<Tenant> => {
@@ -68,6 +71,7 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
     updatedAt: now,
     vatNumber: null,
     taxRates: [], // Default empty array for tax rates
+    productCustomFieldDefinitions: [], // Default empty array for custom product fields
   };
 
   if (chartOfAccountsTemplateId) {
@@ -132,6 +136,7 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
           activeFiscalYearId: data.activeFiscalYearId,
           vatNumber: data.vatNumber,
           taxRates: data.taxRates || [],
+          productCustomFieldDefinitions: data.productCustomFieldDefinitions || [],
       } as Tenant;
   }
   throw new Error("Could not retrieve tenant after creation.");
@@ -149,6 +154,9 @@ export const updateTenant = async (id: string, dataToUpdate: Partial<Tenant>): P
   if (dataToUpdate.hasOwnProperty('taxRates') && dataToUpdate.taxRates === undefined) {
     firestoreUpdateData.taxRates = []; // Default to empty array if cleared
   }
+  if (dataToUpdate.hasOwnProperty('productCustomFieldDefinitions') && dataToUpdate.productCustomFieldDefinitions === undefined) {
+    firestoreUpdateData.productCustomFieldDefinitions = [];
+  }
 
 
   await updateDoc(tenantDocRef, firestoreUpdateData); 
@@ -165,6 +173,7 @@ export const updateTenant = async (id: string, dataToUpdate: Partial<Tenant>): P
         activeFiscalYearId: data.activeFiscalYearId,
         vatNumber: data.vatNumber,
         taxRates: data.taxRates || [],
+        productCustomFieldDefinitions: data.productCustomFieldDefinitions || [],
     } as Tenant;
   }
   return undefined;
@@ -193,3 +202,6 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+
+
+    

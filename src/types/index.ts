@@ -7,8 +7,9 @@ export interface Tenant {
   chartOfAccountsTemplateId?: string; // ID of the template used during creation
   chartOfAccountsId?: string; // ID of the tenant's specific Chart of Accounts document
   activeFiscalYearId?: string; // ID of the currently active fiscal year for this tenant
-  vatNumber?: string; // VAT / MWST Nummer
+  vatNumber?: string | null; // VAT / MWST Nummer - allow null
   taxRates?: TaxRate[]; // Defined tax rates for the tenant
+  productCustomFieldDefinitions?: CustomProductFieldDefinition[]; // For inventory custom fields
 }
 
 export interface TaxRate {
@@ -100,6 +101,7 @@ export enum Module {
   TENANT_SETTINGS_USERS = "TENANT_SETTINGS_USERS",
   TENANT_SETTINGS_COA = "TENANT_SETTINGS_COA",
   TENANT_SETTINGS_FISCAL_YEARS = "TENANT_SETTINGS_FISCAL_YEARS",
+  TENANT_SETTINGS_INVENTORY = "TENANT_SETTINGS_INVENTORY", // New for custom product fields
   // Add other modules as needed
 }
 
@@ -248,7 +250,7 @@ export interface BudgetEntry {
   accountId: string; 
   accountNumber?: string; 
   accountName?: string;   
-  counterAccountId?: string; 
+  counterAccountId?: string | null; // Allow null for non-transfer entries
   counterAccountNumber?: string; 
   counterAccountName?: string;   
   description: string;
@@ -462,6 +464,18 @@ export type TimeEntryFormValues = Omit<NewTimeEntryPayload, 'tenantId' | 'date'>
 
 
 // --- Inventory / Product Management Types ---
+export type CustomProductFieldType = 'text' | 'number' | 'boolean' | 'date' | 'textarea'; // Add 'textarea'
+
+export interface CustomProductFieldDefinition {
+  id: string; // Unique ID for the field definition
+  name: string; // Internal name/key, e.g., "material_type"
+  label: string; // User-friendly label, e.g., "Materialart"
+  type: CustomProductFieldType;
+  options?: string[]; // For 'select' type if added in future
+  isRequired?: boolean;
+  order?: number; // For controlling display order
+}
+
 export interface Product {
   id: string;
   tenantId: string;
@@ -471,10 +485,16 @@ export interface Product {
   unitPrice: number;
   taxRateId?: string; 
   unit?: string; 
-  stock?: number; 
+  minimumQuantity?: number; // Mindestmenge
+  stock?: number; // Current stock level
+  customFields?: Record<string, any>; // Stores values for custom fields defined by tenant { [fieldDefinitionId]: value }
   createdAt: string;
   updatedAt: string;
 }
+
+export type NewProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+export type ProductFormValues = Omit<NewProductPayload, 'tenantId'> & { customFields?: Record<string, any> }; // For the form
+
 
 // --- Invoicing Types ---
 export interface InvoiceLine {
@@ -506,3 +526,5 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
 }
+
+    
