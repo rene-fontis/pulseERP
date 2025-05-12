@@ -1,4 +1,3 @@
-
 import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { Tenant, CustomProductFieldDefinition } from '@/types';
@@ -70,8 +69,8 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
     createdAt: now,
     updatedAt: now,
     vatNumber: null,
-    taxRates: [], // Default empty array for tax rates
-    productCustomFieldDefinitions: [], // Default empty array for custom product fields
+    taxRates: [], 
+    productCustomFieldDefinitions: [], 
   };
 
   if (chartOfAccountsTemplateId) {
@@ -90,10 +89,12 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
       }
     } catch (error) {
       console.error("Error creating tenant chart of accounts from template:", error);
+      // Decide if tenant creation should fail or proceed without CoA
     }
   } else {
     console.log(`No chart of accounts template selected for tenant ${name}. Creating an empty CoA.`);
     try {
+        // Define default fixed groups for an empty CoA
         const emptyGroups = [ 
             { id: 'fixed_asset_group_global', name: "Aktiven", mainType: "Asset", accounts: [], isFixed: true, parentId: null, level: 0, balance: 0 },
             { id: 'fixed_liability_group_global', name: "Passiven", mainType: "Liability", accounts: [], isFixed: true, parentId: null, level: 0, balance: 0 },
@@ -102,6 +103,7 @@ export const addTenant = async (name: string, chartOfAccountsTemplateId?: string
                 name: "Eigenkapital", 
                 mainType: "Equity", 
                 accounts: [
+                  // Add default Retained Earnings account here if needed
                 ], 
                 isFixed: true, parentId: null, level: 0, balance: 0 
             },
@@ -147,15 +149,15 @@ export const updateTenant = async (id: string, dataToUpdate: Partial<Tenant>): P
   
   const firestoreUpdateData: any = { ...dataToUpdate, updatedAt: serverTimestamp() };
 
-  // Ensure specific fields are set to null if they are cleared, rather than undefined
-  if (dataToUpdate.hasOwnProperty('vatNumber') && (dataToUpdate.vatNumber === '' || dataToUpdate.vatNumber === undefined)) {
+  // Ensure specific fields are set to null/empty array if they are cleared, rather than undefined
+  if (dataToUpdate.hasOwnProperty('vatNumber') && (dataToUpdate.vatNumber === '' || dataToUpdate.vatNumber === undefined || dataToUpdate.vatNumber === null)) {
     firestoreUpdateData.vatNumber = null;
   }
-  if (dataToUpdate.hasOwnProperty('taxRates') && dataToUpdate.taxRates === undefined) {
-    firestoreUpdateData.taxRates = []; // Default to empty array if cleared
+  if (dataToUpdate.hasOwnProperty('taxRates')) {
+    firestoreUpdateData.taxRates = dataToUpdate.taxRates === undefined ? [] : dataToUpdate.taxRates;
   }
-  if (dataToUpdate.hasOwnProperty('productCustomFieldDefinitions') && dataToUpdate.productCustomFieldDefinitions === undefined) {
-    firestoreUpdateData.productCustomFieldDefinitions = [];
+  if (dataToUpdate.hasOwnProperty('productCustomFieldDefinitions')) {
+    firestoreUpdateData.productCustomFieldDefinitions = dataToUpdate.productCustomFieldDefinitions === undefined ? [] : dataToUpdate.productCustomFieldDefinitions;
   }
 
 
@@ -191,9 +193,17 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
         console.log(`Successfully deleted chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}`);
       } catch (error) {
         console.error(`Error deleting chart of accounts ${tenantData.chartOfAccountsId} for tenant ${id}:`, error);
+        // Potentially re-throw or handle more gracefully if CoA deletion is critical
       }
     }
     // TODO: Delete other related subcollections like fiscalYears, budgets, entries, contacts, projects etc.
+    // For example, fiscalYears:
+    // const fiscalYearsRef = collection(db, 'tenants', id, 'fiscalYears');
+    // const fiscalYearsSnapshot = await getDocs(fiscalYearsRef);
+    // const deleteFiscalYearPromises = fiscalYearsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    // await Promise.all(deleteFiscalYearPromises);
+    // ... repeat for other subcollections
+
     await deleteDoc(tenantDocRef);
     console.log(`Successfully deleted tenant ${id}`);
     return true; 
@@ -202,6 +212,3 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
     return false;
   }
 };
-
-
-    
