@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -9,13 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useGetProjectById, useUpdateProject } from "@/hooks/useProjects";
-import type { Project, Milestone, MilestoneFormValues, NewMilestonePayload, projectStatusLabels } from "@/types";
+import type { Project, Milestone, MilestoneFormValues, NewMilestonePayload } from "@/types";
+import { projectStatusLabels } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { MilestoneForm } from "@/components/projects/MilestoneForm";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -24,6 +27,7 @@ export default function ProjectDetailPage() {
   const projectId = params.projectId as string;
   const { data: project, isLoading: isLoadingProject, error: projectError, refetch: refetchProject } = useGetProjectById(projectId);
   const updateProjectMutation = useUpdateProject();
+  const { toast } = useToast();
 
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
