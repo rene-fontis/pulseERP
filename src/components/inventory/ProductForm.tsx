@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -57,10 +58,10 @@ interface ProductFormProps {
   isSubmitting?: boolean;
 }
 
-// Helper function to translate custom mask to regex pattern
+// Helper function to translate custom mask to regex pattern for HTML pattern attribute
 function translateMaskToPattern(mask?: string): string | undefined {
   if (!mask) return undefined;
-  let pattern = '^';
+  let pattern = ''; // Removed ^ and $ for more flexible partial matching if desired, but for strict format, they are good. Let's keep them for strictness.
   for (const char of mask) {
     switch (char) {
       case '9':
@@ -72,18 +73,17 @@ function translateMaskToPattern(mask?: string): string | undefined {
       case '*':
         pattern += '[a-zA-Z0-9]';
         break;
-      // Escape special regex characters
-      case '.': case '\\': case '+': case '?': case '[': case '^':
-      case '$': case '(': case ')': case '{': case '}': case '|': case '-':
+      // Escape special regex characters if they are part of the literal mask
+      case '.': case '\\': case '+': case '?': case '[': case ']':
+      case '^': case '$': case '(': case ')': case '{': case '}': case '|':
         pattern += `\\${char}`;
         break;
       default:
-        pattern += char; // Literal character
+        pattern += char; // Literal character from mask (e.g., '-')
         break;
     }
   }
-  pattern += '$';
-  return pattern;
+  return `^${pattern}$`; // Enforce full string match
 }
 
 
@@ -181,13 +181,13 @@ export function ProductForm({
 
     const renderActualInput = (field: any) => { // field from Controller render prop
         if (definition.type === 'text') {
-            return <Input placeholder={definition.label} {...field} value={field.value || ''} pattern={htmlPattern} />;
+            return <Input placeholder={definition.label} {...field} value={field.value || ''} pattern={htmlPattern} title={htmlPattern ? `Format: ${definition.inputMask}`: undefined} />;
         }
         if (definition.type === 'textarea') {
             return <Textarea placeholder={definition.label} {...field} value={field.value || ''} />;
         }
         if (definition.type === 'number') {
-            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} pattern={htmlPattern} />;
+            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} pattern={htmlPattern} title={htmlPattern ? `Format: ${definition.inputMask}`: undefined} />;
         }
         if (definition.type === 'boolean') {
             return (
@@ -238,7 +238,9 @@ export function ProductForm({
               {renderActualInput(field)}
             </FormControl>
             {definition.inputMask && (definition.type === 'text' || definition.type === 'number') && (
-                <FormDescription className="text-xs">Erwartetes Format: {definition.inputMask} (9=Ziffer, a=Buchstabe, *=Alphanumerisch)</FormDescription>
+                <FormDescription className="text-xs">Erwartetes Format: {definition.inputMask} (9=Ziffer, a=Buchstabe, *=Alphanumerisch).
+                Die Eingabe wird auf dieses Format beschränkt.
+                </FormDescription>
             )}
             <FormMessage />
           </FormItem>
@@ -429,3 +431,4 @@ export function ProductForm({
     </Form>
   );
 }
+
