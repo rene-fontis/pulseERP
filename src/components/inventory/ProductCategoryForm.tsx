@@ -40,7 +40,8 @@ export function ProductCategoryForm({
   isSubmitting,
   currentCategoryId,
 }: ProductCategoryFormProps) {
-  const { data: categories, isLoading: isLoadingCategories } = useGetProductCategories(tenantId, null); // Fetch all for parent selection
+  // Fetch all categories for parent selection by passing undefined or omitting parentId
+  const { data: categories, isLoading: isLoadingCategories } = useGetProductCategories(tenantId); 
 
   const form = useForm<ProductCategoryFormValues>({
     resolver: zodResolver(productCategoryFormSchema),
@@ -76,8 +77,11 @@ export function ProductCategoryForm({
 
   const parentCategoryOptions = React.useMemo(() => {
     if (!categories) return [];
+    // Filter out the current category to prevent self-parenting
+    // Also, ideally, filter out descendants of the current category if editing,
+    // but that's more complex and not implemented here for simplicity.
     return categories
-      .filter(cat => cat.id !== currentCategoryId) // Exclude current category from being its own parent
+      .filter(cat => cat.id !== currentCategoryId) 
       .map(cat => ({ value: cat.id, label: cat.name }));
   }, [categories, currentCategoryId]);
 
