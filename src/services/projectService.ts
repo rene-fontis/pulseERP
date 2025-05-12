@@ -40,7 +40,7 @@ const mapDocToProject = (docSnapshot: any): Project => {
       createdAt: formatFirestoreTimestamp(ms.createdAt, ms.id, 'now'), 
       updatedAt: formatFirestoreTimestamp(ms.updatedAt, ms.id, 'now'), 
     })),
-    tasks: (data.tasks || []).map((task: any) => ({ // Map tasks
+    tasks: (data.tasks || []).map((task: any) => ({ 
       ...task,
       id: task.id || crypto.randomUUID(),
       dueDate: task.dueDate ? formatFirestoreTimestamp(task.dueDate, task.id, 'now') : null,
@@ -52,16 +52,18 @@ const mapDocToProject = (docSnapshot: any): Project => {
   } as Project;
 };
 
-export const getProjects = async (tenantId: string, statusFilter?: ProjectStatus[]): Promise<Project[]> => {
+export const getProjects = async (tenantId: string, statusFilter?: ProjectStatus[], contactId?: string): Promise<Project[]> => {
   const qConstraints: any[] = [ 
     where("tenantId", "==", tenantId),
     orderBy("createdAt", "desc")
   ];
-  // If statusFilter is provided and not empty, add the 'in' filter
+  
   if (statusFilter && statusFilter.length > 0) {
     qConstraints.push(where("status", "in", statusFilter));
   }
-  // If statusFilter is not provided or is empty, no status filter is applied, fetching all projects for the tenant.
+  if (contactId) {
+    qConstraints.push(where("contactId", "==", contactId));
+  }
   
   const q = query(projectsCollectionRef, ...qConstraints);
   const querySnapshot = await getDocs(q);
@@ -98,7 +100,7 @@ export const addProject = async (tenantId: string, projectData: NewProjectPayloa
       }
       return milestoneToAdd;
     }),
-    tasks: (projectData.tasks || []).map(task => { // Initialize tasks array
+    tasks: (projectData.tasks || []).map(task => { 
         const taskToAdd: any = {
             id: crypto.randomUUID(),
             name: task.name,
@@ -153,18 +155,13 @@ export const updateProject = async (
   if (projectData.milestones) {
     updateData.milestones = projectData.milestones.map(ms => {
       const milestoneUpdate: any = {
-        id: ms.id,
+        id: ms.id || crypto.randomUUID(), // Ensure ID exists, generate if new
         name: ms.name,
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        // Firestore Timestamps for createdAt and updatedAt should generally not be client-overwritten on update
-        // unless specifically intended. Typically, only `updatedAt` is set to serverTimestamp().
-        // If createdAt is meant to be immutable, it shouldn't be in the update payload.
-        // If it can change, it should also be converted to Timestamp.
-        // For this example, assuming they are part of the payload:
-        createdAt: Timestamp.fromDate(new Date(ms.createdAt)), 
-        updatedAt: Timestamp.fromDate(new Date(ms.updatedAt)), 
+        createdAt: ms.createdAt ? Timestamp.fromDate(new Date(ms.createdAt)) : serverTimestamp(), // Handle existing or new
+        updatedAt: serverTimestamp(), 
       };
       if (ms.description === undefined && milestoneUpdate.description === null) {
         delete milestoneUpdate.description; 
@@ -173,17 +170,17 @@ export const updateProject = async (
     });
   }
 
-  if (projectData.tasks) { // Handle tasks update
+  if (projectData.tasks) { 
     updateData.tasks = projectData.tasks.map(task => {
       const taskUpdate: any = {
-        id: task.id,
+        id: task.id || crypto.randomUUID(), // Ensure ID exists
         name: task.name,
         description: task.description === undefined ? null : task.description,
         milestoneId: task.milestoneId === undefined ? null : task.milestoneId,
         status: task.status,
         dueDate: task.dueDate ? Timestamp.fromDate(new Date(task.dueDate)) : null,
-        createdAt: Timestamp.fromDate(new Date(task.createdAt)),
-        updatedAt: Timestamp.fromDate(new Date(task.updatedAt)),
+        createdAt: task.createdAt ? Timestamp.fromDate(new Date(task.createdAt)) : serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
        if (task.description === undefined && taskUpdate.description === null) delete taskUpdate.description;
        if (task.milestoneId === undefined && taskUpdate.milestoneId === null) delete taskUpdate.milestoneId;

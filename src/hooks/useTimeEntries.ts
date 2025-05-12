@@ -9,12 +9,10 @@ import {
   deleteTimeEntry,
 } from "@/services/timeEntryService";
 import type { TimeEntry, NewTimeEntryPayload } from "@/types";
-// Assuming you might have an auth hook to get current user ID
-// import { useAuth } from './useAuth'; 
 
 const timeEntryQueryKeys = {
   all: (tenantId: string) => ["timeEntries", tenantId] as const,
-  lists: (tenantId: string, filters?: any) => [...timeEntryQueryKeys.all(tenantId), "list", filters || {}] as const,
+  lists: (tenantId: string, filters?: any) => [...timeEntryQueryKeys.all(tenantId), "list", filters ? JSON.stringify(filters) : "no-filters"] as const,
   details: (tenantId: string) => [...timeEntryQueryKeys.all(tenantId), "detail"] as const,
   detail: (entryId: string) => [...timeEntryQueryKeys.details(""), entryId] as const,
 };
@@ -40,7 +38,6 @@ export function useGetTimeEntryById(entryId: string | null) {
 
 export function useAddTimeEntry(tenantId: string) {
   const queryClient = useQueryClient();
-  // const { currentUser } = useAuth(); // Example: Get current user for userId
 
   return useMutation<TimeEntry, Error, NewTimeEntryPayload>({
     mutationFn: (entryData) => {
@@ -50,6 +47,13 @@ export function useAddTimeEntry(tenantId: string) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId) });
+      // If filters were used for a specific view (e.g., contact detail), that specific query should also be invalidated
+      if (data.contactId) {
+        queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId, { contactId: data.contactId }) });
+      }
+       if (data.projectId) {
+        queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId, { projectId: data.projectId }) });
+      }
     },
   });
 }
@@ -66,6 +70,12 @@ export function useUpdateTimeEntry(tenantId: string) {
       if (data) {
         queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId) });
         queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.detail(variables.entryId) });
+         if (data.contactId) {
+            queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId, { contactId: data.contactId }) });
+        }
+        if (data.projectId) {
+            queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId, { projectId: data.projectId }) });
+        }
       }
     },
   });
@@ -75,8 +85,11 @@ export function useDeleteTimeEntry(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, string>({
     mutationFn: deleteTimeEntry,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.lists(tenantId) });
+    onSuccess: (success, deletedEntryId) => {
+        if (success) {
+            // Broad invalidation for now, can be more specific if needed
+            queryClient.invalidateQueries({ queryKey: timeEntryQueryKeys.all(tenantId) });
+        }
     },
   });
 }

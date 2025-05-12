@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,17 +12,16 @@ import type { Project, NewProjectPayload, ProjectStatus } from "@/types";
 
 const projectQueryKeys = {
   all: (tenantId: string) => ["projects", tenantId] as const,
-  lists: (tenantId: string, statusFilter?: ProjectStatus[]) => 
-    [...projectQueryKeys.all(tenantId), "list", statusFilter ? statusFilter.join('_') : "ALL_STATUSES"] as const,
+  lists: (tenantId: string, statusFilter?: ProjectStatus[], contactId?: string) => 
+    [...projectQueryKeys.all(tenantId), "list", statusFilter ? statusFilter.join('_') : "ALL_STATUSES", contactId || "ALL_CONTACTS"] as const,
   details: (tenantId: string) => [...projectQueryKeys.all(tenantId), "detail"] as const,
-  detail: (projectId: string) => [...projectQueryKeys.details(""), projectId] as const, // Using empty string for tenantId if not needed for specific detail
+  detail: (projectId: string) => [...projectQueryKeys.details(""), projectId] as const, 
 };
 
-export function useGetProjects(tenantId: string | null, statusFilter?: ProjectStatus[]) {
+export function useGetProjects(tenantId: string | null, statusFilter?: ProjectStatus[], contactId?: string) {
   return useQuery<Project[], Error>({
-    // Use a distinct key part like "ALL_STATUSES" when statusFilter is undefined to ensure it's cached separately.
-    queryKey: projectQueryKeys.lists(tenantId!, statusFilter), 
-    queryFn: () => (tenantId ? getProjects(tenantId, statusFilter) : Promise.resolve([])),
+    queryKey: projectQueryKeys.lists(tenantId!, statusFilter, contactId), 
+    queryFn: () => (tenantId ? getProjects(tenantId, statusFilter, contactId) : Promise.resolve([])),
     enabled: !!tenantId,
   });
 }
@@ -41,7 +39,6 @@ export function useAddProject(tenantId: string) {
   return useMutation<Project, Error, NewProjectPayload>({
     mutationFn: (projectData) => addProject(tenantId, projectData),
     onSuccess: (data) => {
-      // Invalidate all relevant lists when a new project is added.
       queryClient.invalidateQueries({ queryKey: projectQueryKeys.all(tenantId) }); 
     },
   });
@@ -57,7 +54,6 @@ export function useUpdateProject() {
     mutationFn: ({ projectId, data }) => updateProject(projectId, data),
     onSuccess: (data, variables) => {
       if (data) {
-        // Invalidate all relevant lists when a project is updated.
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.all(data.tenantId) });
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(variables.projectId) });
       }
@@ -71,10 +67,7 @@ export function useDeleteProject() {
     mutationFn: deleteProject,
     onSuccess: (success, projectId, context) => {
       if (success) {
-        // To properly invalidate, we ideally need the tenantId.
-        // For now, broadly invalidate all project queries or fetch tenantId if possible.
-        // This assumes project IDs are globally unique or the deletion context provides tenantId.
-        queryClient.invalidateQueries({ queryKey: ["projects"] }); // Broad invalidation
+        queryClient.invalidateQueries({ queryKey: ["projects"] }); 
         queryClient.removeQueries({ queryKey: projectQueryKeys.detail(projectId) });
       }
     },

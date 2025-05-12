@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -257,7 +256,11 @@ export default function TenantContactsPage() {
                   {contacts && contacts.length > 0 ? (
                     contacts.map((contact) => (
                       <TableRow key={contact.id}>
-                        <TableCell className="font-medium">{contact.firstName ? `${contact.firstName} ${contact.name}` : contact.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/tenants/${tenantId}/contacts/${contact.id}`} className="text-primary hover:underline">
+                            {contact.firstName ? `${contact.firstName} ${contact.name}` : contact.name}
+                          </Link>
+                        </TableCell>
                         <TableCell>{contact.companyName || "-"}</TableCell>
                         <TableCell>{contact.email || "-"}</TableCell>
                         <TableCell>{contact.phone || "-"}</TableCell>
