@@ -57,6 +57,36 @@ interface ProductFormProps {
   isSubmitting?: boolean;
 }
 
+// Helper function to translate custom mask to regex pattern
+function translateMaskToPattern(mask?: string): string | undefined {
+  if (!mask) return undefined;
+  let pattern = '^';
+  for (const char of mask) {
+    switch (char) {
+      case '9':
+        pattern += '\\d';
+        break;
+      case 'a':
+        pattern += '[a-zA-Z]';
+        break;
+      case '*':
+        pattern += '[a-zA-Z0-9]';
+        break;
+      // Escape special regex characters
+      case '.': case '\\': case '+': case '?': case '[': case '^':
+      case '$': case '(': case ')': case '{': case '}': case '|': case '-':
+        pattern += `\\${char}`;
+        break;
+      default:
+        pattern += char; // Literal character
+        break;
+    }
+  }
+  pattern += '$';
+  return pattern;
+}
+
+
 export function ProductForm({
   tenantId,
   onSubmit,
@@ -147,16 +177,17 @@ export function ProductForm({
   
   const renderCustomField = (definition: CustomProductFieldDefinition) => {
     const fieldName = `customFields.${definition.name}` as const;
+    const htmlPattern = (definition.type === 'text' || definition.type === 'number') ? translateMaskToPattern(definition.inputMask) : undefined;
 
     const renderActualInput = (field: any) => { // field from Controller render prop
         if (definition.type === 'text') {
-            return <Input placeholder={definition.label} {...field} value={field.value || ''} />;
+            return <Input placeholder={definition.label} {...field} value={field.value || ''} pattern={htmlPattern} />;
         }
         if (definition.type === 'textarea') {
             return <Textarea placeholder={definition.label} {...field} value={field.value || ''} />;
         }
         if (definition.type === 'number') {
-            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />;
+            return <Input type="number" placeholder={definition.label} {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} pattern={htmlPattern} />;
         }
         if (definition.type === 'boolean') {
             return (
@@ -207,7 +238,7 @@ export function ProductForm({
               {renderActualInput(field)}
             </FormControl>
             {definition.inputMask && (definition.type === 'text' || definition.type === 'number') && (
-                <FormDescription className="text-xs">Format: {definition.inputMask}</FormDescription>
+                <FormDescription className="text-xs">Erwartetes Format: {definition.inputMask} (9=Ziffer, a=Buchstabe, *=Alphanumerisch)</FormDescription>
             )}
             <FormMessage />
           </FormItem>
@@ -398,4 +429,3 @@ export function ProductForm({
     </Form>
   );
 }
-
