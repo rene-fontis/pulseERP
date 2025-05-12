@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,14 +13,16 @@ import type { Project, NewProjectPayload, ProjectStatus } from "@/types";
 
 const projectQueryKeys = {
   all: (tenantId: string) => ["projects", tenantId] as const,
-  lists: (tenantId: string, statusFilter?: ProjectStatus[]) => [...projectQueryKeys.all(tenantId), "list", ...(statusFilter || ["ALL_STATUSES"])] as const, // Use a unique key when no filter
+  lists: (tenantId: string, statusFilter?: ProjectStatus[]) => 
+    [...projectQueryKeys.all(tenantId), "list", statusFilter ? statusFilter.join('_') : "ALL_STATUSES"] as const,
   details: (tenantId: string) => [...projectQueryKeys.all(tenantId), "detail"] as const,
-  detail: (projectId: string) => [...projectQueryKeys.details(""), projectId] as const,
+  detail: (projectId: string) => [...projectQueryKeys.details(""), projectId] as const, // Using empty string for tenantId if not needed for specific detail
 };
 
 export function useGetProjects(tenantId: string | null, statusFilter?: ProjectStatus[]) {
   return useQuery<Project[], Error>({
-    queryKey: projectQueryKeys.lists(tenantId!, statusFilter),
+    // Use a distinct key part like "ALL_STATUSES" when statusFilter is undefined to ensure it's cached separately.
+    queryKey: projectQueryKeys.lists(tenantId!, statusFilter), 
     queryFn: () => (tenantId ? getProjects(tenantId, statusFilter) : Promise.resolve([])),
     enabled: !!tenantId,
   });
@@ -38,9 +41,8 @@ export function useAddProject(tenantId: string) {
   return useMutation<Project, Error, NewProjectPayload>({
     mutationFn: (projectData) => addProject(tenantId, projectData),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId) }); // Invalidate general list
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId, ['Active']) }); // Specific for active list
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId, undefined) }); // Invalidate "all statuses" list
+      // Invalidate all relevant lists when a new project is added.
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all(tenantId) }); 
     },
   });
 }
@@ -55,13 +57,9 @@ export function useUpdateProject() {
     mutationFn: ({ projectId, data }) => updateProject(projectId, data),
     onSuccess: (data, variables) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId) }); // Invalidate general list
+        // Invalidate all relevant lists when a project is updated.
+        queryClient.invalidateQueries({ queryKey: projectQueryKeys.all(data.tenantId) });
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(variables.projectId) });
-        // Invalidate specific status lists if status changed
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Active']) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Archived']) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Completed']) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, undefined) }); // Invalidate "all statuses" list
       }
     },
   });
@@ -73,9 +71,10 @@ export function useDeleteProject() {
     mutationFn: deleteProject,
     onSuccess: (success, projectId, context) => {
       if (success) {
-        // To properly invalidate, we'd need tenantId
-        // For now, broadly invalidate or fetch tenantId from a cached project
-        queryClient.invalidateQueries({ queryKey: ["projects"] });
+        // To properly invalidate, we ideally need the tenantId.
+        // For now, broadly invalidate all project queries or fetch tenantId if possible.
+        // This assumes project IDs are globally unique or the deletion context provides tenantId.
+        queryClient.invalidateQueries({ queryKey: ["projects"] }); // Broad invalidation
         queryClient.removeQueries({ queryKey: projectQueryKeys.detail(projectId) });
       }
     },

@@ -23,14 +23,10 @@ type EnrichedTask = ProjectTask & {
   milestoneName?: string;
 };
 
-const formatDate = (dateString?: string | null, relative: boolean = false) => {
+const formatDate = (dateString?: string | null) => {
   if (!dateString) return "Kein Datum";
   try {
     const date = parseISO(dateString);
-    if (relative) {
-      // Add relative formatting if needed, e.g., using formatDistanceToNow
-      return format(date, "PPP", { locale: de });
-    }
     return format(date, "dd.MM.yyyy", { locale: de });
   } catch (e) {
     return "Ungültiges Datum";
@@ -43,7 +39,7 @@ const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
       case 'Open': return 'bg-blue-100 text-blue-700';
       case 'InProgress': return 'bg-yellow-100 text-yellow-700';
       case 'InReview': return 'bg-purple-100 text-purple-700';
-      case 'Completed': return 'bg-green-100 text-green-700';
+      case 'Completed': return 'bg-green-100 text-green-700'; // Should be filtered out in the main list
       case 'Blocked': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
@@ -89,16 +85,17 @@ export default function AllTasksPage() {
   const [clientLoaded, setClientLoaded] = useState(false);
   useEffect(() => setClientLoaded(true), []);
 
-  // Fetch all projects for the tenant, regardless of status, to get all tasks
+  // Fetch all projects for the tenant (statusFilter undefined fetches all)
   const { data: projects, isLoading: isLoadingProjects, error: projectsError } = useGetProjects(tenantId, undefined);
 
-  const allTasks = useMemo(() => {
+  const allNonCompletedTasks = useMemo(() => {
     if (!projects) return [];
     
     const taskList: EnrichedTask[] = [];
     
     projects.forEach(project => {
-      if (project.tenantId !== tenantId) return; // Ensure project belongs to current tenant
+      // Ensure project belongs to current tenant (should be guaranteed by useGetProjects hook already)
+      // if (project.tenantId !== tenantId) return; 
 
       const milestoneMap = new Map<string, string>();
       project.milestones.forEach(milestone => {
@@ -112,13 +109,13 @@ export default function AllTasksPage() {
             ...task,
             projectId: project.id,
             projectName: project.name,
-            tenantId: tenantId, // Use tenantId from params for consistency in links
+            tenantId: project.tenantId, // Use tenantId from project data
             milestoneName: task.milestoneId ? milestoneMap.get(task.milestoneId) : undefined,
           });
         });
     });
     return taskList;
-  }, [projects, tenantId]);
+  }, [projects]);
 
   const categorizedTasks = useMemo(() => {
     const today = startOfDay(new Date());
@@ -128,7 +125,7 @@ export default function AllTasksPage() {
     const dueSoon: EnrichedTask[] = [];
     const noDueDate: EnrichedTask[] = [];
 
-    allTasks.forEach(task => {
+    allNonCompletedTasks.forEach(task => {
       if (!task.dueDate) {
         noDueDate.push(task);
       } else {
@@ -138,10 +135,13 @@ export default function AllTasksPage() {
         } else if (isWithinInterval(dueDate, { start: today, end: sevenDaysFromNow })) {
           dueSoon.push(task);
         } 
+        // Tasks further in the future or with no due date are implicitly handled by not being in overdue/dueSoon
+        // unless they are explicitly added to another category (which they are not here).
+        // If you need a "future tasks" category, you would add another else-if here.
       }
     });
     
-    const sortTasks = (tasks: EnrichedTask[]) => tasks.sort((a,b) => {
+    const sortTasks = (tasksToSort: EnrichedTask[]) => tasksToSort.sort((a,b) => {
         if (a.dueDate && b.dueDate) return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime();
         if (a.dueDate) return -1; 
         if (b.dueDate) return 1;
@@ -153,7 +153,7 @@ export default function AllTasksPage() {
       dueSoon: sortTasks(dueSoon),
       noDueDate: sortTasks(noDueDate),
     };
-  }, [allTasks]);
+  }, [allNonCompletedTasks]);
 
   const isLoading = isLoadingProjects && !clientLoaded;
 
@@ -200,76 +200,72 @@ export default function AllTasksPage() {
     );
   }
 
-  if (allTasks.length === 0 && !isLoadingProjects && clientLoaded) {
-    return (
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex items-center">
-          <ClipboardList className="h-8 w-8 mr-3 text-primary" />
-          <h1 className="text-3xl font-bold">Aufgabenübersicht</h1>
-        </div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Für diesen Mandanten wurden keine offenen Aufgaben in den Projekten gefunden.</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Sie können Aufgaben in der <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projektverwaltung</Link> erstellen.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       <div className="flex items-center">
         <ClipboardList className="h-8 w-8 mr-3 text-primary" />
-        <h1 className="text-3xl font-bold">Aufgabenübersicht (Offene Aufgaben)</h1>
+        <h1 className="text-3xl font-bold">Aufgabenübersicht</h1>
       </div>
+      <Card className="shadow-sm">
+        <CardContent className="p-4 text-sm text-muted-foreground">
+          Dies ist eine globale Aufgabenübersicht aller nicht erledigten Aufgaben.
+          Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.
+        </CardContent>
+      </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center space-x-2">
-            <CalendarX className="h-6 w-6 text-destructive" />
-            <CardTitle>Überfällig ({categorizedTasks.overdue.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-[400px] overflow-y-auto">
-            {categorizedTasks.overdue.length > 0 ? (
-              categorizedTasks.overdue.map(task => <TaskItem key={task.id} task={task} />)
-            ) : (
-              <p className="text-sm text-muted-foreground">Keine überfälligen Aufgaben.</p>
-            )}
+      {allNonCompletedTasks.length === 0 && !isLoadingProjects && clientLoaded && (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">Für diesen Mandanten wurden keine offenen Aufgaben in den Projekten gefunden.</p>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center space-x-2">
-            <CalendarClock className="h-6 w-6 text-yellow-500" />
-            <CardTitle>Bald fällig ({categorizedTasks.dueSoon.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-[400px] overflow-y-auto">
-            {categorizedTasks.dueSoon.length > 0 ? (
-              categorizedTasks.dueSoon.map(task => <TaskItem key={task.id} task={task} />)
-            ) : (
-              <p className="text-sm text-muted-foreground">Keine bald fälligen Aufgaben.</p>
-            )}
-          </CardContent>
-        </Card>
+      {allNonCompletedTasks.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="shadow-md">
+            <CardHeader className="flex flex-row items-center space-x-2">
+              <CalendarX className="h-6 w-6 text-destructive" />
+              <CardTitle>Überfällig ({categorizedTasks.overdue.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="max-h-[400px] overflow-y-auto">
+              {categorizedTasks.overdue.length > 0 ? (
+                categorizedTasks.overdue.map(task => <TaskItem key={task.id} task={task} />)
+              ) : (
+                <p className="text-sm text-muted-foreground">Keine überfälligen Aufgaben.</p>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center space-x-2">
-            <Calendar className="h-6 w-6 text-muted-foreground" />
-            <CardTitle>Ohne Fälligkeitsdatum ({categorizedTasks.noDueDate.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-[400px] overflow-y-auto">
-            {categorizedTasks.noDueDate.length > 0 ? (
-              categorizedTasks.noDueDate.map(task => <TaskItem key={task.id} task={task} />)
-            ) : (
-              <p className="text-sm text-muted-foreground">Keine Aufgaben ohne Fälligkeitsdatum.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      {/* The "Hinweis" card has been removed from here */}
+          <Card className="shadow-md">
+            <CardHeader className="flex flex-row items-center space-x-2">
+              <CalendarClock className="h-6 w-6 text-yellow-500" />
+              <CardTitle>Bald fällig ({categorizedTasks.dueSoon.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="max-h-[400px] overflow-y-auto">
+              {categorizedTasks.dueSoon.length > 0 ? (
+                categorizedTasks.dueSoon.map(task => <TaskItem key={task.id} task={task} />)
+              ) : (
+                <p className="text-sm text-muted-foreground">Keine bald fälligen Aufgaben.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md">
+            <CardHeader className="flex flex-row items-center space-x-2">
+              <Calendar className="h-6 w-6 text-muted-foreground" />
+              <CardTitle>Ohne Fälligkeitsdatum ({categorizedTasks.noDueDate.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="max-h-[400px] overflow-y-auto">
+              {categorizedTasks.noDueDate.length > 0 ? (
+                categorizedTasks.noDueDate.map(task => <TaskItem key={task.id} task={task} />)
+              ) : (
+                <p className="text-sm text-muted-foreground">Keine Aufgaben ohne Fälligkeitsdatum.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
