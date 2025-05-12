@@ -153,6 +153,15 @@ export interface JournalEntry {
 
 // Type for submitting new journal entries to the service/mutation
 export type NewJournalEntryPayload = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
+export type JournalEntryFormValues = Omit<NewJournalEntryPayload, 'tenantId' | 'fiscalYearId' | 'date' | 'lines'> & {
+  date: Date;
+  lines: Array<Partial<Omit<JournalEntryLine, 'accountNumber' | 'accountName'>>>; // For form, ID might be temp, accountNumber/Name not needed
+  entryType: 'single' | 'batch';
+  debitAccountId?: string; // For single entry
+  creditAccountId?: string; // For single entry
+  amount?: number; // For single entry
+};
+
 
 // --- Fiscal Year Types ---
 export interface FiscalYear {
@@ -477,6 +486,19 @@ export interface CustomProductFieldDefinition {
   order?: number; // For controlling display order
 }
 
+export interface ProductCategory {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  parentId?: string | null; // For sub-categories
+  createdAt: string;
+  updatedAt: string;
+}
+export type NewProductCategoryPayload = Omit<ProductCategory, 'id' | 'createdAt' | 'updatedAt' | 'tenantId'>;
+export type ProductCategoryFormValues = Omit<NewProductCategoryPayload, 'parentId'> & { parentId?: string | null };
+
+
 export interface Warehouse {
   id: string;
   tenantId: string;
@@ -514,20 +536,20 @@ export interface Product {
   name: string;
   description?: string;
   unitPrice: number; // Verkaufspreis
-  purchasePrice?: number; // Einkaufspreis (optional)
-  taxRateId?: string; 
+  purchasePrice?: number | null; // Einkaufspreis (optional)
+  taxRateId?: string | null; 
   unit?: string; // Einheit (Stk, kg, m, etc.)
-  minimumQuantity?: number; // Mindestbestellmenge oder Meldebestand
+  minimumQuantity?: number | null; // Mindestbestellmenge oder Meldebestand
   stockOnHand?: number; // Gesamter Lagerbestand über alle Lager (kann berechnet werden)
   defaultWarehouseId?: string | null; // Standardlager für dieses Produkt
-  // stockPerWarehouse?: Record<string, number>; // { warehouseId: quantity } - For more granular stock
+  categoryIds?: string[]; // IDs of ProductCategory
   customFields?: Record<string, any>; // Stores values for custom fields defined by tenant { [fieldDefinitionId]: value }
   createdAt: string;
   updatedAt: string;
 }
 
 export type NewProductPayload = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
-export type ProductFormValues = Omit<NewProductPayload, 'tenantId'> & { customFields?: Record<string, any> }; // For the form
+export type ProductFormValues = Omit<NewProductPayload, 'tenantId'>;
 
 
 // --- Invoicing Types ---
