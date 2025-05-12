@@ -1,16 +1,17 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ClipboardList, CalendarClock, CalendarX, CalendarCheck2, Loader2 } from 'lucide-react';
+import { AlertCircle, ClipboardList, CalendarClock, CalendarX, CalendarCheck2, Loader2, Calendar } from 'lucide-react'; // Added Calendar import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useGetProjects } from '@/hooks/useProjects';
 import type { Project, ProjectTask, TaskStatus } from '@/types';
 import { taskStatusLabels } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parseISO, isBefore, isAfter, addDays, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, addDays, startOfDay, isWithinInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 type EnrichedTask = ProjectTask & {
   projectId: string;
   projectName: string;
+  tenantId: string; // Added tenantId to EnrichedTask
 };
 
 const formatDate = (dateString?: string | null, relative: boolean = false) => {
@@ -33,6 +35,9 @@ const formatDate = (dateString?: string | null, relative: boolean = false) => {
     return "Ungültiges Datum";
   }
 };
+
+// Initialize projectMilestonesMap globally but populate it within useMemo or useEffect
+let projectMilestonesMap: Record<string, string> = {};
 
 const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
   const getStatusColor = (status: TaskStatus) => {
@@ -77,9 +82,6 @@ const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
   );
 };
 
-// Helper to create a map of milestoneId to milestoneName for quick lookup
-let projectMilestonesMap: Record<string, string> = {};
-
 
 export default function AllTasksPage() {
   const params = useParams();
@@ -106,7 +108,7 @@ export default function AllTasksPage() {
           ...task,
           projectId: project.id,
           projectName: project.name,
-          tenantId: project.tenantId, // Add tenantId to task for linking
+          tenantId: project.tenantId, 
         });
       });
     });
@@ -268,3 +270,4 @@ export default function AllTasksPage() {
     </div>
   );
 }
+
