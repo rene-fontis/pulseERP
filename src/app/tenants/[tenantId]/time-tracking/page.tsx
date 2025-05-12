@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Clock, PlusCircle, Edit, Trash2, AlertCircle, Loader2, PlayCircle, PauseCircle, StopCircle, Brain } from "lucide-react";
+import { Clock, PlusCircle, Edit, Trash2, AlertCircle, Loader2, PlayCircle, PauseCircle, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,14 +12,16 @@ import { TimeEntryForm } from "@/components/time-tracking/TimeEntryForm";
 import { useGetTimeEntries, useAddTimeEntry, useUpdateTimeEntry, useDeleteTimeEntry } from "@/hooks/useTimeEntries";
 import { useGetContacts } from "@/hooks/useContacts";
 import { useGetProjects } from "@/hooks/useProjects";
-import type { TimeEntry, NewTimeEntryPayload, Contact, Project as ProjectType, ProjectTask } from "@/types"; // Renamed Project to ProjectType to avoid conflict
+import type { TimeEntry, NewTimeEntryPayload, Project as ProjectType, ProjectTask, TimeEntryFormValues } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO, intervalToDuration, formatDuration } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+
+const TIMER_STORAGE_KEY = 'pulseERPTimerState';
 
 export default function TenantTimeTrackingPage() {
   const params = useParams();
@@ -27,7 +29,7 @@ export default function TenantTimeTrackingPage() {
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<Partial<TimeEntry> | null>(null); // Allow partial for timer
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // Timer State
@@ -43,13 +45,6 @@ export default function TenantTimeTrackingPage() {
   const [timerProjectId, setTimerProjectId] = useState<string | null>(null);
   const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
   const [timerDescription, setTimerDescription] = useState("");
-
-  useEffect(() => {
-    setClientLoaded(true);
-    return () => { // Cleanup interval on component unmount
-      if (timerIntervalId) clearInterval(timerIntervalId);
-    };
-  }, [timerIntervalId]);
 
   const { data: timeEntries, isLoading: isLoadingEntries, error: entriesError } = useGetTimeEntries(tenantId);
   const { data: contacts, isLoading: isLoadingContacts } = useGetContacts(tenantId);
@@ -68,6 +63,85 @@ export default function TenantTimeTrackingPage() {
   }, []);
 
   useEffect(() => {
+    setClientLoaded(true);
+    return () => {
+      if (timerIntervalId) clearInterval(timerIntervalId);
+    };
+  }, [timerIntervalId]);
+
+
+  // Save to localStorage whenever relevant state changes
+  useEffect(() => {
+    if (!clientLoaded) return;
+
+    const timerState = {
+      startTimeEpoch,
+      accumulatedElapsedTime,
+      timerActive,
+      timerPaused,
+      timerContactId,
+      timerProjectId,
+      timerTaskId,
+      timerDescription,
+    };
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+  }, [
+    clientLoaded,
+    startTimeEpoch,
+    accumulatedElapsedTime,
+    timerActive,
+    timerPaused,
+    timerContactId,
+    timerProjectId,
+    timerTaskId,
+    timerDescription,
+  ]);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (!clientLoaded) return;
+
+    const savedTimerStateJSON = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (savedTimerStateJSON) {
+      try {
+        const savedState = JSON.parse(savedTimerStateJSON);
+
+        setTimerContactId(savedState.timerContactId || null);
+        setTimerProjectId(savedState.timerProjectId || null);
+        setTimerTaskId(savedState.timerTaskId || null);
+        setTimerDescription(savedState.timerDescription || "");
+
+        if (savedState.timerActive) {
+          let newAccumulatedTime = savedState.accumulatedElapsedTime || 0;
+          if (!savedState.timerPaused && savedState.startTimeEpoch) {
+            const elapsedSinceLastSave = (Date.now() - savedState.startTimeEpoch) / 1000;
+            newAccumulatedTime += elapsedSinceLastSave;
+          }
+          setAccumulatedElapsedTime(newAccumulatedTime);
+          setTimerActive(true);
+          setTimerPaused(savedState.timerPaused || false);
+
+          if (!savedState.timerPaused) {
+            setStartTimeEpoch(Date.now());
+          } else {
+            setDisplayTime(formatTimerDisplay(newAccumulatedTime));
+          }
+        } else {
+          setAccumulatedElapsedTime(savedState.accumulatedElapsedTime || 0);
+          setTimerActive(false);
+          setTimerPaused(false);
+          setStartTimeEpoch(null);
+          setDisplayTime(formatTimerDisplay(savedState.accumulatedElapsedTime || 0));
+        }
+      } catch (error) {
+        console.error("Error parsing saved timer state from localStorage:", error);
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+      }
+    }
+  }, [clientLoaded, formatTimerDisplay]);
+
+
+  useEffect(() => {
     if (timerActive && !timerPaused && startTimeEpoch) {
       const interval = setInterval(() => {
         const currentElapsed = (Date.now() - startTimeEpoch) / 1000;
@@ -78,20 +152,18 @@ export default function TenantTimeTrackingPage() {
     } else if (timerIntervalId) {
       clearInterval(timerIntervalId);
       setTimerIntervalId(null);
-      // Ensure displayTime reflects accumulatedTime when paused or stopped
       setDisplayTime(formatTimerDisplay(accumulatedElapsedTime));
     }
-  }, [timerActive, timerPaused, startTimeEpoch, accumulatedElapsedTime, formatTimerDisplay]);
+  }, [timerActive, timerPaused, startTimeEpoch, accumulatedElapsedTime, formatTimerDisplay, timerIntervalId]);
 
 
   const handleStartTimer = () => {
-    if (!timerActive) { // Start new or resume from completely stopped state
+    if (!timerActive) {
       setStartTimeEpoch(Date.now());
-      // accumulatedElapsedTime is already 0 if new, or preserved if resuming from a previous stop that wasn't saved
       setTimerActive(true);
       setTimerPaused(false);
-    } else if (timerPaused) { // Resume from paused state
-      setStartTimeEpoch(Date.now()); // Reset start time for current segment
+    } else if (timerPaused) {
+      setStartTimeEpoch(Date.now());
       setTimerPaused(false);
     }
   };
@@ -107,7 +179,7 @@ export default function TenantTimeTrackingPage() {
 
   const handleStopAndSaveTimer = () => {
     let finalElapsedTime = accumulatedElapsedTime;
-    if (timerActive && !timerPaused && startTimeEpoch) { // If timer was running
+    if (timerActive && !timerPaused && startTimeEpoch) {
       finalElapsedTime += (Date.now() - startTimeEpoch) / 1000;
     }
 
@@ -115,47 +187,42 @@ export default function TenantTimeTrackingPage() {
       const hoursToSave = finalElapsedTime / 3600;
       const initialFormData: Partial<TimeEntryFormValues> = {
         date: new Date(),
-        hours: parseFloat(hoursToSave.toFixed(2)), // Round to 2 decimal places
+        hours: parseFloat(hoursToSave.toFixed(2)),
         description: timerDescription,
         contactId: timerContactId,
         projectId: timerProjectId,
         taskId: timerTaskId,
-        isBillable: true, // Default to billable
+        isBillable: true,
       };
-      // Pre-fill rate from contact if selected
       if (timerContactId && contacts) {
         const contact = contacts.find(c => c.id === timerContactId);
         if (contact?.hourlyRate) {
           initialFormData.rate = contact.hourlyRate;
         }
       }
-
-      setSelectedEntry(initialFormData as TimeEntry); // Cast for form, actual save handles NewTimeEntryPayload
+      setSelectedEntry(initialFormData as Partial<TimeEntry>);
       setIsModalOpen(true);
     } else {
         toast({title: "Info", description: "Keine Zeit erfasst zum Speichern.", variant: "default"});
     }
 
-    // Reset timer state
     setTimerActive(false);
     setTimerPaused(false);
     setStartTimeEpoch(null);
     setAccumulatedElapsedTime(0);
     setDisplayTime("00:00:00");
-    setTimerDescription("");
-    // Optionally reset context selectors, or leave them for next timer
-    // setTimerContactId(null);
-    // setTimerProjectId(null);
-    // setTimerTaskId(null);
+    // Optionally keep description and context for next timer, or clear:
+    // setTimerDescription(""); 
+    // setTimerContactId(null); etc.
+    localStorage.removeItem(TIMER_STORAGE_KEY);
   };
-
 
   const handleAddOrUpdateEntry = async (values: NewTimeEntryPayload) => {
     try {
-      if (selectedEntry && selectedEntry.id) { // If it's an existing entry being edited
+      if (selectedEntry && selectedEntry.id) {
         await updateEntryMutation.mutateAsync({ entryId: selectedEntry.id, data: values });
         toast({ title: "Erfolg", description: "Zeiteintrag erfolgreich aktualisiert." });
-      } else { // New entry (either manual or from timer)
+      } else {
         await addEntryMutation.mutateAsync(values);
         toast({ title: "Erfolg", description: "Zeiteintrag erfolgreich erstellt." });
       }
@@ -218,7 +285,6 @@ export default function TenantTimeTrackingPage() {
     return selectedProject?.tasks.filter(t => t.status !== 'Completed').map(t => ({ value: t.id, label: t.name })) || [];
   }, [timerProjectId, projectOptionsForTimer]);
 
-
   const isLoading = (isLoadingEntries || isLoadingContacts || isLoadingProjects) && !clientLoaded;
 
   if (entriesError) {
@@ -257,7 +323,7 @@ export default function TenantTimeTrackingPage() {
               <TimeEntryForm
                 tenantId={tenantId}
                 onSubmit={handleAddOrUpdateEntry}
-                initialData={selectedEntry} // This can be a partial TimeEntry for timer saves
+                initialData={selectedEntry}
                 isSubmitting={addEntryMutation.isPending || updateEntryMutation.isPending}
               />
             </DialogContent>
@@ -293,7 +359,7 @@ export default function TenantTimeTrackingPage() {
                 </div>
                  <div className="space-y-1">
                     <label htmlFor="timer-task" className="text-sm font-medium">Aufgabe (optional)</label>
-                     <Select value={timerTaskId || undefined} onValueChange={(value) => setTimerTaskId(value === "none" ? null : value)} disabled={timerActive || !timerProjectId || taskOptionsForTimer.length === 0}>
+                     <Select value={timerTaskId || undefined} onValueChange={(value) => setTimerTaskId(value === "none" ? null : value)} disabled={timerActive || !timerProjectId}>
                         <SelectTrigger id="timer-task"><SelectValue placeholder="Aufgabe wählen..." /></SelectTrigger>
                         <SelectContent>
                              <SelectItem value="none">(Keine Aufgabe)</SelectItem>
@@ -304,7 +370,7 @@ export default function TenantTimeTrackingPage() {
             </div>
              <div className="space-y-1">
                 <label htmlFor="timer-description" className="text-sm font-medium">Notiz für Timer (optional)</label>
-                <Input id="timer-description" value={timerDescription} onChange={(e) => setTimerDescription(e.target.value)} placeholder="Kurze Notiz..." disabled={timerActive && !timerPaused} />
+                <Input id="timer-description" value={timerDescription} onChange={(e) => setTimerDescription(e.target.value)} placeholder="Kurze Notiz..." disabled={timerActive} />
             </div>
 
             <div className="flex flex-col items-center sm:flex-row sm:justify-around gap-4 pt-4 border-t">
@@ -407,4 +473,3 @@ export default function TenantTimeTrackingPage() {
     </div>
   );
 }
-
