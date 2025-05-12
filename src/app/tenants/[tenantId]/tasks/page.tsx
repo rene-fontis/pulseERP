@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -97,6 +98,8 @@ export default function AllTasksPage() {
     const taskList: EnrichedTask[] = [];
     
     projects.forEach(project => {
+      if (project.tenantId !== tenantId) return; // Ensure project belongs to current tenant
+
       const milestoneMap = new Map<string, string>();
       project.milestones.forEach(milestone => {
         milestoneMap.set(milestone.id, milestone.name);
@@ -109,13 +112,13 @@ export default function AllTasksPage() {
             ...task,
             projectId: project.id,
             projectName: project.name,
-            tenantId: project.tenantId,
+            tenantId: tenantId, // Use tenantId from params for consistency in links
             milestoneName: task.milestoneId ? milestoneMap.get(task.milestoneId) : undefined,
           });
         });
     });
     return taskList;
-  }, [projects]);
+  }, [projects, tenantId]);
 
   const categorizedTasks = useMemo(() => {
     const today = startOfDay(new Date());
@@ -126,7 +129,6 @@ export default function AllTasksPage() {
     const noDueDate: EnrichedTask[] = [];
 
     allTasks.forEach(task => {
-      // No need to check for 'Completed' status here as 'allTasks' is already filtered
       if (!task.dueDate) {
         noDueDate.push(task);
       } else {
@@ -267,14 +269,8 @@ export default function AllTasksPage() {
           </CardContent>
         </Card>
       </div>
-       <Card className="shadow-lg mt-8">
-        <CardHeader>
-            <CardTitle>Aufgabenübersicht Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <p className="text-muted-foreground">Dies ist eine globale Aufgabenübersicht aller nicht erledigten Aufgaben. Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.</p>
-        </CardContent>
-      </Card>
+      {/* The "Hinweis" card has been removed from here */}
     </div>
   );
 }
+
