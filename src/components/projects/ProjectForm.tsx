@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -15,7 +16,8 @@ import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Project, NewProjectPayload, Contact, ProjectStatus, ProjectFormValues, projectStatusLabels } from "@/types";
+import type { Project, NewProjectPayload, Contact, ProjectStatus, ProjectFormValues } from "@/types";
+import { projectStatusLabels } from "@/types"; // Import projectStatusLabels
 import { useGetContacts } from "@/hooks/useContacts";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
