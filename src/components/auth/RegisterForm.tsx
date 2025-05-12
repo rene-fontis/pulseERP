@@ -6,19 +6,20 @@ import {
   createUserWithEmailAndPassword, 
   signInWithPopup, 
   GoogleAuthProvider,
+  updateProfile, // Import updateProfile
   type UserCredential
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'; // Added getDoc
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { useForm } from 'react-hook-form';
 import { Loader2, Chrome } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // Changed from next/router
+import { useRouter } from 'next/navigation';
 import type { NewUserPayload } from '@/types';
 
 const registerFormSchema = z.object({
@@ -44,18 +45,25 @@ export function RegisterForm() {
     },
   });
 
-  const saveUserToFirestore = async (firebaseUser: UserCredential['user']) => {
+  const saveUserToFirestore = async (firebaseUser: UserCredential['user'], displayNameFromForm?: string | null) => {
     const userDocRef = doc(db, "users", firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef); // Check if user already exists (e.g. from Google sign-in)
+    const userDoc = await getDoc(userDocRef); 
     if (!userDoc.exists()) {
         const userData: NewUserPayload = {
             email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || form.getValues("displayName") || null,
+            displayName: firebaseUser.displayName || displayNameFromForm || null,
             photoURL: firebaseUser.photoURL || null,
             tenantIds: [],
             createdAt: serverTimestamp(),
         };
         await setDoc(userDocRef, userData);
+    } else {
+      // Optionally update existing document if needed, e.g. if displayName changed
+      // For now, we just ensure it exists
+      const existingData = userDoc.data();
+      if (displayNameFromForm && existingData.displayName !== displayNameFromForm) {
+        await setDoc(userDocRef, { displayName: displayNameFromForm }, { merge: true });
+      }
     }
   };
 
@@ -63,7 +71,16 @@ export function RegisterForm() {
     setIsLoadingEmail(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      await saveUserToFirestore(userCredential.user);
+      const user = userCredential.user;
+
+      // Update Firebase Auth profile display name if provided
+      if (values.displayName) {
+        await updateProfile(user, { displayName: values.displayName });
+      }
+      
+      // Save/ensure user data in Firestore
+      await saveUserToFirestore(user, values.displayName);
+
       toast({
         title: "Erfolg",
         description: "Benutzer erfolgreich mit E-Mail registriert.",
@@ -85,7 +102,11 @@ export function RegisterForm() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      await saveUserToFirestore(result.user); // saveUserToFirestore now checks for existence
+      const user = result.user;
+      
+      // Save/ensure user data in Firestore, using displayName from Google profile
+      await saveUserToFirestore(user, user.displayName); 
+      
       toast({
         title: "Erfolg",
         description: "Erfolgreich mit Google angemeldet/registriert.",
