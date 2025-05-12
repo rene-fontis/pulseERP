@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -30,15 +31,15 @@ const mapDocToProject = (docSnapshot: any): Project => {
     description: data.description,
     contactId: data.contactId || null,
     contactName: data.contactName || null,
-    startDate: data.startDate ? formatFirestoreTimestamp(data.startDate) : null,
-    endDate: data.endDate ? formatFirestoreTimestamp(data.endDate) : null,
+    startDate: data.startDate ? formatFirestoreTimestamp(data.startDate, docSnapshot.id, 'now') : null,
+    endDate: data.endDate ? formatFirestoreTimestamp(data.endDate, docSnapshot.id, 'now') : null,
     status: data.status || 'Active',
     milestones: (data.milestones || []).map((ms: any) => ({
       ...ms,
       id: ms.id || crypto.randomUUID(),
-      dueDate: ms.dueDate ? formatFirestoreTimestamp(ms.dueDate) : null,
-      createdAt: ms.createdAt ? formatFirestoreTimestamp(ms.createdAt) : new Date(0).toISOString(),
-      updatedAt: ms.updatedAt ? formatFirestoreTimestamp(ms.updatedAt) : new Date(0).toISOString(),
+      dueDate: ms.dueDate ? formatFirestoreTimestamp(ms.dueDate, ms.id, 'now') : null,
+      createdAt: formatFirestoreTimestamp(ms.createdAt, ms.id, 'now'), // Default to 'now' if missing
+      updatedAt: formatFirestoreTimestamp(ms.updatedAt, ms.id, 'now'), // Default to 'now' if missing
     })),
     createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, "now"),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, "now"),
@@ -46,7 +47,7 @@ const mapDocToProject = (docSnapshot: any): Project => {
 };
 
 export const getProjects = async (tenantId: string, statusFilter?: ProjectStatus[]): Promise<Project[]> => {
-  const qConstraints = [
+  const qConstraints: any[] = [ // Use any[] for queryConstraints to satisfy TS for push
     where("tenantId", "==", tenantId),
     orderBy("createdAt", "desc")
   ];
@@ -74,19 +75,29 @@ export const addProject = async (tenantId: string, projectData: NewProjectPayloa
     ...projectData,
     tenantId,
     status: projectData.status || 'Active',
-    milestones: (projectData.milestones || []).map(ms => ({
-        ...ms,
+    milestones: (projectData.milestones || []).map(ms => {
+      // ms is Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>
+      // ms.dueDate is string | null
+      const milestoneToAdd: any = {
         id: crypto.randomUUID(),
+        name: ms.name,
+        description: ms.description === undefined ? null : ms.description,
+        completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        createdAt: now,
+        createdAt: now, // Use serverTimestamp for new milestones within a new project
         updatedAt: now,
-    })),
+      };
+      if (ms.description === undefined) {
+          delete milestoneToAdd.description; // Firestore omits undefined fields
+      }
+      return milestoneToAdd;
+    }),
     createdAt: now,
     updatedAt: now,
   };
+  
   if (projectData.startDate) newProjectData.startDate = Timestamp.fromDate(new Date(projectData.startDate));
   if (projectData.endDate) newProjectData.endDate = Timestamp.fromDate(new Date(projectData.endDate));
-  
   if (!projectData.contactId) newProjectData.contactId = null;
 
 
@@ -100,25 +111,44 @@ export const addProject = async (tenantId: string, projectData: NewProjectPayloa
 
 export const updateProject = async (
   projectId: string,
-  projectData: Partial<Project>
+  projectData: Partial<Project> // Project type has string dates for milestones
 ): Promise<Project | undefined> => {
   const projectDocRef = doc(db, "projects", projectId);
   const updateData: any = { ...projectData, updatedAt: serverTimestamp() };
 
-  if (projectData.startDate) updateData.startDate = Timestamp.fromDate(new Date(projectData.startDate));
-  if (projectData.endDate) updateData.endDate = Timestamp.fromDate(new Date(projectData.endDate));
-  if (projectData.hasOwnProperty('contactId') && projectData.contactId === undefined) updateData.contactId = null;
-  if (projectData.hasOwnProperty('contactName') && projectData.contactName === undefined) updateData.contactName = null;
-
+  // Handle project-level dates
+  if (projectData.hasOwnProperty('startDate')) {
+    updateData.startDate = projectData.startDate ? Timestamp.fromDate(new Date(projectData.startDate)) : null;
+  }
+  if (projectData.hasOwnProperty('endDate')) {
+    updateData.endDate = projectData.endDate ? Timestamp.fromDate(new Date(projectData.endDate)) : null;
+  }
+  if (projectData.hasOwnProperty('contactId') && projectData.contactId === undefined) {
+      updateData.contactId = null;
+  }
+  if (projectData.hasOwnProperty('contactName') && projectData.contactName === undefined) {
+      updateData.contactName = null;
+  }
 
   if (projectData.milestones) {
-    updateData.milestones = projectData.milestones.map(ms => ({
-        ...ms,
+    updateData.milestones = projectData.milestones.map(ms => {
+      // ms is a Milestone object from the client, where dates are ISO strings or null
+      const milestoneUpdate: any = {
+        id: ms.id,
+        name: ms.name,
+        description: ms.description === undefined ? null : ms.description,
+        completed: ms.completed,
+        // Convert ISO string dates from client to Firestore Timestamps
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        // Retain existing createdAt if not provided, or set if new
-        createdAt: ms.createdAt ? (typeof ms.createdAt === 'string' ? Timestamp.fromDate(new Date(ms.createdAt)) : ms.createdAt) : serverTimestamp(),
-        updatedAt: serverTimestamp()
-    }));
+        // createdAt is an ISO string from client (either original from DB or new from client `now`)
+        createdAt: Timestamp.fromDate(new Date(ms.createdAt)), 
+        updatedAt: serverTimestamp(), // Always set/update updatedAt with serverTimestamp for any change
+      };
+      if (ms.description === undefined && milestoneUpdate.description === null) {
+        delete milestoneUpdate.description; // Prefer omitting if it was truly undefined
+      }
+      return milestoneUpdate;
+    });
   }
 
   await updateDoc(projectDocRef, updateData);
@@ -134,22 +164,3 @@ export const deleteProject = async (projectId: string): Promise<boolean> => {
   await deleteDoc(projectDocRef);
   return true;
 };
-
-// Milestone specific functions if milestones were a subcollection (not used for now)
-// For now, milestones are updated as part of the project document.
-// Example of how it would look if milestones were a subcollection:
-/*
-export const addMilestoneToProject = async (projectId: string, milestoneData: NewMilestonePayload): Promise<Milestone> => {
-  const milestonesColRef = collection(db, "projects", projectId, "milestones");
-  const now = serverTimestamp();
-  const newMilestone = {
-    ...milestoneData,
-    dueDate: milestoneData.dueDate ? Timestamp.fromDate(new Date(milestoneData.dueDate)) : null,
-    completed: milestoneData.completed || false,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(milestonesColRef, newMilestone);
-  return { id: docRef.id, ...newMilestone } as Milestone; // simplified return for example
-};
-*/
