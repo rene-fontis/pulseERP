@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -58,9 +57,11 @@ export const getProjects = async (tenantId: string, statusFilter?: ProjectStatus
     where("tenantId", "==", tenantId),
     orderBy("createdAt", "desc")
   ];
+  // If statusFilter is provided and not empty, add the 'in' filter
   if (statusFilter && statusFilter.length > 0) {
     qConstraints.push(where("status", "in", statusFilter));
   }
+  // If statusFilter is not provided or is empty, no status filter is applied, fetching all projects for the tenant.
   
   const q = query(projectsCollectionRef, ...qConstraints);
   const querySnapshot = await getDocs(q);
@@ -157,6 +158,11 @@ export const updateProject = async (
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
+        // Firestore Timestamps for createdAt and updatedAt should generally not be client-overwritten on update
+        // unless specifically intended. Typically, only `updatedAt` is set to serverTimestamp().
+        // If createdAt is meant to be immutable, it shouldn't be in the update payload.
+        // If it can change, it should also be converted to Timestamp.
+        // For this example, assuming they are part of the payload:
         createdAt: Timestamp.fromDate(new Date(ms.createdAt)), 
         updatedAt: Timestamp.fromDate(new Date(ms.updatedAt)), 
       };

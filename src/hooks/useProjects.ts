@@ -12,7 +12,7 @@ import type { Project, NewProjectPayload, ProjectStatus } from "@/types";
 
 const projectQueryKeys = {
   all: (tenantId: string) => ["projects", tenantId] as const,
-  lists: (tenantId: string, statusFilter?: ProjectStatus[]) => [...projectQueryKeys.all(tenantId), "list", ...(statusFilter || [])] as const,
+  lists: (tenantId: string, statusFilter?: ProjectStatus[]) => [...projectQueryKeys.all(tenantId), "list", ...(statusFilter || ["ALL_STATUSES"])] as const, // Use a unique key when no filter
   details: (tenantId: string) => [...projectQueryKeys.all(tenantId), "detail"] as const,
   detail: (projectId: string) => [...projectQueryKeys.details(""), projectId] as const,
 };
@@ -38,8 +38,9 @@ export function useAddProject(tenantId: string) {
   return useMutation<Project, Error, NewProjectPayload>({
     mutationFn: (projectData) => addProject(tenantId, projectData),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId) });
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId) }); // Invalidate general list
       queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId, ['Active']) }); // Specific for active list
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(tenantId, undefined) }); // Invalidate "all statuses" list
     },
   });
 }
@@ -54,12 +55,13 @@ export function useUpdateProject() {
     mutationFn: ({ projectId, data }) => updateProject(projectId, data),
     onSuccess: (data, variables) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId) });
+        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId) }); // Invalidate general list
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(variables.projectId) });
         // Invalidate specific status lists if status changed
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Active']) });
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Archived']) });
         queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, ['Completed']) });
+        queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists(data.tenantId, undefined) }); // Invalidate "all statuses" list
       }
     },
   });

@@ -88,6 +88,7 @@ export default function AllTasksPage() {
   const [clientLoaded, setClientLoaded] = useState(false);
   useEffect(() => setClientLoaded(true), []);
 
+  // Fetch all projects for the tenant, regardless of status, to get all tasks
   const { data: projects, isLoading: isLoadingProjects, error: projectsError } = useGetProjects(tenantId);
 
   const allTasks = useMemo(() => {
