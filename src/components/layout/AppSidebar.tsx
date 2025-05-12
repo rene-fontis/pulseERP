@@ -1,8 +1,9 @@
+// src/components/layout/AppSidebar.tsx
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus, Warehouse as WarehouseIcon, Tag } from 'lucide-react'; 
+import { Building2, LayoutDashboard, Settings, HomeIcon, BookOpen, Users, FileText as FileTextIcon, CalendarDays, BarChartBig, Briefcase, Clock, Package, Receipt, ClipboardList, PackagePlus, Warehouse as WarehouseIcon, Tag } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -13,8 +14,8 @@ import {
   SidebarMenuSkeleton,
   useSidebar,
   SidebarMenuSub,
+  // SidebarMenuSubItem, // Removed as direct import
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useGetTenantById } from '@/hooks/useTenants';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,21 @@ export function AppSidebar() {
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
+
+  const globalUserSettingsButton = (
+    <SidebarMenuItem>
+        <SidebarMenuButton
+            asChild
+            isActive={pathname === '/settings/users'}
+            tooltip="Benutzerverwaltung (Global)"
+        >
+            <Link href="/settings/users">
+                <Users /> {/* Using Users icon */}
+                <span>Benutzerverwaltung</span>
+            </Link>
+        </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
   
   const adminImportButton = (
      <SidebarMenuItem>
@@ -75,10 +91,10 @@ export function AppSidebar() {
             asChild
             isActive={pathname === '/admin/import'}
             tooltip="Vorlagen Importieren"
-            disabled={true} 
+            // disabled={true} // Re-enable if import is not needed often
         >
             <Link href="/admin/import">
-                <Users /> 
+                <Users /> {/* Consider changing icon if Users is for User Mgmt */}
                 <span>Vorlagen Importieren</span>
             </Link>
         </SidebarMenuButton>
@@ -150,26 +166,26 @@ export function AppSidebar() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
-                                <SidebarMenuSubItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting` || pathname === `/tenants/${currentTenantId}/accounting/overview` }>
                                       <Link href={`/tenants/${currentTenantId}/accounting`}>Übersicht</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/journal`}>
                                     <Link href={`/tenants/${currentTenantId}/accounting/journal`}>Journal</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                 <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                 <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname.startsWith(`/tenants/${currentTenantId}/accounting/accounts`)}>
                                       <Link href={`/tenants/${currentTenantId}/accounting/accounts`}>Konten</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/accounting/reports`}>
                                         <Link href={`/tenants/${currentTenantId}/accounting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                </SidebarMenuItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -190,16 +206,16 @@ export function AppSidebar() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/[budgetId]/entries`) }>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
+                                    <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting` || pathname.includes(`/tenants/${currentTenantId}/budgeting/`) }>
                                       <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgets & Einträge</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting/reports`}>
                                       <Link href={`/tenants/${currentTenantId}/budgeting/reports`}>Berichte</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                </SidebarMenuItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -233,16 +249,16 @@ export function AppSidebar() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
-                                <SidebarMenuSubItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/projects` || pathname.startsWith(`/tenants/${currentTenantId}/projects/`) }>
                                       <Link href={`/tenants/${currentTenantId}/projects`}>Projektübersicht</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/tasks`}>
                                       <Link href={`/tenants/${currentTenantId}/tasks`}><ClipboardList className="mr-1 h-3.5 w-3.5"/> Aufgabenübersicht</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                </SidebarMenuItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -276,21 +292,21 @@ export function AppSidebar() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                            <SidebarMenuSub>
-                                <SidebarMenuSubItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory` || pathname === `/tenants/${currentTenantId}/inventory/overview`}>
                                       <Link href={`/tenants/${currentTenantId}/inventory`}>Übersicht</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory/products`}>
                                       <Link href={`/tenants/${currentTenantId}/inventory/products`}>Produkte</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/inventory/warehouses`}>
                                       <Link href={`/tenants/${currentTenantId}/inventory/warehouses`}><WarehouseIcon className="mr-1 h-3.5 w-3.5" />Lager</Link>
                                     </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                </SidebarMenuItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -325,41 +341,41 @@ export function AppSidebar() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-0 pl-2 pr-0 pt-1">
                             <SidebarMenuSub>
-                                <SidebarMenuSubItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings` || pathname === `/tenants/${currentTenantId}/settings/overview`}>
                                     <Link href={`/tenants/${currentTenantId}/settings`}>Übersicht</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/basic`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/basic`}>Basis</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/users`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/users`}>Benutzer</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/chart-of-accounts`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/chart-of-accounts`}>Kontenplan</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/fiscal-years`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/fiscal-years`}>Geschäftsjahre</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/inventory`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/inventory`}><PackagePlus className="mr-1 h-3.5 w-3.5"/>Produktfelder</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                 <SidebarMenuSubItem>
+                                </SidebarMenuItem>
+                                 <SidebarMenuItem> {/* Changed from SidebarMenuSubItem */}
                                 <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/settings/product-categories`}>
                                     <Link href={`/tenants/${currentTenantId}/settings/product-categories`}><Tag className="mr-1 h-3.5 w-3.5"/>Produktkategorien</Link>
                                 </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                </SidebarMenuItem>
                             </SidebarMenuSub>
                         </AccordionContent>
                     </AccordionItem>
@@ -531,6 +547,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
+                {globalUserSettingsButton} 
                 {adminImportButton}
               </>
             ) : (
@@ -546,6 +563,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
                 {commonMandantenVerwaltenButton}
                 {commonVorlagenVerwaltenButton}
+                {globalUserSettingsButton}
                 {adminImportButton}
               </>
             )}

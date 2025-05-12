@@ -1,8 +1,8 @@
-
+// src/components/layout/Header.tsx
 "use client";
 
 import Link from 'next/link';
-import { Briefcase, Settings, ChevronDown, Building2, FileText } from 'lucide-react';
+import { Briefcase, Settings, ChevronDown, Building2, FileText, Users } from 'lucide-react'; // Added Users icon
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import {
@@ -54,10 +54,11 @@ export function Header() {
 
   const tenantDropdownTriggerIcon = <Building2 className="h-4 w-4 text-primary" />;
 
-  const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md w-full";
+  const headerBaseClasses = "sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card text-card-foreground shadow-md";
   const divBaseClasses = "flex items-center gap-2";
   
-  const headerDynamicClasses = ""; 
+  // Always apply w-full to headerBaseClasses
+  const headerDynamicClasses = "w-full"; 
   const leftDivPaddingClasses = "pl-4 sm:pl-6";
   const rightDivPaddingClasses = "pr-4 sm:pr-6"; 
   
@@ -129,6 +130,12 @@ export function Header() {
                     Vorlagen verwalten
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild data-active={pathname === '/settings/users'}>
+                  <Link href="/settings/users" className="flex items-center">
+                    <Users className="mr-2 h-4 w-4" />
+                    Benutzerverwaltung
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -142,4 +149,3 @@ export function Header() {
     </header>
   );
 }
-

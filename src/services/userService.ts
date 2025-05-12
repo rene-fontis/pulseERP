@@ -1,9 +1,9 @@
 // src/services/userService.ts
 "use client";
 
-import { collection, getDocs, getFirestore, Timestamp, doc, getDoc, setDoc, serverTimestamp as fsServerTimestamp } from "firebase/firestore";
-import { app } from '@/lib/firebase'; // Assuming app is exported from firebase.ts
-import type { User, NewUserPayload } from '@/types'; // Import User type from global types
+import { collection, getDocs, getFirestore, Timestamp, doc, getDoc, setDoc, serverTimestamp as fsServerTimestamp, query, orderBy } from "firebase/firestore"; // Added query, orderBy
+import { app } from '@/lib/firebase'; 
+import type { User, NewUserPayload } from '@/types'; 
 import { formatFirestoreTimestamp } from "@/lib/utils/firestoreUtils";
 
 
@@ -12,7 +12,13 @@ const usersCollectionRef = collection(db, "users");
 
 
 export const getUsers = async (): Promise<User[]> => {
-  const querySnapshot = await getDocs(usersCollectionRef);
+  if (!usersCollectionRef) {
+    console.warn("Users collection reference is not initialized.");
+    return [];
+  }
+  // Order users by creation date, newest first, for more predictable listing.
+  const q = query(usersCollectionRef, orderBy("createdAt", "desc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data();
     return {
@@ -20,6 +26,7 @@ export const getUsers = async (): Promise<User[]> => {
         email: data.email,
         displayName: data.displayName || null,
         photoURL: data.photoURL || null,
+        // Ensure createdAt is consistently formatted as an ISO string
         createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, 'now'),
         tenantIds: data.tenantIds || [],
     } as User;
@@ -47,7 +54,7 @@ export const addUser = async (userId: string, userData: Omit<NewUserPayload, 'cr
     const userDocRef = doc(db, "users", userId);
     const dataToSave: NewUserPayload = {
         ...userData,
-        createdAt: fsServerTimestamp(), // Use Firestore server timestamp
+        createdAt: fsServerTimestamp(), 
     };
     await setDoc(userDocRef, dataToSave);
     const newUserSnapshot = await getDoc(userDocRef);
@@ -58,7 +65,7 @@ export const addUser = async (userId: string, userData: Omit<NewUserPayload, 'cr
             email: data.email,
             displayName: data.displayName || null,
             photoURL: data.photoURL || null,
-            createdAt: formatFirestoreTimestamp(data.createdAt, newUserSnapshot.id, 'now'), // This will be evaluated on client
+            createdAt: formatFirestoreTimestamp(data.createdAt, newUserSnapshot.id, 'now'),
             tenantIds: data.tenantIds || [],
         } as User;
     }
