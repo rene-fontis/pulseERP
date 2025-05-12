@@ -1,46 +1,268 @@
-// src/app/tenants/[tenantId]/tasks/page.tsx
 "use client";
 
-import { useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ClipboardList, Construction } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AlertCircle, ClipboardList, CalendarClock, CalendarX, CalendarCheck2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useGetProjects } from '@/hooks/useProjects';
+import type { Project, ProjectTask, TaskStatus } from '@/types';
+import { taskStatusLabels } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { format, parseISO, isBefore, isAfter, addDays, startOfDay } from 'date-fns';
+import { de } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-export default function TenantTasksPage() {
-  const params = useParams();
-  const tenantId = params.tenantId as string;
+type EnrichedTask = ProjectTask & {
+  projectId: string;
+  projectName: string;
+};
+
+const formatDate = (dateString?: string | null, relative: boolean = false) => {
+  if (!dateString) return "Kein Datum";
+  try {
+    const date = parseISO(dateString);
+    if (relative) {
+      // Add relative formatting if needed, e.g., using formatDistanceToNow
+      return format(date, "PPP", { locale: de });
+    }
+    return format(date, "dd.MM.yyyy", { locale: de });
+  } catch (e) {
+    return "Ungültiges Datum";
+  }
+};
+
+const TaskItem: React.FC<{ task: EnrichedTask }> = ({ task }) => {
+  const getStatusColor = (status: TaskStatus) => {
+    switch (status) {
+      case 'Open': return 'bg-blue-100 text-blue-700';
+      case 'InProgress': return 'bg-yellow-100 text-yellow-700';
+      case 'InReview': return 'bg-purple-100 text-purple-700';
+      case 'Completed': return 'bg-green-100 text-green-700';
+      case 'Blocked': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex items-center mb-6">
+    <Card className="p-3 mb-2 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start">
+        <div>
+          <Link href={`/tenants/${task.tenantId}/projects/${task.projectId}`} className="hover:underline">
+            <h4 className="font-medium text-base">{task.name}</h4>
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            Projekt: <Link href={`/tenants/${task.tenantId}/projects/${task.projectId}`} className="hover:underline text-primary">{task.projectName}</Link>
+          </p>
+        </div>
+        <Badge className={cn("text-xs", getStatusColor(task.status))}>{taskStatusLabels[task.status]}</Badge>
+      </div>
+      {task.description && <p className="text-sm text-muted-foreground mt-1 mb-2">{task.description}</p>}
+      <div className="flex justify-between items-center mt-2">
+        <p className={cn(
+          "text-xs",
+          task.dueDate && isBefore(parseISO(task.dueDate), startOfDay(new Date())) && task.status !== 'Completed' ? "text-destructive font-semibold" : "text-muted-foreground"
+        )}>
+          Fällig: {formatDate(task.dueDate)}
+        </p>
+        {task.milestoneId && projectMilestonesMap[task.milestoneId] && (
+          <Badge variant="outline" className="text-xs">
+            Meilenstein: {projectMilestonesMap[task.milestoneId]}
+          </Badge>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+// Helper to create a map of milestoneId to milestoneName for quick lookup
+let projectMilestonesMap: Record<string, string> = {};
+
+
+export default function AllTasksPage() {
+  const params = useParams();
+  const router = useRouter();
+  const tenantId = params.tenantId as string;
+
+  const [clientLoaded, setClientLoaded] = useState(false);
+  useEffect(() => setClientLoaded(true), []);
+
+  const { data: projects, isLoading: isLoadingProjects, error: projectsError } = useGetProjects(tenantId);
+
+  const allTasks = useMemo(() => {
+    if (!projects) return [];
+    
+    const taskList: EnrichedTask[] = [];
+    const tempMilestoneMap: Record<string, string> = {};
+
+    projects.forEach(project => {
+      project.milestones.forEach(milestone => {
+        tempMilestoneMap[milestone.id] = milestone.name;
+      });
+      (project.tasks || []).forEach(task => {
+        taskList.push({
+          ...task,
+          projectId: project.id,
+          projectName: project.name,
+          tenantId: project.tenantId, // Add tenantId to task for linking
+        });
+      });
+    });
+    projectMilestonesMap = tempMilestoneMap; // Update global map
+    return taskList;
+  }, [projects]);
+
+  const categorizedTasks = useMemo(() => {
+    const today = startOfDay(new Date());
+    const sevenDaysFromNow = addDays(today, 7);
+
+    const overdue: EnrichedTask[] = [];
+    const dueSoon: EnrichedTask[] = [];
+    const noDueDate: EnrichedTask[] = [];
+    // const upcoming: EnrichedTask[] = []; // Optional category
+
+    allTasks.forEach(task => {
+      if (task.status === 'Completed') return;
+
+      if (!task.dueDate) {
+        noDueDate.push(task);
+      } else {
+        const dueDate = startOfDay(parseISO(task.dueDate));
+        if (isBefore(dueDate, today)) {
+          overdue.push(task);
+        } else if (isWithinInterval(dueDate, { start: today, end: sevenDaysFromNow })) {
+          dueSoon.push(task);
+        } 
+        // else {
+        //   upcoming.push(task);
+        // }
+      }
+    });
+    
+    const sortTasks = (tasks: EnrichedTask[]) => tasks.sort((a,b) => {
+        if (a.dueDate && b.dueDate) return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime();
+        if (a.dueDate) return -1; // Tasks with due dates first
+        if (b.dueDate) return 1;
+        return a.name.localeCompare(b.name); // Fallback sort by name
+    });
+
+    return {
+      overdue: sortTasks(overdue),
+      dueSoon: sortTasks(dueSoon),
+      noDueDate: sortTasks(noDueDate),
+      // upcoming: sortTasks(upcoming),
+    };
+  }, [allTasks]);
+
+  const isLoading = isLoadingProjects && !clientLoaded;
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex items-center mb-6">
+          <Skeleton className="h-8 w-8 mr-3 rounded-full" />
+          <Skeleton className="h-8 w-1/3" />
+        </div>
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader><Skeleton className="h-7 w-1/4" /></CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (projectsError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-destructive p-4">
+        <AlertCircle className="w-16 h-16 mb-4" />
+        <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Aufgaben</h2>
+        <p>{projectsError.message}</p>
+        <Button variant="outline" onClick={() => router.back()} className="mt-4">
+          Zurück
+        </Button>
+      </div>
+    );
+  }
+  
+  if (!projects && !isLoadingProjects && clientLoaded) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
+        <AlertCircle className="w-16 h-16 mb-4" />
+        <h2 className="text-2xl font-semibold mb-2">Keine Projekte gefunden</h2>
+        <p>Für diesen Mandanten wurden keine Projekte gefunden, um Aufgaben anzuzeigen.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="flex items-center">
         <ClipboardList className="h-8 w-8 mr-3 text-primary" />
         <h1 className="text-3xl font-bold">Aufgabenübersicht</h1>
       </div>
-      <Card className="shadow-lg">
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card className="shadow-md">
+          <CardHeader className="flex flex-row items-center space-x-2">
+            <CalendarX className="h-6 w-6 text-destructive" />
+            <CardTitle>Überfällig ({categorizedTasks.overdue.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-[400px] overflow-y-auto">
+            {categorizedTasks.overdue.length > 0 ? (
+              categorizedTasks.overdue.map(task => <TaskItem key={task.id} task={task} />)
+            ) : (
+              <p className="text-sm text-muted-foreground">Keine überfälligen Aufgaben.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md">
+          <CardHeader className="flex flex-row items-center space-x-2">
+            <CalendarClock className="h-6 w-6 text-yellow-500" />
+            <CardTitle>Bald fällig ({categorizedTasks.dueSoon.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-[400px] overflow-y-auto">
+            {categorizedTasks.dueSoon.length > 0 ? (
+              categorizedTasks.dueSoon.map(task => <TaskItem key={task.id} task={task} />)
+            ) : (
+              <p className="text-sm text-muted-foreground">Keine bald fälligen Aufgaben.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md">
+          <CardHeader className="flex flex-row items-center space-x-2">
+            <Calendar className="h-6 w-6 text-muted-foreground" />
+            <CardTitle>Ohne Fälligkeitsdatum ({categorizedTasks.noDueDate.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-[400px] overflow-y-auto">
+            {categorizedTasks.noDueDate.length > 0 ? (
+              categorizedTasks.noDueDate.map(task => <TaskItem key={task.id} task={task} />)
+            ) : (
+              <p className="text-sm text-muted-foreground">Keine Aufgaben ohne Fälligkeitsdatum.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+       <Card className="shadow-lg mt-8">
         <CardHeader>
-          <CardTitle className="text-xl">Aufgabenverwaltung</CardTitle>
-          <CardDescription>Verwalten und verfolgen Sie alle Aufgaben für diesen Mandanten.</CardDescription>
+            <CardTitle>Hinweis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center text-center py-12">
-            <Construction className="h-16 w-16 text-primary mb-4" />
-            <p className="text-lg font-medium text-muted-foreground mb-2">
-              Diese Funktion ist in Kürze verfügbar.
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Hier können Sie Aufgaben erstellen, Projekten zuweisen, den Status verfolgen und vieles mehr.
-            </p>
+            <p className="text-muted-foreground">Dies ist eine globale Aufgabenübersicht. Detaillierte Aufgabenverwaltung und Kanban-Boards finden Sie direkt in den einzelnen <Link href={`/tenants/${tenantId}/projects`} className="text-primary hover:underline">Projekten</Link>.</p>
             <img 
-              src="https://picsum.photos/seed/tasksModule/1200/400" 
-              alt="Symbolbild Aufgabenmanagement und Produktivität"
-              data-ai-hint="tasks productivity"
-              className="rounded-lg shadow-md w-full max-w-2xl object-cover h-64"
+              src="https://picsum.photos/seed/allTasksView/1200/300" 
+              data-ai-hint="task board project"
+              alt="Symbolbild Aufgabenmanagement" 
+              className="mt-4 rounded-lg shadow-md w-full object-cover h-48"
             />
-            <Button asChild variant="outline" className="mt-8">
-                <Link href={`/tenants/${tenantId}/projects`}>Zurück zur Projektübersicht</Link>
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

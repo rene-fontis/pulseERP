@@ -195,11 +195,7 @@ export function AppSidebar() {
                                       <Link href={`/tenants/${currentTenantId}/budgeting`}>Budgetübersicht</Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton asChild isActive={pathname.includes(`/tenants/${currentTenantId}/budgeting/`) && pathname.includes('/entries') }>
-                                      <Link href={`/tenants/${currentTenantId}/budgeting`}>Einträge verwalten</Link>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                {/* Sub-item for entries is handled by clicking on a budget from the overview */}
                                 <SidebarMenuSubItem>
                                     <SidebarMenuSubButton asChild isActive={pathname === `/tenants/${currentTenantId}/budgeting/reports`}>
                                       <Link href={`/tenants/${currentTenantId}/budgeting/reports`}>Berichte</Link>
