@@ -26,6 +26,8 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from 
 
 
 const TIMER_STORAGE_KEY = "pulseERPTimerState";
+const NO_SELECTION_PLACEHOLDER = "___NO_SELECTION___";
+
 
 export default function TenantTimeTrackingPage() {
   const params = useParams();
@@ -60,11 +62,11 @@ export default function TenantTimeTrackingPage() {
 
   // Load timer state from localStorage
   useEffect(() => {
-    setClientLoaded(true); // Set clientLoaded to true immediately
+    setClientLoaded(true); 
   }, []);
 
   useEffect(() => {
-    if (!clientLoaded) return; // Guard against running before clientLoaded is true
+    if (!clientLoaded) return; 
 
     const savedTimerStateJSON = localStorage.getItem(TIMER_STORAGE_KEY);
     if (savedTimerStateJSON) {
@@ -77,7 +79,6 @@ export default function TenantTimeTrackingPage() {
           setTimerPaused(savedState.timerPaused || false);
 
           if (!savedState.timerPaused && savedState.startTimeEpoch) {
-            // Calculate elapsed time since last save if timer was running and not paused
             const elapsedSinceLastSave = (Date.now() - savedState.startTimeEpoch) / 1000;
             newAccumulatedTime += elapsedSinceLastSave;
           }
@@ -89,12 +90,11 @@ export default function TenantTimeTrackingPage() {
           setTimerDescription(savedState.timerDescription || "");
 
           if (!savedState.timerPaused) {
-            setStartTimeEpoch(Date.now()); // Continue timing from now
+            setStartTimeEpoch(Date.now()); 
           } else if (savedState.startTimeEpoch) {
-            setStartTimeEpoch(savedState.startTimeEpoch); // Restore paused start time
+            setStartTimeEpoch(savedState.startTimeEpoch); 
           }
         } else {
-          // If timer was not active, just restore accumulated time and context
            setAccumulatedElapsedTime(savedState.accumulatedElapsedTime || 0);
            setTimerContactId(savedState.timerContactId || null);
            setTimerProjectId(savedState.timerProjectId || null);
@@ -103,14 +103,14 @@ export default function TenantTimeTrackingPage() {
         }
       } catch (error) {
         console.error("Error parsing saved timer state from localStorage:", error);
-        localStorage.removeItem(TIMER_STORAGE_KEY); // Clear corrupted state
+        localStorage.removeItem(TIMER_STORAGE_KEY); 
       }
     }
-  }, [clientLoaded]); // Depend on clientLoaded
+  }, [clientLoaded]); 
 
   // Save timer state to localStorage
   useEffect(() => {
-    if (!clientLoaded) return; // Only run on client and after initial load
+    if (!clientLoaded) return; 
 
     const timerState = {
       startTimeEpoch,
@@ -132,7 +132,7 @@ export default function TenantTimeTrackingPage() {
     timerProjectId,
     timerTaskId,
     timerDescription,
-    clientLoaded, // Add clientLoaded here
+    clientLoaded, 
   ]);
 
 
@@ -146,7 +146,6 @@ export default function TenantTimeTrackingPage() {
         setDisplayTime(formatDuration(accumulatedElapsedTime + elapsedSinceStart));
       }, 1000);
     } else {
-      // Ensure displayTime is updated even when paused or stopped based on accumulatedElapsedTime
       setDisplayTime(formatDuration(accumulatedElapsedTime));
     }
 
@@ -155,15 +154,12 @@ export default function TenantTimeTrackingPage() {
 
 
   const handleStartTimer = () => {
-    if (!timerActive) { // Start new or restart after stop
+    if (!timerActive) { 
       setStartTimeEpoch(Date.now());
-      // Do not reset accumulatedElapsedTime if we intend to potentially resume an old value that was stopped/discarded without saving
-      // However, for a "fresh" start, it might be desired. For now, let's assume start means continue from where it was or 0.
-      // If accumulatedElapsedTime is 0, it's a fresh start.
       setTimerActive(true);
       setTimerPaused(false);
-    } else if (timerPaused) { // Resume paused timer
-      setStartTimeEpoch(Date.now()); // Recalculate from this point
+    } else if (timerPaused) { 
+      setStartTimeEpoch(Date.now()); 
       setTimerPaused(false);
     }
   };
@@ -179,21 +175,20 @@ export default function TenantTimeTrackingPage() {
   };
 
   const handleStopTimerAndSave = async () => {
-    if (!timerActive && accumulatedElapsedTime === 0) { // Nothing to save if timer wasn't active and no time accumulated
+    if (!timerActive && accumulatedElapsedTime === 0) { 
         toast({ title: "Info", description: "Keine Zeit erfasst zum Speichern."});
         return;
     }
 
     let finalElapsedTime = accumulatedElapsedTime;
-    if (timerActive && !timerPaused && startTimeEpoch) { // If timer is active and not paused, add current session's time
+    if (timerActive && !timerPaused && startTimeEpoch) { 
       const currentTime = Date.now();
       finalElapsedTime += (currentTime - startTimeEpoch) / 1000;
     }
     
-    if (finalElapsedTime <= 1) { // Consider 1 second as a minimum threshold
+    if (finalElapsedTime <= 1) { 
       toast({ title: "Info", description: "Zu wenig Zeit erfasst zum Speichern (min. 1 Sekunde)."});
-      // Optionally reset timer state if deemed too short
-      handleDiscardTimer(false); // Call discard without toast if it's an auto-discard
+      handleDiscardTimer(false); 
       return;
     }
 
@@ -214,7 +209,7 @@ export default function TenantTimeTrackingPage() {
     try {
       await addTimeEntryMutation.mutateAsync(payload);
       toast({ title: "Erfolg", description: "Zeiteintrag gespeichert." });
-      handleDiscardTimer(false); // Reset timer after successful save without redundant toast
+      handleDiscardTimer(false); 
       refetchTimeEntries();
     } catch (e) {
       const error = e as Error;
@@ -227,7 +222,6 @@ export default function TenantTimeTrackingPage() {
     setTimerPaused(false);
     setStartTimeEpoch(null);
     setAccumulatedElapsedTime(0);
-    // setDisplayTime("00:00:00"); // This will be handled by the useEffect for displayTime
     setTimerContactId(null);
     setTimerProjectId(null);
     setTimerTaskId(null);
@@ -311,7 +305,7 @@ export default function TenantTimeTrackingPage() {
             <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle>{editingEntry ? "Zeiteintrag bearbeiten" : "Manueller Zeiteintrag"}</DialogTitle>
-                <CardDescription> {/* ShadCN CardDescription can be used here too */}
+                <CardDescription>
                 {editingEntry ? "Bearbeiten Sie den bestehenden Zeiteintrag." : "Erfassen Sie eine Zeit manuell."}
                 </CardDescription>
             </DialogHeader>
@@ -319,11 +313,9 @@ export default function TenantTimeTrackingPage() {
                 tenantId={tenantId}
                 onSubmit={handleManualSubmit}
                 initialData={editingEntry || { 
-                    // Provide fuller default for new manual entry if different from timer's initial
                     hours: 0,
-                    date: new Date(), // Already a Date object
+                    date: new Date(), 
                     isBillable: true,
-                    // other fields will use TimeEntryForm's defaults
                 }}
                 isSubmitting={addTimeEntryMutation.isPending || updateTimeEntryMutation.isPending}
             />
@@ -343,30 +335,41 @@ export default function TenantTimeTrackingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="timer-contact">Kontakt (optional)</Label>
-              <Select value={timerContactId || ""} onValueChange={setTimerContactId} disabled={timerActive && !timerPaused}>
+              <Select value={timerContactId || NO_SELECTION_PLACEHOLDER} onValueChange={(value) => setTimerContactId(value === NO_SELECTION_PLACEHOLDER ? null : value)} disabled={timerActive && !timerPaused}>
                 <SelectTrigger id="timer-contact"><SelectValue placeholder="Kontakt wählen..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">(Kein Kontakt)</SelectItem>
+                  <SelectItem value={NO_SELECTION_PLACEHOLDER}>(Kein Kontakt)</SelectItem>
                   {contacts?.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName || `${c.firstName} ${c.name}`}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="timer-project">Projekt (optional)</Label>
-              <Select value={timerProjectId || ""} onValueChange={(value) => {setTimerProjectId(value); setTimerTaskId(null);}} disabled={timerActive && !timerPaused}>
+              <Select 
+                value={timerProjectId || NO_SELECTION_PLACEHOLDER} 
+                onValueChange={(value) => {
+                  setTimerProjectId(value === NO_SELECTION_PLACEHOLDER ? null : value); 
+                  setTimerTaskId(null);
+                }} 
+                disabled={timerActive && !timerPaused}
+              >
                 <SelectTrigger id="timer-project"><SelectValue placeholder="Projekt wählen..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">(Kein Projekt)</SelectItem>
+                  <SelectItem value={NO_SELECTION_PLACEHOLDER}>(Kein Projekt)</SelectItem>
                   {projectOptions.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="timer-task">Aufgabe (optional)</Label>
-              <Select value={timerTaskId || ""} onValueChange={setTimerTaskId} disabled={!timerProjectId || (timerActive && !timerPaused) || taskOptions.length === 0}>
+              <Select 
+                value={timerTaskId || NO_SELECTION_PLACEHOLDER} 
+                onValueChange={(value) => setTimerTaskId(value === NO_SELECTION_PLACEHOLDER ? null : value)} 
+                disabled={!timerProjectId || (timerActive && !timerPaused) || taskOptions.length === 0}
+              >
                 <SelectTrigger id="timer-task"><SelectValue placeholder="Aufgabe wählen..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">(Keine Aufgabe)</SelectItem>
+                  <SelectItem value={NO_SELECTION_PLACEHOLDER}>(Keine Aufgabe)</SelectItem>
                   {taskOptions.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>

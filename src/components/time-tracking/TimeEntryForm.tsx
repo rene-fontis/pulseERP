@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -19,6 +20,8 @@ import type { TimeEntry, TimeEntryFormValues, Contact, Project as ProjectType, P
 import { useGetContacts } from "@/hooks/useContacts";
 import { useGetProjects } from "@/hooks/useProjects"; // Assuming hook name, adjust if different
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+
+const NO_SELECTION_PLACEHOLDER_FORM = "___NO_SELECTION_FORM___";
 
 const timeEntryFormSchema = z.object({
   date: z.date({ required_error: "Datum ist erforderlich." }),
@@ -111,8 +114,6 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
 
   const selectedContactId = form.watch("contactId");
   useEffect(() => {
-    // Only auto-fill if rate is not already set by initialData (which could be from a timer stop)
-    // and if not explicitly set in the form by the user yet.
     if (selectedContactId && contacts && (!initialData || initialData.rate === undefined || initialData.rate === null) && (form.getValues("rate") === undefined || form.getValues("rate") === null) ) {
       const contact = contacts.find(c => c.id === selectedContactId);
       if (contact?.hourlyRate) {
@@ -134,7 +135,7 @@ export function TimeEntryForm({ tenantId, onSubmit, initialData, isSubmitting }:
       description: values.description || undefined,
     };
     await onSubmit(payload);
-    if (!initialData?.id) { // Reset form only if it was a new entry (not an edit or timer save)
+    if (!initialData?.id) { 
       form.reset({
         date: new Date(),
         hours: 0,
@@ -303,8 +304,8 @@ function AutocompleteSelect({ options, value, onChange, placeholder, isLoading, 
           <CommandList>
             <CommandEmpty>Nichts gefunden.</CommandEmpty>
             <CommandGroup>
-                <CommandItem onSelect={() => { onChange(null); setOpen(false);}} className="text-xs">
-                    <Check className={cn("mr-2 h-3 w-3", value === null ? "opacity-100" : "opacity-0")} />
+                <CommandItem onSelect={() => { onChange(null); setOpen(false);}} className="text-xs" value={NO_SELECTION_PLACEHOLDER_FORM}>
+                    <Check className={cn("mr-2 h-3 w-3", (value === null || value === undefined) ? "opacity-100" : "opacity-0")} />
                     (Keine Auswahl)
                 </CommandItem>
               {options.map((option) => (
