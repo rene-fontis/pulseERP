@@ -38,7 +38,6 @@ export default function TenantTimeTrackingPage() {
   const [startTimeEpoch, setStartTimeEpoch] = useState<number | null>(null);
   const [accumulatedElapsedTime, setAccumulatedElapsedTime] = useState(0); // in seconds
   const [displayTime, setDisplayTime] = useState("00:00:00");
-  // Removed timerIntervalId state as it's managed within useEffect
 
   // Timer Context State
   const [timerContactId, setTimerContactId] = useState<string | null>(null);
@@ -55,11 +54,11 @@ export default function TenantTimeTrackingPage() {
   const deleteEntryMutation = useDeleteTimeEntry(tenantId);
 
   const formatTimerDisplay = useCallback((totalSeconds: number) => {
-    const duration = intervalToDuration({ start: 0, end: totalSeconds * 1000 });
-    return formatDuration(duration, { format: ['hours', 'minutes', 'seconds'], zero: true, locale: de, delimiter: ':' })
-      .split(' ')
-      .map(part => part.padStart(2, '0'))
-      .join(':');
+    const duration = intervalToDuration({ start: 0, end: Math.max(0, totalSeconds) * 1000 });
+    const hours = (duration.hours || 0).toString().padStart(2, '0');
+    const minutes = (duration.minutes || 0).toString().padStart(2, '0');
+    const seconds = (duration.seconds || 0).toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
   }, []);
 
   useEffect(() => {
@@ -162,15 +161,13 @@ export default function TenantTimeTrackingPage() {
 
 
   const handleStartTimer = () => {
-    if (!timerActive) { // Starting fresh or from a fully stopped state
-       // setAccumulatedElapsedTime(0); // Reset accumulated time only if explicitly starting a new timer session
+    if (!timerActive) { 
       setStartTimeEpoch(Date.now());
       setTimerActive(true);
       setTimerPaused(false);
-    } else if (timerPaused) { // Resuming from pause
-      setStartTimeEpoch(Date.now()); // Set new start time for this segment
+    } else if (timerPaused) { 
+      setStartTimeEpoch(Date.now()); 
       setTimerPaused(false);
-      // timerActive is already true
     }
   };
 
@@ -179,13 +176,13 @@ export default function TenantTimeTrackingPage() {
       const currentSegmentElapsed = (Date.now() - startTimeEpoch) / 1000;
       setAccumulatedElapsedTime(prev => prev + currentSegmentElapsed);
       setTimerPaused(true);
-      setStartTimeEpoch(null); // Indicate no active segment start
+      setStartTimeEpoch(null); 
     }
   };
 
   const handleStopAndSaveTimer = () => {
     let finalElapsedTime = accumulatedElapsedTime;
-    if (timerActive && !timerPaused && startTimeEpoch) { // If it was running and not paused when stopped
+    if (timerActive && !timerPaused && startTimeEpoch) { 
       finalElapsedTime += (Date.now() - startTimeEpoch) / 1000;
     }
 
@@ -215,12 +212,9 @@ export default function TenantTimeTrackingPage() {
     setTimerActive(false);
     setTimerPaused(false);
     setStartTimeEpoch(null);
-    setAccumulatedElapsedTime(0); // Reset for next timer
+    setAccumulatedElapsedTime(0); 
     setDisplayTime("00:00:00");
-    // Optionally keep description and context for next timer, or clear:
-    // setTimerDescription(""); 
-    // setTimerContactId(null); etc.
-    localStorage.removeItem(TIMER_STORAGE_KEY); // Clear stored state after stopping and attempting save
+    localStorage.removeItem(TIMER_STORAGE_KEY); 
   };
 
   const handleAddOrUpdateEntry = async (values: NewTimeEntryPayload) => {
@@ -298,7 +292,7 @@ export default function TenantTimeTrackingPage() {
       <div className="flex flex-col items-center justify-center h-full text-destructive p-4">
         <AlertCircle className="w-16 h-16 mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Fehler beim Laden der Zeiteinträge</h2>
-        <p>{entriesError.message}</p>
+        <p>{(entriesError as Error).message}</p>
       </div>
     );
   }
