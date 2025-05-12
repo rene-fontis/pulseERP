@@ -41,22 +41,26 @@ export default function ProjectDetailPage() {
     if (!project) return;
 
     let updatedMilestones: Milestone[];
-    const now = new Date().toISOString();
+    const nowISO = new Date().toISOString();
 
     if (selectedMilestone) { // Update existing milestone
       updatedMilestones = project.milestones.map(ms =>
         ms.id === selectedMilestone.id
-          ? { ...selectedMilestone, ...values, dueDate: values.dueDate?.toISOString() || null, updatedAt: now }
+          ? { 
+              ...selectedMilestone, // keep original id and createdAt
+              ...values, // apply form values (name, description, completed)
+              dueDate: values.dueDate?.toISOString() || null, 
+              updatedAt: nowISO // Set new updatedAt
+            }
           : ms
       );
     } else { // Add new milestone
       const newMilestone: Milestone = {
         id: crypto.randomUUID(),
-        ...values,
+        ...values, // name, description, completed from form
         dueDate: values.dueDate?.toISOString() || null,
-        completed: values.completed || false,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: nowISO, // Set new createdAt
+        updatedAt: nowISO, // Set new updatedAt
       };
       updatedMilestones = [...project.milestones, newMilestone];
     }
@@ -300,3 +304,4 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
+

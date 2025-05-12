@@ -38,8 +38,8 @@ const mapDocToProject = (docSnapshot: any): Project => {
       ...ms,
       id: ms.id || crypto.randomUUID(),
       dueDate: ms.dueDate ? formatFirestoreTimestamp(ms.dueDate, ms.id, 'now') : null,
-      createdAt: formatFirestoreTimestamp(ms.createdAt, ms.id, 'now'), // Default to 'now' if missing
-      updatedAt: formatFirestoreTimestamp(ms.updatedAt, ms.id, 'now'), // Default to 'now' if missing
+      createdAt: formatFirestoreTimestamp(ms.createdAt, ms.id, 'now'), 
+      updatedAt: formatFirestoreTimestamp(ms.updatedAt, ms.id, 'now'), 
     })),
     createdAt: formatFirestoreTimestamp(data.createdAt, docSnapshot.id, "now"),
     updatedAt: formatFirestoreTimestamp(data.updatedAt, docSnapshot.id, "now"),
@@ -47,7 +47,7 @@ const mapDocToProject = (docSnapshot: any): Project => {
 };
 
 export const getProjects = async (tenantId: string, statusFilter?: ProjectStatus[]): Promise<Project[]> => {
-  const qConstraints: any[] = [ // Use any[] for queryConstraints to satisfy TS for push
+  const qConstraints: any[] = [ 
     where("tenantId", "==", tenantId),
     orderBy("createdAt", "desc")
   ];
@@ -70,30 +70,28 @@ export const getProjectById = async (projectId: string): Promise<Project | undef
 };
 
 export const addProject = async (tenantId: string, projectData: NewProjectPayload): Promise<Project> => {
-  const now = serverTimestamp();
+  const clientGeneratedTimestamp = Timestamp.fromDate(new Date()); // Use client-generated date, converted to Firestore Timestamp
   const newProjectData: any = {
     ...projectData,
     tenantId,
     status: projectData.status || 'Active',
     milestones: (projectData.milestones || []).map(ms => {
-      // ms is Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>
-      // ms.dueDate is string | null
       const milestoneToAdd: any = {
         id: crypto.randomUUID(),
         name: ms.name,
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        createdAt: now, // Use serverTimestamp for new milestones within a new project
-        updatedAt: now,
+        createdAt: clientGeneratedTimestamp, // Use client-generated timestamp
+        updatedAt: clientGeneratedTimestamp, // Use client-generated timestamp
       };
       if (ms.description === undefined) {
-          delete milestoneToAdd.description; // Firestore omits undefined fields
+          delete milestoneToAdd.description; 
       }
       return milestoneToAdd;
     }),
-    createdAt: now,
-    updatedAt: now,
+    createdAt: serverTimestamp(), // Top-level can use serverTimestamp
+    updatedAt: serverTimestamp(), // Top-level can use serverTimestamp
   };
   
   if (projectData.startDate) newProjectData.startDate = Timestamp.fromDate(new Date(projectData.startDate));
@@ -111,12 +109,11 @@ export const addProject = async (tenantId: string, projectData: NewProjectPayloa
 
 export const updateProject = async (
   projectId: string,
-  projectData: Partial<Project> // Project type has string dates for milestones
+  projectData: Partial<Project> 
 ): Promise<Project | undefined> => {
   const projectDocRef = doc(db, "projects", projectId);
-  const updateData: any = { ...projectData, updatedAt: serverTimestamp() };
+  const updateData: any = { ...projectData, updatedAt: serverTimestamp() }; // Top-level updatedAt can be serverTimestamp
 
-  // Handle project-level dates
   if (projectData.hasOwnProperty('startDate')) {
     updateData.startDate = projectData.startDate ? Timestamp.fromDate(new Date(projectData.startDate)) : null;
   }
@@ -132,20 +129,19 @@ export const updateProject = async (
 
   if (projectData.milestones) {
     updateData.milestones = projectData.milestones.map(ms => {
-      // ms is a Milestone object from the client, where dates are ISO strings or null
       const milestoneUpdate: any = {
         id: ms.id,
         name: ms.name,
         description: ms.description === undefined ? null : ms.description,
         completed: ms.completed,
-        // Convert ISO string dates from client to Firestore Timestamps
         dueDate: ms.dueDate ? Timestamp.fromDate(new Date(ms.dueDate)) : null,
-        // createdAt is an ISO string from client (either original from DB or new from client `now`)
+        // createdAt and updatedAt for milestones inside an array update should be concrete Timestamps
+        // The client will send ISO strings for these.
         createdAt: Timestamp.fromDate(new Date(ms.createdAt)), 
-        updatedAt: serverTimestamp(), // Always set/update updatedAt with serverTimestamp for any change
+        updatedAt: Timestamp.fromDate(new Date(ms.updatedAt)), 
       };
       if (ms.description === undefined && milestoneUpdate.description === null) {
-        delete milestoneUpdate.description; // Prefer omitting if it was truly undefined
+        delete milestoneUpdate.description; 
       }
       return milestoneUpdate;
     });
@@ -164,3 +160,4 @@ export const deleteProject = async (projectId: string): Promise<boolean> => {
   await deleteDoc(projectDocRef);
   return true;
 };
+
