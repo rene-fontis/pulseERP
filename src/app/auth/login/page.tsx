@@ -12,7 +12,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Anmelden</CardTitle>
           <CardDescription>
-            Melden Sie sich an, um pulseERP zu nutzen.
+            Melden dich  an, um pulseERP zu nutzen.
           </CardDescription>
         </CardHeader>
         <CardContent>
